@@ -8,7 +8,13 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // In dev mode, use service role key to bypass RLS
 const isDevMode = import.meta.env.VITE_DEV_MODE === 'true';
 const SUPABASE_SERVICE_ROLE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
-const apiKey = isDevMode && SUPABASE_SERVICE_ROLE_KEY ? SUPABASE_SERVICE_ROLE_KEY : SUPABASE_PUBLISHABLE_KEY;
+
+// Validate service role key is not a placeholder
+const isValidServiceKey = SUPABASE_SERVICE_ROLE_KEY && 
+  !SUPABASE_SERVICE_ROLE_KEY.includes('YourServiceRoleKeyHere') &&
+  SUPABASE_SERVICE_ROLE_KEY.split('.').length === 3;
+
+const apiKey = isDevMode && isValidServiceKey ? SUPABASE_SERVICE_ROLE_KEY : SUPABASE_PUBLISHABLE_KEY;
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
