@@ -5,21 +5,11 @@ import type { Database } from './types';
 const SUPABASE_URL = "https://acdogxqafxylnczezfkm.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFjZG9neHFhZnh5bG5jemV6ZmttIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEzOTEyMDcsImV4cCI6MjA3Njk2NzIwN30.-__7whvV6TpU26qz8D25Ew4Ez37Z8zkk4ccA8cU8aVk";
 
-// In dev mode, use service role key to bypass RLS
-const isDevMode = import.meta.env.VITE_DEV_MODE === 'true';
-const SUPABASE_SERVICE_ROLE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
-
-// Validate service role key is not a placeholder
-const isValidServiceKey = SUPABASE_SERVICE_ROLE_KEY && 
-  !SUPABASE_SERVICE_ROLE_KEY.includes('YourServiceRoleKeyHere') &&
-  SUPABASE_SERVICE_ROLE_KEY.split('.').length === 3;
-
-const apiKey = isDevMode && isValidServiceKey ? SUPABASE_SERVICE_ROLE_KEY : SUPABASE_PUBLISHABLE_KEY;
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, apiKey, {
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,
     persistSession: true,
