@@ -9,6 +9,7 @@ interface AuthState {
   isAdmin: boolean;
   loading: boolean;
   setAuth: (user: User | null, session: Session | null, role: 'admin' | 'customer' | null) => void;
+  setDevAuth: (role: 'admin' | 'customer') => void;
   signOut: () => Promise<void>;
   initialize: () => Promise<void>;
 }
@@ -22,6 +23,30 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   setAuth: (user, session, role) => {
     set({ user, session, role, isAdmin: role === 'admin', loading: false });
+  },
+
+  setDevAuth: (role) => {
+    // Only works in dev mode
+    if (import.meta.env.VITE_DEV_MODE !== 'true') return;
+
+    const mockUser = {
+      id: role === 'admin' ? 'dev-admin-id' : 'dev-customer-id',
+      email: role === 'admin' ? 'admin@dev.local' : 'customer@dev.local',
+      app_metadata: {},
+      user_metadata: {},
+      aud: 'authenticated',
+      created_at: new Date().toISOString(),
+    } as User;
+
+    const mockSession = {
+      access_token: 'dev-token',
+      refresh_token: 'dev-refresh',
+      expires_in: 3600,
+      token_type: 'bearer',
+      user: mockUser,
+    } as Session;
+
+    set({ user: mockUser, session: mockSession, role, isAdmin: role === 'admin', loading: false });
   },
 
   signOut: async () => {
