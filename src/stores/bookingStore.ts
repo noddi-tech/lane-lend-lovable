@@ -5,6 +5,7 @@ interface VehicleInfo {
   model: string;
   year: number;
   registration: string;
+  notes?: string;
 }
 
 interface AvailabilitySlot {

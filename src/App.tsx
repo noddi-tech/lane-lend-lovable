@@ -11,18 +11,17 @@ import { AdminLayout } from '@/components/layouts/AdminLayout';
 import Index from './pages/Index';
 import Auth from './pages/Auth';
 import NotFound from './pages/NotFound';
+import BookingWizard from './pages/BookingWizard';
+import MyBookings from './pages/MyBookings';
+import Profile from './pages/Profile';
+import Dashboard from './pages/admin/Dashboard';
+import Lanes from './pages/admin/Lanes';
+import Workers from './pages/admin/Workers';
+import Capacity from './pages/admin/Capacity';
+import AdminBookings from './pages/admin/Bookings';
+import Settings from './pages/admin/Settings';
 
 const queryClient = new QueryClient();
-
-// Placeholder pages
-const BookingWizard = () => <div className="text-center"><h1 className="text-3xl font-bold">Booking Wizard</h1><p className="mt-4 text-muted-foreground">Coming soon...</p></div>;
-const MyBookings = () => <div className="text-center"><h1 className="text-3xl font-bold">My Bookings</h1><p className="mt-4 text-muted-foreground">Coming soon...</p></div>;
-const Profile = () => <div className="text-center"><h1 className="text-3xl font-bold">Profile</h1><p className="mt-4 text-muted-foreground">Coming soon...</p></div>;
-const Dashboard = () => <div className="text-center"><h1 className="text-3xl font-bold">Admin Dashboard</h1><p className="mt-4 text-muted-foreground">Coming soon...</p></div>;
-const LanesManagement = () => <div className="text-center"><h1 className="text-3xl font-bold">Lanes Management</h1><p className="mt-4 text-muted-foreground">Coming soon...</p></div>;
-const WorkersManagement = () => <div className="text-center"><h1 className="text-3xl font-bold">Workers Management</h1><p className="mt-4 text-muted-foreground">Coming soon...</p></div>;
-const CapacityView = () => <div className="text-center"><h1 className="text-3xl font-bold">Capacity View</h1><p className="mt-4 text-muted-foreground">Coming soon...</p></div>;
-const Settings = () => <div className="text-center"><h1 className="text-3xl font-bold">Settings</h1><p className="mt-4 text-muted-foreground">Coming soon...</p></div>;
 
 function AppContent() {
   const initialize = useAuthStore((state) => state.initialize);
@@ -49,9 +48,10 @@ function AppContent() {
       <Route element={<ProtectedRoute role="admin" />}>
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<Dashboard />} />
-          <Route path="lanes" element={<LanesManagement />} />
-          <Route path="workers" element={<WorkersManagement />} />
-          <Route path="capacity" element={<CapacityView />} />
+          <Route path="lanes" element={<Lanes />} />
+          <Route path="workers" element={<Workers />} />
+          <Route path="capacity" element={<Capacity />} />
+          <Route path="bookings" element={<AdminBookings />} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Route>
