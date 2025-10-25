@@ -30,7 +30,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (import.meta.env.VITE_DEV_MODE !== 'true') return;
 
     const mockUser = {
-      id: role === 'admin' ? 'dev-admin-id' : 'dev-customer-id',
+      id: role === 'admin' ? '00000000-0000-0000-0000-000000000001' : '00000000-0000-0000-0000-000000000002',
       email: role === 'admin' ? 'admin@dev.local' : 'customer@dev.local',
       app_metadata: {},
       user_metadata: {},

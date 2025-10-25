@@ -31,7 +31,7 @@ export function DevPanel() {
       </div>
       
       <Card className="fixed bottom-4 right-4 z-50 p-4 w-72 bg-card border-destructive border-2">
-        <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-bold text-foreground">Dev Panel</h3>
           <Button
             variant="ghost"
@@ -46,6 +46,9 @@ export function DevPanel() {
         <div className="space-y-2 mb-3">
           <div className="text-xs text-muted-foreground">
             Current: {user ? `${role} (${user.email})` : 'Not logged in'}
+          </div>
+          <div className="text-xs text-muted-foreground/70">
+            Dev users seeded in database with UUIDs ending in ...001 (admin) and ...002 (customer)
           </div>
         </div>
 
