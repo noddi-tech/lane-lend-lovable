@@ -28,9 +28,11 @@ export interface SimulationConfigData {
 interface SimulationConfigProps {
   config: SimulationConfigData;
   onChange: (config: SimulationConfigData) => void;
+  selectedDate?: Date | null;
+  currentBookings?: number;
 }
 
-export default function SimulationConfig({ config, onChange }: SimulationConfigProps) {
+export default function SimulationConfig({ config, onChange, selectedDate, currentBookings = 0 }: SimulationConfigProps) {
   const updateConfig = (updates: Partial<SimulationConfigData>) => {
     onChange({ ...config, ...updates });
   };

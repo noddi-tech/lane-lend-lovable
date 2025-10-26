@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { AlertCircle, CheckCircle2, Clock, TrendingUp, Users } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock, TrendingUp, Users, Info } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export interface SimulationMetrics {
   totalBookings: number;
@@ -16,11 +17,23 @@ export interface SimulationMetrics {
   avgWorkerUtilization: number;
 }
 
-interface MetricsPanelProps {
-  metrics: SimulationMetrics | null;
+interface RealMetricsData {
+  totalCapacitySeconds: number;
+  totalBookedSeconds: number;
+  averageUtilization: number;
+  peakUtilization: number;
+  peakHour: number;
+  workersOnShift: number;
+  avgWorkerUtilization: number;
+  hourlyUtilization: Record<number, number>;
 }
 
-export default function MetricsPanel({ metrics }: MetricsPanelProps) {
+interface MetricsPanelProps {
+  metrics: SimulationMetrics | null;
+  realMetrics?: RealMetricsData | null;
+}
+
+export default function MetricsPanel({ metrics, realMetrics }: MetricsPanelProps) {
   if (!metrics) {
     return (
       <Card>
@@ -55,7 +68,27 @@ export default function MetricsPanel({ metrics }: MetricsPanelProps) {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Avg Utilization</p>
+                <div className="flex items-center gap-1">
+                  <p className="text-sm text-muted-foreground">Avg Utilization</p>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="h-3 w-3 text-muted-foreground" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">
+                          Based on real capacity and booking data
+                          {realMetrics && (
+                            <>
+                              <br />Total booked: {Math.floor(realMetrics.totalBookedSeconds / 60)} min
+                              <br />Total capacity: {Math.floor(realMetrics.totalCapacitySeconds / 60)} min
+                            </>
+                          )}
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
                 <p className="text-2xl font-bold">{metrics.averageUtilization.toFixed(0)}%</p>
               </div>
               <TrendingUp className="h-8 w-8 text-muted-foreground" />
