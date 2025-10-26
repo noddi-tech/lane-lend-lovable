@@ -1,6 +1,7 @@
 import { Card } from '@/components/ui/card';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { format, parseISO } from 'date-fns';
+import { EmptyState } from './EmptyState';
 
 interface BookingsTrendChartProps {
   data: any[];
@@ -18,6 +19,12 @@ export function BookingsTrendChart({ data, groupBy }: BookingsTrendChartProps) {
       return value;
     }
   };
+
+  const hasData = data && data.some(item => item.totalBookings > 0);
+
+  if (!hasData) {
+    return <EmptyState type="bookings" />;
+  }
 
   return (
     <Card className="p-6">

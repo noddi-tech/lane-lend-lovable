@@ -1,5 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import { EmptyState } from './EmptyState';
 
 interface StatusPieChartProps {
   data: {
@@ -47,9 +48,7 @@ export function StatusPieChart({ data }: StatusPieChartProps) {
           </PieChart>
         </ResponsiveContainer>
       ) : (
-        <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-          No data available
-        </div>
+        <EmptyState type="bookings" showAction={false} />
       )}
     </Card>
   );

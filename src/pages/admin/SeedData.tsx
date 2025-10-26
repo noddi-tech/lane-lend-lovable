@@ -20,6 +20,9 @@ interface DataStats {
   contributions: number;
   capacityIntervals: number;
   contributionIntervals: number;
+  customers: number;
+  bookings: number;
+  addresses: number;
 }
 
 export default function SeedData() {
@@ -35,6 +38,9 @@ export default function SeedData() {
     contributions: 0,
     capacityIntervals: 0,
     contributionIntervals: 0,
+    customers: 0,
+    bookings: 0,
+    addresses: 0,
   });
   const [seedResults, setSeedResults] = useState<{
     skills?: number;
@@ -42,6 +48,9 @@ export default function SeedData() {
     workers?: number;
     lanes?: number;
     contributions?: number;
+    customers?: number;
+    bookings?: number;
+    addresses?: number;
     skipped?: number;
     error?: string;
   }>({});
@@ -53,7 +62,7 @@ export default function SeedData() {
   const loadCurrentStats = async () => {
     setIsLoadingStats(true);
     try {
-      const [skillsRes, capabilitiesRes, workersRes, lanesRes, contributionsRes, intervalsRes, contribIntervalsRes] = await Promise.all([
+      const [skillsRes, capabilitiesRes, workersRes, lanesRes, contributionsRes, intervalsRes, contribIntervalsRes, customersRes, bookingsRes, addressesRes] = await Promise.all([
         supabase.from('skills').select('id', { count: 'exact', head: true }),
         supabase.from('capabilities').select('id', { count: 'exact', head: true }),
         supabase.from('service_workers').select('id', { count: 'exact', head: true }),
@@ -61,6 +70,9 @@ export default function SeedData() {
         supabase.from('worker_contributions').select('id', { count: 'exact', head: true }),
         supabase.from('capacity_intervals').select('id', { count: 'exact', head: true }),
         supabase.from('contribution_intervals').select('contribution_id', { count: 'exact', head: true }),
+        supabase.from('profiles').select('id', { count: 'exact', head: true }),
+        supabase.from('bookings').select('id', { count: 'exact', head: true }),
+        supabase.from('addresses').select('id', { count: 'exact', head: true }),
       ]);
 
       setCurrentStats({
@@ -71,6 +83,9 @@ export default function SeedData() {
         contributions: contributionsRes.count || 0,
         capacityIntervals: intervalsRes.count || 0,
         contributionIntervals: contribIntervalsRes.count || 0,
+        customers: customersRes.count || 0,
+        bookings: bookingsRes.count || 0,
+        addresses: addressesRes.count || 0,
       });
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -373,6 +388,127 @@ export default function SeedData() {
       results.contributions = createdContributions?.length || 0;
       console.log(`Created ${results.contributions} worker shifts`);
 
+      // 9. Create Test Customer Profiles & Bookings
+      console.log('Creating test customers and bookings...');
+      
+      // Get active sales items
+      const { data: salesItems } = await supabase
+        .from('sales_items')
+        .select('*')
+        .eq('active', true)
+        .limit(5);
+
+      if (!salesItems || salesItems.length === 0) {
+        console.warn('No active sales items found - skipping booking creation');
+        return;
+      }
+
+      // Create 5 test customers with addresses and bookings
+      const customers = [];
+      const addresses = [];
+      const bookings = [];
+      const bookingSalesItems = [];
+
+      for (let i = 0; i < 5; i++) {
+        const customerId = crypto.randomUUID();
+        const addressId = crypto.randomUUID();
+        
+        customers.push({
+          id: customerId,
+          email: `testcustomer${i + 1}@example.com`,
+          full_name: `Test Customer ${i + 1}`,
+          phone: `+47 ${400 + i}00 000`
+        });
+
+        addresses.push({
+          id: addressId,
+          user_id: customerId,
+          street_address: `${100 + i * 10} Test Street`,
+          postal_code: `0${100 + i * 10}`,
+          city: 'Oslo',
+          country: 'NO'
+        });
+
+        // Create 6-10 random bookings per customer over next 14 days
+        const numBookings = 6 + Math.floor(Math.random() * 5);
+        for (let b = 0; b < numBookings; b++) {
+          const bookingId = crypto.randomUUID();
+          const dayOffset = Math.floor(Math.random() * 14);
+          const hour = 9 + Math.floor(Math.random() * 7); // 9 AM - 4 PM
+          const randomLane = createdLanes[Math.floor(Math.random() * createdLanes.length)];
+          const randomSalesItem = salesItems[Math.floor(Math.random() * salesItems.length)];
+          
+          const bookingDate = new Date(today);
+          bookingDate.setDate(today.getDate() + dayOffset);
+          const dateStr = bookingDate.toISOString().split('T')[0];
+          
+          const windowStart = `${dateStr}T${hour.toString().padStart(2, '0')}:00:00Z`;
+          const windowEnd = `${dateStr}T${(hour + 1).toString().padStart(2, '0')}:00:00Z`;
+          
+          // Status distribution: 70% confirmed, 20% completed, 10% cancelled
+          const rand = Math.random();
+          const status = rand < 0.7 ? 'confirmed' : rand < 0.9 ? 'completed' : 'cancelled';
+          
+          const vehicles = [
+            { make: 'Toyota', model: 'Corolla', year: 2020 },
+            { make: 'Honda', model: 'Civic', year: 2021 },
+            { make: 'Ford', model: 'Focus', year: 2019 },
+            { make: 'BMW', model: '3 Series', year: 2022 },
+            { make: 'Tesla', model: 'Model 3', year: 2023 },
+          ];
+          const randomVehicle = vehicles[Math.floor(Math.random() * vehicles.length)];
+          
+          bookings.push({
+            id: bookingId,
+            user_id: customerId,
+            lane_id: randomLane.id,
+            address_id: addressId,
+            delivery_window_starts_at: windowStart,
+            delivery_window_ends_at: windowEnd,
+            service_time_seconds: randomSalesItem.service_time_seconds,
+            vehicle_make: randomVehicle.make,
+            vehicle_model: randomVehicle.model,
+            vehicle_year: randomVehicle.year,
+            vehicle_registration: `AB${Math.floor(Math.random() * 90000) + 10000}`,
+            customer_notes: b % 3 === 0 ? 'Please call before arrival' : null,
+            status
+          });
+
+          bookingSalesItems.push({
+            booking_id: bookingId,
+            sales_item_id: randomSalesItem.id
+          });
+        }
+      }
+
+      // Insert customers
+      const { error: customersError } = await supabase.from('profiles').insert(customers);
+      if (customersError) throw new Error(`Customers: ${customersError.message}`);
+      results.customers = customers.length;
+      console.log(`Created ${results.customers} test customers`);
+
+      // Insert addresses
+      const { error: addressesError } = await supabase.from('addresses').insert(addresses);
+      if (addressesError) throw new Error(`Addresses: ${addressesError.message}`);
+      results.addresses = addresses.length;
+      console.log(`Created ${results.addresses} addresses`);
+
+      // Insert bookings
+      const { data: createdBookings, error: bookingsError } = await supabase
+        .from('bookings')
+        .insert(bookings)
+        .select();
+      if (bookingsError) throw new Error(`Bookings: ${bookingsError.message}`);
+      results.bookings = createdBookings?.length || 0;
+      console.log(`Created ${results.bookings} test bookings`);
+
+      // Link sales items to bookings
+      const { error: bsiError } = await supabase
+        .from('booking_sales_items')
+        .insert(bookingSalesItems);
+      if (bsiError) throw new Error(`Booking Sales Items: ${bsiError.message}`);
+
+      console.log('Test data creation complete');
   };
 
   const seedWithUpsert = async (results: typeof seedResults) => {
@@ -477,7 +613,7 @@ export default function SeedData() {
               
               <Separator />
               
-              <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold">{currentStats.capacityIntervals}</div>
                   <div className="text-sm text-muted-foreground">Capacity Intervals</div>
@@ -485,6 +621,18 @@ export default function SeedData() {
                 <div className="text-center">
                   <div className="text-2xl font-bold">{currentStats.contributionIntervals}</div>
                   <div className="text-sm text-muted-foreground">Contribution Intervals</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{currentStats.customers}</div>
+                  <div className="text-sm text-muted-foreground">Customers</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{currentStats.addresses}</div>
+                  <div className="text-sm text-muted-foreground">Addresses</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{currentStats.bookings}</div>
+                  <div className="text-sm text-muted-foreground">Bookings</div>
                 </div>
               </div>
               
@@ -576,8 +724,8 @@ export default function SeedData() {
         <Database className="h-4 w-4" />
         <AlertTitle>Sample Data Overview</AlertTitle>
         <AlertDescription>
-          This will create test data including skills, capabilities, workers, lanes, and shifts.
-          Use this to test the complete booking flow with capability matching.
+          This will create test data including skills, capabilities, workers, lanes, shifts, customers, and 30-50 realistic bookings.
+          Use this to test the complete booking flow, analytics, and capacity management.
         </AlertDescription>
       </Alert>
 
@@ -654,6 +802,16 @@ export default function SeedData() {
               9 shifts total (3 workers × 3 days) covering the next 3 days
             </p>
           </div>
+
+          <Separator />
+
+          <div>
+            <h3 className="font-semibold mb-2">Test Bookings (30-50)</h3>
+            <p className="text-sm text-muted-foreground">
+              5 test customers with realistic bookings distributed over the next 14 days (70% confirmed, 20% completed, 10% cancelled).
+              Includes addresses, vehicle information, and sales items linking.
+            </p>
+          </div>
         </CardContent>
       </Card>
 
@@ -671,8 +829,9 @@ export default function SeedData() {
           <AlertTitle>Success!</AlertTitle>
           <AlertDescription>
             Created: {seedResults.skills || 0} skills, {seedResults.capabilities || 0} capabilities,{' '}
-            {seedResults.workers || 0} workers, {seedResults.lanes || 0} lanes, and{' '}
-            {seedResults.contributions || 0} shifts
+            {seedResults.workers || 0} workers, {seedResults.lanes || 0} lanes,{' '}
+            {seedResults.contributions || 0} shifts, {seedResults.customers || 0} customers,{' '}
+            {seedResults.addresses || 0} addresses, and {seedResults.bookings || 0} bookings
             {seedResults.skipped !== undefined && seedResults.skipped > 0 && (
               <span className="block mt-1">({seedResults.skipped} records skipped - already exist)</span>
             )}

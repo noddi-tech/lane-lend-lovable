@@ -1,5 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { useMemo } from 'react';
+import { EmptyState } from './EmptyState';
 
 interface PeakHoursHeatmapProps {
   data: Array<{ hour: number; dayOfWeek: number; bookingCount: number }>;
@@ -12,6 +13,14 @@ export function PeakHoursHeatmap({ data }: PeakHoursHeatmapProps) {
   const maxCount = useMemo(() => {
     return Math.max(...data.map(d => d.bookingCount), 1);
   }, [data]);
+
+  const hasData = useMemo(() => {
+    return data.some(d => d.bookingCount > 0);
+  }, [data]);
+
+  if (!hasData) {
+    return <EmptyState type="bookings" />;
+  }
 
   const getIntensity = (count: number) => {
     if (count === 0) return 0;

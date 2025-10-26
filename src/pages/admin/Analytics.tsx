@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Download, TrendingUp, Users, Calendar as CalendarLucide, Activity } from 'lucide-react';
+import { CalendarIcon, Download, TrendingUp, Users, Calendar as CalendarLucide, Activity, Database } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useBookingAnalytics, useWorkerPerformance, useCapacityInsights, usePeakHoursAnalysis, useSystemInsights } from '@/hooks/admin/useAnalytics';
@@ -115,6 +116,10 @@ export default function Analytics() {
     };
   }, [bookingData]);
 
+  const hasNoData = useMemo(() => {
+    return bookingData && bookingData.analytics.every(item => item.totalBookings === 0);
+  }, [bookingData]);
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -124,6 +129,14 @@ export default function Analytics() {
             Comprehensive insights into bookings, workers, and capacity
           </p>
         </div>
+        {hasNoData && !bookingsLoading && (
+          <Button asChild>
+            <Link to="/admin/seed-data">
+              <Database className="mr-2 h-4 w-4" />
+              Generate Test Data
+            </Link>
+          </Button>
+        )}
       </div>
 
       {/* Filters */}

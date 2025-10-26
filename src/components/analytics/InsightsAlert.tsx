@@ -13,7 +13,7 @@ export function InsightsAlert({ insights }: InsightsAlertProps) {
         <Info className="h-4 w-4" />
         <AlertTitle>All Systems Normal</AlertTitle>
         <AlertDescription>
-          No issues detected in the selected time period.
+          No capacity or operational issues detected in the selected time period. All lanes are operating within normal parameters.
         </AlertDescription>
       </Alert>
     );

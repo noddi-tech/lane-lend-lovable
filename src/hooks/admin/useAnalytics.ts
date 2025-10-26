@@ -222,12 +222,21 @@ export function useCapacityInsights(filters: AnalyticsFilters) {
 
       const { data: laneCapacities } = await capacityQuery;
 
-        laneCapacities?.forEach((lc: any) => {
+        for (const lc of laneCapacities || []) {
           // Use the total_booked_seconds from lane_interval_capacity
           const bookedSeconds = lc.total_booked_seconds || 0;
 
-          // For now, use a simple calculation - in production you'd get actual capacity
-          const totalCapacity = bookedSeconds > 0 ? bookedSeconds * 1.5 : 3600; // Placeholder
+          // Get actual capacity from contribution_intervals for this lane and interval
+          const { data: capacityData } = await supabase
+            .from('contribution_intervals')
+            .select(`
+              remaining_seconds,
+              worker_contributions!inner(lane_id)
+            `)
+            .eq('interval_id', interval.id)
+            .eq('worker_contributions.lane_id', lc.lane_id);
+
+          const totalCapacity = capacityData?.reduce((sum, ci: any) => sum + (ci.remaining_seconds || 0), 0) || 0;
           const utilizationRate = totalCapacity > 0 ? (bookedSeconds / totalCapacity) * 100 : 0;
 
           insights.push({
@@ -243,7 +252,7 @@ export function useCapacityInsights(filters: AnalyticsFilters) {
             isOverbooking: utilizationRate > 100,
             isUnderUtilized: utilizationRate < 25 && totalCapacity > 0
           });
-        });
+        }
       }
 
       return insights;

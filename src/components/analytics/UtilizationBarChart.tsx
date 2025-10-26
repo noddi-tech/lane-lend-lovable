@@ -1,5 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { EmptyState } from './EmptyState';
 
 interface UtilizationBarChartProps {
   data: any[];
@@ -14,6 +15,10 @@ export function UtilizationBarChart({ data, title, dataKey, nameKey }: Utilizati
     if (value > 50) return 'hsl(38 92% 50%)'; // Yellow for medium
     return 'hsl(142 76% 36%)'; // Green for low
   };
+
+  if (!data || data.length === 0) {
+    return <EmptyState type="workers" />;
+  }
 
   return (
     <Card className="p-6">
