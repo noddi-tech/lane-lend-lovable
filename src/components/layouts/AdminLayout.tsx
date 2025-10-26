@@ -34,7 +34,8 @@ const menuItems = [
   { title: 'Shifts', url: '/admin/contributions', icon: Clock },
   { title: 'Skills', url: '/admin/skills', icon: Award },
   { title: 'Capabilities', url: '/admin/capabilities', icon: Zap },
-  { title: 'Seed Data', url: '/admin/seed', icon: Database },
+  { title: 'Seed Data', url: '/admin/seed-data', icon: Database },
+  { title: 'Simulation', url: '/admin/simulation', icon: Zap },
   { title: 'Settings', url: '/admin/settings', icon: Settings },
 ];
 
