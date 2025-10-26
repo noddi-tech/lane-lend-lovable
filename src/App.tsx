@@ -23,6 +23,7 @@ import AdminBookings from './pages/admin/Bookings';
 import Settings from './pages/admin/Settings';
 import Skills from './pages/admin/Skills';
 import Capabilities from './pages/admin/Capabilities';
+import Contributions from './pages/admin/Contributions';
 
 const queryClient = new QueryClient();
 
@@ -53,6 +54,7 @@ function AppContent() {
           <Route index element={<Dashboard />} />
           <Route path="lanes" element={<Lanes />} />
           <Route path="workers" element={<Workers />} />
+          <Route path="contributions" element={<Contributions />} />
           <Route path="capacity" element={<Capacity />} />
           <Route path="bookings" element={<AdminBookings />} />
           <Route path="skills" element={<Skills />} />
