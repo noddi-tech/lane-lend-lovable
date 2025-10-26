@@ -14,17 +14,31 @@ export interface Worker {
   updated_at: string;
 }
 
+export interface WorkerWithSkills extends Worker {
+  skills: Array<{ id: string; name: string }>;
+}
+
 export function useWorkers() {
   return useQuery({
     queryKey: ['workers'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('service_workers')
-        .select('*')
+        .select(`
+          *,
+          worker_skills(
+            skill_id,
+            skills(id, name)
+          )
+        `)
         .order('first_name');
 
       if (error) throw error;
-      return data as Worker[];
+      
+      return data.map(worker => ({
+        ...worker,
+        skills: worker.worker_skills?.map((ws: any) => ws.skills).filter(Boolean) || [],
+      })) as WorkerWithSkills[];
     },
   });
 }
@@ -96,6 +110,68 @@ export function useDeleteWorker() {
     },
     onError: (error: Error) => {
       toast.error(`Failed to delete worker: ${error.message}`);
+    },
+  });
+}
+
+export function useWorkerSkills(workerId: string) {
+  return useQuery({
+    queryKey: ['worker-skills', workerId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('worker_skills')
+        .select('skill_id, skills(id, name)')
+        .eq('worker_id', workerId);
+
+      if (error) throw error;
+      return data.map((ws: any) => ws.skills).filter(Boolean) as Array<{ id: string; name: string }>;
+    },
+    enabled: !!workerId,
+  });
+}
+
+export function useAssignSkillToWorker() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ workerId, skillId }: { workerId: string; skillId: string }) => {
+      const { error } = await supabase
+        .from('worker_skills')
+        .insert({ worker_id: workerId, skill_id: skillId });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workers'] });
+      queryClient.invalidateQueries({ queryKey: ['worker-skills'] });
+      toast.success('Skill assigned successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to assign skill: ${error.message}`);
+    },
+  });
+}
+
+export function useRemoveSkillFromWorker() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ workerId, skillId }: { workerId: string; skillId: string }) => {
+      const { error } = await supabase
+        .from('worker_skills')
+        .delete()
+        .eq('worker_id', workerId)
+        .eq('skill_id', skillId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workers'] });
+      queryClient.invalidateQueries({ queryKey: ['worker-skills'] });
+      toast.success('Skill removed successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to remove skill: ${error.message}`);
     },
   });
 }
