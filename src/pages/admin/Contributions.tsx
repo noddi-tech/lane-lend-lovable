@@ -49,6 +49,7 @@ import {
 } from '@/hooks/admin/useContributions';
 import { useWorkers } from '@/hooks/admin/useWorkers';
 import { useLanes } from '@/hooks/admin/useLanes';
+import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 
 export default function Contributions() {
@@ -118,16 +119,22 @@ export default function Contributions() {
       ends_at: new Date(formData.ends_at).toISOString(),
     };
 
-    if (editingContribution) {
-      await updateContribution.mutateAsync({
-        id: editingContribution.id,
-        ...contributionData,
-      });
-    } else {
-      await createContribution.mutateAsync(contributionData);
-    }
+    try {
+      if (editingContribution) {
+        await updateContribution.mutateAsync({
+          id: editingContribution.id,
+          ...contributionData,
+        });
+      } else {
+        await createContribution.mutateAsync(contributionData);
+      }
 
-    handleCloseDialog();
+      // Intervals are auto-synced via database trigger
+      handleCloseDialog();
+    } catch (error) {
+      console.error('Error saving contribution:', error);
+      toast.error('Failed to save contribution');
+    }
   };
 
   const handleDelete = async () => {

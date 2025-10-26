@@ -8,7 +8,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle2, Database, AlertCircle, Trash2, RefreshCw } from 'lucide-react';
+import { Loader2, CheckCircle2, Database, AlertCircle, Trash2, RefreshCw, Zap } from 'lucide-react';
 
 type SeedMode = 'clear-and-seed' | 'smart-upsert';
 
@@ -18,10 +18,13 @@ interface DataStats {
   workers: number;
   lanes: number;
   contributions: number;
+  capacityIntervals: number;
+  contributionIntervals: number;
 }
 
 export default function SeedData() {
   const [isSeeding, setIsSeeding] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
   const [seedMode, setSeedMode] = useState<SeedMode>('clear-and-seed');
   const [currentStats, setCurrentStats] = useState<DataStats>({
@@ -30,6 +33,8 @@ export default function SeedData() {
     workers: 0,
     lanes: 0,
     contributions: 0,
+    capacityIntervals: 0,
+    contributionIntervals: 0,
   });
   const [seedResults, setSeedResults] = useState<{
     skills?: number;
@@ -48,12 +53,14 @@ export default function SeedData() {
   const loadCurrentStats = async () => {
     setIsLoadingStats(true);
     try {
-      const [skillsRes, capabilitiesRes, workersRes, lanesRes, contributionsRes] = await Promise.all([
+      const [skillsRes, capabilitiesRes, workersRes, lanesRes, contributionsRes, intervalsRes, contribIntervalsRes] = await Promise.all([
         supabase.from('skills').select('id', { count: 'exact', head: true }),
         supabase.from('capabilities').select('id', { count: 'exact', head: true }),
         supabase.from('service_workers').select('id', { count: 'exact', head: true }),
         supabase.from('lanes').select('id', { count: 'exact', head: true }),
         supabase.from('worker_contributions').select('id', { count: 'exact', head: true }),
+        supabase.from('capacity_intervals').select('id', { count: 'exact', head: true }),
+        supabase.from('contribution_intervals').select('contribution_id', { count: 'exact', head: true }),
       ]);
 
       setCurrentStats({
@@ -62,11 +69,34 @@ export default function SeedData() {
         workers: workersRes.count || 0,
         lanes: lanesRes.count || 0,
         contributions: contributionsRes.count || 0,
+        capacityIntervals: intervalsRes.count || 0,
+        contributionIntervals: contribIntervalsRes.count || 0,
       });
     } catch (error) {
       console.error('Error loading stats:', error);
     } finally {
       setIsLoadingStats(false);
+    }
+  };
+
+  const handleSyncCapacityIntervals = async () => {
+    setIsSyncing(true);
+    try {
+      toast.info('Syncing capacity intervals...');
+      
+      // Call the database function to sync intervals
+      const { data, error } = await supabase.rpc('sync_contribution_intervals' as any);
+      
+      if (error) throw error;
+      
+      await loadCurrentStats();
+      toast.success(`Synced ${data || 0} contribution intervals successfully!`);
+    } catch (error) {
+      console.error('Sync error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`Failed to sync intervals: ${errorMessage}`);
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -102,6 +132,11 @@ export default function SeedData() {
       
       setSeedResults(results);
       await loadCurrentStats();
+      
+      // Auto-sync capacity intervals after seeding
+      toast.info('Auto-syncing capacity intervals...');
+      await handleSyncCapacityIntervals();
+      
       toast.success('Sample data seeded successfully!');
 
     } catch (error) {
@@ -128,6 +163,11 @@ export default function SeedData() {
       results.skipped = totalSkipped;
       setSeedResults(results);
       await loadCurrentStats();
+      
+      // Auto-sync capacity intervals after seeding
+      toast.info('Auto-syncing capacity intervals...');
+      await handleSyncCapacityIntervals();
+      
       toast.success('Sample data updated successfully!');
 
     } catch (error) {
@@ -411,26 +451,73 @@ export default function SeedData() {
               Loading database statistics...
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold">{currentStats.skills}</div>
-                <div className="text-sm text-muted-foreground">Skills</div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{currentStats.skills}</div>
+                  <div className="text-sm text-muted-foreground">Skills</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{currentStats.capabilities}</div>
+                  <div className="text-sm text-muted-foreground">Capabilities</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{currentStats.workers}</div>
+                  <div className="text-sm text-muted-foreground">Workers</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{currentStats.lanes}</div>
+                  <div className="text-sm text-muted-foreground">Lanes</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{currentStats.contributions}</div>
+                  <div className="text-sm text-muted-foreground">Shifts</div>
+                </div>
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">{currentStats.capabilities}</div>
-                <div className="text-sm text-muted-foreground">Capabilities</div>
+              
+              <Separator />
+              
+              <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{currentStats.capacityIntervals}</div>
+                  <div className="text-sm text-muted-foreground">Capacity Intervals</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{currentStats.contributionIntervals}</div>
+                  <div className="text-sm text-muted-foreground">Contribution Intervals</div>
+                </div>
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">{currentStats.workers}</div>
-                <div className="text-sm text-muted-foreground">Workers</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">{currentStats.lanes}</div>
-                <div className="text-sm text-muted-foreground">Lanes</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">{currentStats.contributions}</div>
-                <div className="text-sm text-muted-foreground">Shifts</div>
+              
+              {currentStats.contributions > 0 && currentStats.contributionIntervals === 0 && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Intervals Missing</AlertTitle>
+                  <AlertDescription>
+                    You have {currentStats.contributions} shifts but no contribution intervals. 
+                    Click "Sync Capacity Intervals" below to generate them.
+                  </AlertDescription>
+                </Alert>
+              )}
+              
+              <div className="flex gap-2">
+                <Button 
+                  onClick={handleSyncCapacityIntervals} 
+                  disabled={isSyncing || currentStats.contributions === 0}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  {isSyncing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Syncing...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="mr-2 h-4 w-4" />
+                      Sync Capacity Intervals
+                    </>
+                  )}
+                </Button>
               </div>
             </div>
           )}
