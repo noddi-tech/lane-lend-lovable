@@ -6,6 +6,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { generateCustomers, createCustomersInDatabase } from '@/utils/customerGenerator';
@@ -15,9 +17,17 @@ import { calculateDailyBookingCount, selectTimeSlot, findNextAvailableSlot, type
 import { assignServices } from '@/utils/serviceAssignment';
 import { createBooking, type BookingData } from '@/utils/bookingCreator';
 import type { SalesItem } from '@/types/booking';
-import { Loader2, Users, Calendar, TrendingUp } from 'lucide-react';
+import { Loader2, Users, Calendar, TrendingUp, AlertCircle } from 'lucide-react';
+import PrerequisitesCard from '@/components/seed-data/PrerequisitesCard';
+import WorkflowStepper from '@/components/seed-data/WorkflowStepper';
+import EmptyStateCard from '@/components/seed-data/EmptyStateCard';
+import { useSystemReadiness } from '@/hooks/admin/useSystemReadiness';
 
-export default function CustomerSeedData() {
+interface CustomerSeedDataProps {
+  onNavigateToBaseData: () => void;
+}
+
+export default function CustomerSeedData({ onNavigateToBaseData }: CustomerSeedDataProps) {
   const [customerCount, setCustomerCount] = useState<number>(10);
   const [customCount, setCustomCount] = useState<string>('10');
   const [dateRange, setDateRange] = useState({ start: 7, end: 30 }); // days from now
@@ -26,7 +36,15 @@ export default function CustomerSeedData() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState('');
-  const [results, setResults] = useState<{ customers: number; addresses: number; bookings: number } | null>(null);
+  const [results, setResults] = useState<{ 
+    customers: number; 
+    addresses: number; 
+    bookings: number;
+    attemptedBookings?: number;
+    skippedBookings?: number;
+  } | null>(null);
+
+  const { data: readiness, isLoading: isLoadingReadiness } = useSystemReadiness();
 
   const handleGenerate = async () => {
     setIsGenerating(true);
@@ -78,6 +96,7 @@ export default function CustomerSeedData() {
       endDate.setDate(endDate.getDate() + dateRange.end);
       
       let totalBookings = 0;
+      let attemptedBookings = 0;
       const daysToGenerate = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
       
       setStatus(`Generating bookings for ${daysToGenerate} days...`);
@@ -89,13 +108,17 @@ export default function CustomerSeedData() {
         const dailyBookingCount = calculateDailyBookingCount(currentDate, density);
         
         for (let i = 0; i < dailyBookingCount; i++) {
+          attemptedBookings++;
           try {
             // Select random customer and lane
             const customer = customers[Math.floor(Math.random() * customers.length)];
             const address = addresses.find(a => a.user_id === customer.id);
             const lane = allLanes[Math.floor(Math.random() * allLanes.length)];
             
-            if (!address) continue;
+            if (!address) {
+              attemptedBookings--;
+              continue;
+            }
             
             // Select time slot
             const timeSlot = selectTimeSlot(currentDate, peakHours);
@@ -151,13 +174,24 @@ export default function CustomerSeedData() {
       
       setProgress(100);
       setStatus('Complete!');
+      
+      const skippedBookings = attemptedBookings - totalBookings;
+      
       setResults({
         customers: customers.length,
         addresses: addresses.length,
         bookings: totalBookings,
+        attemptedBookings,
+        skippedBookings,
       });
       
-      toast.success(`Successfully generated ${customers.length} customers and ${totalBookings} bookings!`);
+      if (totalBookings === 0 && attemptedBookings > 0) {
+        toast.warning(`Generated ${customers.length} customers but 0 bookings. All ${attemptedBookings} booking attempts failed due to insufficient capacity.`);
+      } else if (skippedBookings > 0) {
+        toast.success(`Generated ${customers.length} customers and ${totalBookings} bookings. ${skippedBookings} bookings skipped due to capacity.`);
+      } else {
+        toast.success(`Successfully generated ${customers.length} customers and ${totalBookings} bookings!`);
+      }
     } catch (error: any) {
       console.error('Error generating seed data:', error);
       toast.error(error.message || 'Failed to generate seed data');
@@ -166,8 +200,30 @@ export default function CustomerSeedData() {
     }
   };
 
+  // Check if system is ready
+  const systemNotReady = !readiness?.overallReady;
+  const hasNoData = readiness && 
+    readiness.lanes.count === 0 && 
+    readiness.workers.count === 0 && 
+    readiness.salesItems.count === 0;
+
+  // Show empty state for brand new users
+  if (hasNoData && !isLoadingReadiness) {
+    return (
+      <div className="space-y-6">
+        <EmptyStateCard 
+          onGetStarted={onNavigateToBaseData}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      <PrerequisitesCard />
+      
+      <WorkflowStepper onNavigateToBaseData={onNavigateToBaseData} />
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -250,6 +306,15 @@ export default function CustomerSeedData() {
                 />
               </div>
             </div>
+            {readiness?.capacity.coverageEnd && (
+              <Alert variant="default" className="mt-2">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="text-sm">
+                  Worker capacity available until{' '}
+                  {readiness.capacity.coverageEnd.toLocaleDateString()}. Bookings outside this range will be skipped.
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
 
           {/* Booking Density */}
@@ -321,7 +386,7 @@ export default function CustomerSeedData() {
             <Card className="bg-muted">
               <CardContent className="pt-6">
                 <h3 className="font-semibold mb-3">Generation Results</h3>
-                <div className="grid grid-cols-3 gap-4 text-center">
+                <div className="grid grid-cols-3 gap-4 text-center mb-4">
                   <div>
                     <p className="text-2xl font-bold text-primary">{results.customers}</p>
                     <p className="text-sm text-muted-foreground">Customers</p>
@@ -335,26 +400,66 @@ export default function CustomerSeedData() {
                     <p className="text-sm text-muted-foreground">Bookings</p>
                   </div>
                 </div>
+
+                {results.skippedBookings && results.skippedBookings > 0 && (
+                  <Alert variant={results.bookings === 0 ? "destructive" : "default"}>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      <div className="space-y-2">
+                        <p className="font-semibold">
+                          {results.bookings === 0 ? 'Why were 0 bookings created?' : `${results.skippedBookings} bookings skipped`}
+                        </p>
+                        <p className="text-sm">
+                          {results.attemptedBookings} booking{results.attemptedBookings !== 1 ? 's' : ''} attempted, 
+                          {results.skippedBookings} failed capacity checks
+                        </p>
+                        {results.bookings === 0 && (
+                          <>
+                            <p className="text-sm font-medium mt-2">Recommended Actions:</p>
+                            <ol className="list-decimal list-inside text-sm space-y-1">
+                              <li>Go to "Setup: Lanes & Workers" tab</li>
+                              <li>Click "Seed Base Data" to regenerate 35 days of capacity</li>
+                              <li>Return here and try again</li>
+                            </ol>
+                          </>
+                        )}
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                )}
               </CardContent>
             </Card>
           )}
 
           {/* Action Button */}
-          <Button
-            onClick={handleGenerate}
-            disabled={isGenerating}
-            className="w-full"
-            size="lg"
-          >
-            {isGenerating ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              'Generate Customers & Bookings'
-            )}
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <Button
+                    onClick={handleGenerate}
+                    disabled={isGenerating || systemNotReady}
+                    className="w-full"
+                    size="lg"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      'Generate Customers & Bookings'
+                    )}
+                  </Button>
+                </div>
+              </TooltipTrigger>
+              {systemNotReady && (
+                <TooltipContent>
+                  <p>Missing prerequisites. Check System Readiness above.</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
         </CardContent>
       </Card>
     </div>

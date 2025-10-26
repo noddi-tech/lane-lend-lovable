@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -11,6 +11,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Loader2, CheckCircle2, Database, AlertCircle, Trash2, RefreshCw, Zap } from 'lucide-react';
 import CustomerSeedData from './CustomerSeedData';
+import SystemStatusBadge from '@/components/seed-data/SystemStatusBadge';
+import QuickStartCard from '@/components/seed-data/QuickStartCard';
 
 type SeedMode = 'clear-and-seed' | 'smart-upsert';
 
@@ -32,6 +34,7 @@ export default function SeedData() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
   const [seedMode, setSeedMode] = useState<SeedMode>('clear-and-seed');
+  const [activeTab, setActiveTab] = useState('base');
   const [currentStats, setCurrentStats] = useState<DataStats>({
     skills: 0,
     capabilities: 0,
@@ -379,16 +382,28 @@ export default function SeedData() {
 
   return (
     <div className="container mx-auto p-6 max-w-4xl">
-      <h1 className="text-3xl font-bold mb-6">Seed Test Data</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold">Seed Test Data</h1>
+        <SystemStatusBadge />
+      </div>
 
-      <Tabs defaultValue="base" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="base">Base Data</TabsTrigger>
-          <TabsTrigger value="customers">Customer & Bookings</TabsTrigger>
-          <TabsTrigger value="bulk">Bulk Operations</TabsTrigger>
+          <TabsTrigger value="base">1️⃣ Setup: Lanes & Workers</TabsTrigger>
+          <TabsTrigger value="customers">2️⃣ Generate: Customers & Bookings</TabsTrigger>
+          <TabsTrigger value="bulk">3️⃣ Manage: Clear Data</TabsTrigger>
         </TabsList>
 
         <TabsContent value="base" className="space-y-6">
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Step 1:</strong> Create the foundation - lanes, workers, skills, and 35 days of capacity
+            </AlertDescription>
+          </Alert>
+
+          <QuickStartCard onExecute={handleClearAndSeed} disabled={isSeeding} />
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -526,10 +541,23 @@ export default function SeedData() {
         </TabsContent>
 
         <TabsContent value="customers">
-          <CustomerSeedData />
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Step 2:</strong> Generate test customers and their bookings within available capacity
+            </AlertDescription>
+          </Alert>
+          <CustomerSeedData onNavigateToBaseData={() => setActiveTab('base')} />
         </TabsContent>
 
         <TabsContent value="bulk" className="space-y-6">
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Step 3:</strong> Reset data for fresh testing
+            </AlertDescription>
+          </Alert>
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
