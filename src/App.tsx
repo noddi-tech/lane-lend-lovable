@@ -21,6 +21,8 @@ import Workers from './pages/admin/Workers';
 import Capacity from './pages/admin/Capacity';
 import AdminBookings from './pages/admin/Bookings';
 import Settings from './pages/admin/Settings';
+import Skills from './pages/admin/Skills';
+import Capabilities from './pages/admin/Capabilities';
 
 const queryClient = new QueryClient();
 
@@ -53,6 +55,8 @@ function AppContent() {
           <Route path="workers" element={<Workers />} />
           <Route path="capacity" element={<Capacity />} />
           <Route path="bookings" element={<AdminBookings />} />
+          <Route path="skills" element={<Skills />} />
+          <Route path="capabilities" element={<Capabilities />} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Route>

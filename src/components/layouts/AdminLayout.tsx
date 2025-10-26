@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, Settings, Users, Calendar, Gauge, LogOut, User } from 'lucide-react';
+import { LayoutDashboard, Settings, Users, Calendar, Gauge, LogOut, User, Award, Zap } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 const menuItems = [
@@ -29,6 +29,8 @@ const menuItems = [
   { title: 'Lanes', url: '/admin/lanes', icon: Gauge },
   { title: 'Workers', url: '/admin/workers', icon: Users },
   { title: 'Capacity', url: '/admin/capacity', icon: Calendar },
+  { title: 'Skills', url: '/admin/skills', icon: Award },
+  { title: 'Capabilities', url: '/admin/capabilities', icon: Zap },
   { title: 'Settings', url: '/admin/settings', icon: Settings },
 ];
 
