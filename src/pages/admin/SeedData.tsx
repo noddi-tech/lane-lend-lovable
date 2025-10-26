@@ -158,6 +158,53 @@ export default function SeedData() {
   };
 
   const seedFreshData = async (results: typeof seedResults) => {
+    // STEP 0: Create dev users if in dev mode
+    if (import.meta.env.VITE_DEV_MODE === 'true') {
+      console.log('Creating dev users...');
+      
+      const devUsers = [
+        {
+          id: '00000000-0000-0000-0000-000000000001',
+          email: 'admin@dev.local',
+          full_name: 'Dev Admin',
+          phone: '+47 900 00 001'
+        },
+        {
+          id: '00000000-0000-0000-0000-000000000002',
+          email: 'customer@dev.local',
+          full_name: 'Dev Customer',
+          phone: '+47 900 00 002'
+        }
+      ];
+
+      // Upsert dev profiles (upsert = insert or update if exists)
+      const { error: profilesError } = await supabase
+        .from('profiles')
+        .upsert(devUsers, { onConflict: 'id' });
+
+      if (profilesError) {
+        console.warn('Dev profiles creation warning:', profilesError.message);
+      } else {
+        console.log('✓ Dev profiles created/updated');
+      }
+
+      // Upsert dev roles
+      const devRoles = [
+        { user_id: '00000000-0000-0000-0000-000000000001', role: 'admin' as const },
+        { user_id: '00000000-0000-0000-0000-000000000002', role: 'customer' as const }
+      ];
+
+      const { error: rolesError } = await supabase
+        .from('user_roles')
+        .upsert(devRoles, { onConflict: 'user_id,role' });
+
+      if (rolesError) {
+        console.warn('Dev roles creation warning:', rolesError.message);
+      } else {
+        console.log('✓ Dev roles created/updated');
+      }
+    }
+
     console.log('Creating sample skills...');
     const skills = [
       { name: 'Oil Change Certified', description: 'Certified to perform oil changes and basic fluid checks' },
