@@ -24,6 +24,7 @@ import Settings from './pages/admin/Settings';
 import Skills from './pages/admin/Skills';
 import Capabilities from './pages/admin/Capabilities';
 import Contributions from './pages/admin/Contributions';
+import SeedData from './pages/admin/SeedData';
 
 const queryClient = new QueryClient();
 
@@ -59,6 +60,7 @@ function AppContent() {
           <Route path="bookings" element={<AdminBookings />} />
           <Route path="skills" element={<Skills />} />
           <Route path="capabilities" element={<Capabilities />} />
+          <Route path="seed-data" element={<SeedData />} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Route>
