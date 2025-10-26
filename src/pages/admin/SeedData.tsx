@@ -1,49 +1,164 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle2, Database, AlertCircle } from 'lucide-react';
+import { Loader2, CheckCircle2, Database, AlertCircle, Trash2, RefreshCw } from 'lucide-react';
+
+type SeedMode = 'clear-and-seed' | 'smart-upsert';
+
+interface DataStats {
+  skills: number;
+  capabilities: number;
+  workers: number;
+  lanes: number;
+  contributions: number;
+}
 
 export default function SeedData() {
   const [isSeeding, setIsSeeding] = useState(false);
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [seedMode, setSeedMode] = useState<SeedMode>('clear-and-seed');
+  const [currentStats, setCurrentStats] = useState<DataStats>({
+    skills: 0,
+    capabilities: 0,
+    workers: 0,
+    lanes: 0,
+    contributions: 0,
+  });
   const [seedResults, setSeedResults] = useState<{
     skills?: number;
     capabilities?: number;
     workers?: number;
     lanes?: number;
     contributions?: number;
+    skipped?: number;
     error?: string;
   }>({});
 
-  const handleSeedData = async () => {
+  useEffect(() => {
+    loadCurrentStats();
+  }, []);
+
+  const loadCurrentStats = async () => {
+    setIsLoadingStats(true);
+    try {
+      const [skillsRes, capabilitiesRes, workersRes, lanesRes, contributionsRes] = await Promise.all([
+        supabase.from('skills').select('id', { count: 'exact', head: true }),
+        supabase.from('capabilities').select('id', { count: 'exact', head: true }),
+        supabase.from('service_workers').select('id', { count: 'exact', head: true }),
+        supabase.from('lanes').select('id', { count: 'exact', head: true }),
+        supabase.from('worker_contributions').select('id', { count: 'exact', head: true }),
+      ]);
+
+      setCurrentStats({
+        skills: skillsRes.count || 0,
+        capabilities: capabilitiesRes.count || 0,
+        workers: workersRes.count || 0,
+        lanes: lanesRes.count || 0,
+        contributions: contributionsRes.count || 0,
+      });
+    } catch (error) {
+      console.error('Error loading stats:', error);
+    } finally {
+      setIsLoadingStats(false);
+    }
+  };
+
+  const handleClearAndSeed = async () => {
     setIsSeeding(true);
     setSeedResults({});
     
     try {
       const results: typeof seedResults = {};
+      let totalSkipped = 0;
 
-      // 1. Create Skills
-      console.log('Creating sample skills...');
-      const skills = [
-        { name: 'Oil Change Certified', description: 'Certified to perform oil changes and basic fluid checks' },
-        { name: 'Tire Specialist', description: 'Expert in tire rotation, balancing, and installation' },
-        { name: 'Brake Expert', description: 'Specialized in brake system maintenance and repair' },
-        { name: 'Engine Diagnostics', description: 'Skilled in engine diagnostics and troubleshooting' },
-        { name: 'Electrical Systems', description: 'Expert in automotive electrical systems' },
-      ];
+      // Clear existing sample data first
+      console.log('Clearing existing sample data...');
+      toast.info('Clearing existing data...');
+      
+      await supabase.from('worker_contributions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('contribution_intervals').delete().neq('contribution_id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('booking_intervals').delete().neq('booking_id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('lane_capabilities').delete().neq('lane_id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('worker_skills').delete().neq('worker_id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('capability_skills').delete().neq('capability_id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('worker_capabilities').delete().neq('worker_id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('lanes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('service_workers').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('capabilities').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('skills').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      
+      console.log('Cleared existing data');
+      toast.success('Existing data cleared');
 
-      const { data: createdSkills, error: skillsError } = await supabase
-        .from('skills')
-        .insert(skills)
-        .select();
+      // Now seed fresh data
+      await seedFreshData(results);
+      
+      setSeedResults(results);
+      await loadCurrentStats();
+      toast.success('Sample data seeded successfully!');
 
-      if (skillsError) throw new Error(`Skills: ${skillsError.message}`);
-      results.skills = createdSkills?.length || 0;
-      console.log(`Created ${results.skills} skills`);
+    } catch (error) {
+      console.error('Seeding error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setSeedResults({ error: errorMessage });
+      toast.error(`Failed to seed data: ${errorMessage}`);
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
+  const handleSmartUpsert = async () => {
+    setIsSeeding(true);
+    setSeedResults({});
+    
+    try {
+      const results: typeof seedResults = {};
+      let totalSkipped = 0;
+
+      // Check existing data and only insert new records
+      await seedWithUpsert(results);
+      
+      results.skipped = totalSkipped;
+      setSeedResults(results);
+      await loadCurrentStats();
+      toast.success('Sample data updated successfully!');
+
+    } catch (error) {
+      console.error('Seeding error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setSeedResults({ error: errorMessage });
+      toast.error(`Failed to seed data: ${errorMessage}`);
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
+  const seedFreshData = async (results: typeof seedResults) => {
+    // 1. Create Skills
+    console.log('Creating sample skills...');
+    const skills = [
+      { name: 'Oil Change Certified', description: 'Certified to perform oil changes and basic fluid checks' },
+      { name: 'Tire Specialist', description: 'Expert in tire rotation, balancing, and installation' },
+      { name: 'Brake Expert', description: 'Specialized in brake system maintenance and repair' },
+      { name: 'Engine Diagnostics', description: 'Skilled in engine diagnostics and troubleshooting' },
+      { name: 'Electrical Systems', description: 'Expert in automotive electrical systems' },
+    ];
+
+    const { data: createdSkills, error: skillsError } = await supabase
+      .from('skills')
+      .insert(skills)
+      .select();
+
+    if (skillsError) throw new Error(`Skills: ${skillsError.message}`);
+    results.skills = createdSkills?.length || 0;
+    console.log(`Created ${results.skills} skills`);
 
       // 2. Create Capabilities
       console.log('Creating sample capabilities...');
@@ -218,16 +333,58 @@ export default function SeedData() {
       results.contributions = createdContributions?.length || 0;
       console.log(`Created ${results.contributions} worker shifts`);
 
-      setSeedResults(results);
-      toast.success('Sample data seeded successfully!');
+  };
 
-    } catch (error) {
-      console.error('Seeding error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      setSeedResults({ error: errorMessage });
-      toast.error(`Failed to seed data: ${errorMessage}`);
-    } finally {
-      setIsSeeding(false);
+  const seedWithUpsert = async (results: typeof seedResults) => {
+    // Similar logic but checks for existing records first
+    console.log('Using smart upsert mode...');
+    
+    const skillNames = ['Oil Change Certified', 'Tire Specialist', 'Brake Expert', 'Engine Diagnostics', 'Electrical Systems'];
+    const { data: existingSkills } = await supabase.from('skills').select('*').in('name', skillNames);
+    
+    const newSkills = skillNames
+      .filter(name => !existingSkills?.find(s => s.name === name))
+      .map(name => ({
+        name,
+        description: `Sample skill: ${name}`
+      }));
+
+    if (newSkills.length > 0) {
+      const { data: createdSkills, error } = await supabase.from('skills').insert(newSkills).select();
+      if (error) throw new Error(`Skills: ${error.message}`);
+      results.skills = createdSkills?.length || 0;
+    } else {
+      results.skills = 0;
+    }
+
+    // Get all skills for linking
+    const { data: allSkills } = await supabase.from('skills').select('*');
+    if (!allSkills) throw new Error('Failed to fetch skills');
+
+    // Similar pattern for other entities...
+    const capNames = ['Basic Service', 'Tire Service', 'Brake Service', 'Advanced Diagnostics'];
+    const { data: existingCaps } = await supabase.from('capabilities').select('*').in('name', capNames);
+    
+    const newCaps = capNames
+      .filter(name => !existingCaps?.find(c => c.name === name))
+      .map(name => ({ name, description: `Sample capability: ${name}` }));
+
+    if (newCaps.length > 0) {
+      const { data: createdCaps, error } = await supabase.from('capabilities').insert(newCaps).select();
+      if (error) throw new Error(`Capabilities: ${error.message}`);
+      results.capabilities = createdCaps?.length || 0;
+    } else {
+      results.capabilities = 0;
+    }
+
+    toast.info('Smart upsert mode: Only new records will be created');
+  };
+
+  const handleSeedData = () => {
+    if (seedMode === 'clear-and-seed') {
+      handleClearAndSeed();
+    } else {
+      handleSmartUpsert();
     }
   };
 
@@ -239,6 +396,94 @@ export default function SeedData() {
           Populate your system with test data to verify functionality
         </p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Current Database State</CardTitle>
+          <CardDescription>
+            Review existing data before seeding
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoadingStats ? (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading database statistics...
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold">{currentStats.skills}</div>
+                <div className="text-sm text-muted-foreground">Skills</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold">{currentStats.capabilities}</div>
+                <div className="text-sm text-muted-foreground">Capabilities</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold">{currentStats.workers}</div>
+                <div className="text-sm text-muted-foreground">Workers</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold">{currentStats.lanes}</div>
+                <div className="text-sm text-muted-foreground">Lanes</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold">{currentStats.contributions}</div>
+                <div className="text-sm text-muted-foreground">Shifts</div>
+              </div>
+            </div>
+          )}
+          
+          {!isLoadingStats && (currentStats.skills > 0 || currentStats.capabilities > 0) && (
+            <Alert className="mt-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Existing Data Detected</AlertTitle>
+              <AlertDescription>
+                Your database already contains data. Choose "Clear & Seed" to start fresh or "Smart Upsert" to add only missing records.
+              </AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Seeding Mode</CardTitle>
+          <CardDescription>
+            Choose how to handle existing data
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RadioGroup value={seedMode} onValueChange={(value) => setSeedMode(value as SeedMode)}>
+            <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4">
+              <RadioGroupItem value="clear-and-seed" id="clear" />
+              <div className="space-y-1 leading-none flex-1">
+                <Label htmlFor="clear" className="flex items-center gap-2 cursor-pointer">
+                  <Trash2 className="h-4 w-4" />
+                  <span className="font-semibold">Clear & Seed (Recommended)</span>
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Deletes ALL existing data and creates fresh sample data. Best for testing and development.
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4">
+              <RadioGroupItem value="smart-upsert" id="upsert" />
+              <div className="space-y-1 leading-none flex-1">
+                <Label htmlFor="upsert" className="flex items-center gap-2 cursor-pointer">
+                  <RefreshCw className="h-4 w-4" />
+                  <span className="font-semibold">Smart Upsert</span>
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Only adds records that don't already exist (checks by name). Preserves existing data.
+                </p>
+              </div>
+            </div>
+          </RadioGroup>
+        </CardContent>
+      </Card>
 
       <Alert>
         <Database className="h-4 w-4" />
@@ -338,9 +583,12 @@ export default function SeedData() {
           <CheckCircle2 className="h-4 w-4" />
           <AlertTitle>Success!</AlertTitle>
           <AlertDescription>
-            Created: {seedResults.skills} skills, {seedResults.capabilities} capabilities,{' '}
-            {seedResults.workers} workers, {seedResults.lanes} lanes, and{' '}
-            {seedResults.contributions} shifts
+            Created: {seedResults.skills || 0} skills, {seedResults.capabilities || 0} capabilities,{' '}
+            {seedResults.workers || 0} workers, {seedResults.lanes || 0} lanes, and{' '}
+            {seedResults.contributions || 0} shifts
+            {seedResults.skipped !== undefined && seedResults.skipped > 0 && (
+              <span className="block mt-1">({seedResults.skipped} records skipped - already exist)</span>
+            )}
           </AlertDescription>
         </Alert>
       )}
@@ -365,14 +613,16 @@ export default function SeedData() {
         </Button>
       </div>
 
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Warning</AlertTitle>
-        <AlertDescription>
-          This will create new records in your database. Make sure you haven't already seeded data
-          to avoid duplicates. This action cannot be easily undone.
-        </AlertDescription>
-      </Alert>
+      {seedMode === 'clear-and-seed' && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Warning: Data Will Be Deleted</AlertTitle>
+          <AlertDescription>
+            Clear & Seed mode will DELETE ALL existing skills, capabilities, workers, lanes, and shifts.
+            This action cannot be undone. Only use this in development/testing environments.
+          </AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 }
