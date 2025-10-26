@@ -20,6 +20,7 @@ import Lanes from './pages/admin/Lanes';
 import Workers from './pages/admin/Workers';
 import Capacity from './pages/admin/Capacity';
 import AdminBookings from './pages/admin/Bookings';
+import Analytics from './pages/admin/Analytics';
 import Settings from './pages/admin/Settings';
 import Skills from './pages/admin/Skills';
 import Capabilities from './pages/admin/Capabilities';
@@ -53,14 +54,16 @@ function AppContent() {
       <Route element={<ProtectedRoute role="admin" />}>
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<Dashboard />} />
+          <Route path="dashboard" element={<Dashboard />} />
           <Route path="lanes" element={<Lanes />} />
           <Route path="workers" element={<Workers />} />
           <Route path="contributions" element={<Contributions />} />
           <Route path="capacity" element={<Capacity />} />
           <Route path="bookings" element={<AdminBookings />} />
+          <Route path="analytics" element={<Analytics />} />
           <Route path="skills" element={<Skills />} />
           <Route path="capabilities" element={<Capabilities />} />
-          <Route path="seed-data" element={<SeedData />} />
+          <Route path="seed" element={<SeedData />} />
           <Route path="settings" element={<Settings />} />
         </Route>
       </Route>
