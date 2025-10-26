@@ -30,8 +30,8 @@ export default function Analytics() {
     endDate: format(today, 'yyyy-MM-dd')
   });
   const [groupBy, setGroupBy] = useState<'day' | 'week' | 'month'>('day');
-  const [selectedLane, setSelectedLane] = useState<string | undefined>(undefined);
-  const [selectedWorker, setSelectedWorker] = useState<string | undefined>(undefined);
+  const [selectedLane, setSelectedLane] = useState<string>("all");
+  const [selectedWorker, setSelectedWorker] = useState<string>("all");
 
   const { data: lanes } = useLanes();
   const { data: workers } = useWorkers();
@@ -39,17 +39,17 @@ export default function Analytics() {
   const bookingFilters = useMemo(() => ({
     ...dateRange,
     groupBy,
-    laneId: selectedLane
+    laneId: selectedLane === 'all' ? undefined : selectedLane
   }), [dateRange, groupBy, selectedLane]);
 
   const workerFilters = useMemo(() => ({
     ...dateRange,
-    workerId: selectedWorker
+    workerId: selectedWorker === 'all' ? undefined : selectedWorker
   }), [dateRange, selectedWorker]);
 
   const capacityFilters = useMemo(() => ({
     ...dateRange,
-    laneId: selectedLane
+    laneId: selectedLane === 'all' ? undefined : selectedLane
   }), [dateRange, selectedLane]);
 
   const { data: bookingData, isLoading: bookingsLoading } = useBookingAnalytics(bookingFilters);
@@ -298,7 +298,7 @@ export default function Analytics() {
                 </SelectContent>
               </Select>
 
-              <Select value={selectedLane} onValueChange={(value) => setSelectedLane(value === 'all' ? undefined : value)}>
+              <Select value={selectedLane} onValueChange={setSelectedLane}>
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="All Lanes" />
                 </SelectTrigger>
@@ -368,7 +368,7 @@ export default function Analytics() {
         {/* Workers Tab */}
         <TabsContent value="workers" className="space-y-6">
           <div className="flex items-center justify-between">
-            <Select value={selectedWorker} onValueChange={(value) => setSelectedWorker(value === 'all' ? undefined : value)}>
+            <Select value={selectedWorker} onValueChange={setSelectedWorker}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="All Workers" />
               </SelectTrigger>
@@ -438,7 +438,7 @@ export default function Analytics() {
         {/* Capacity Tab */}
         <TabsContent value="capacity" className="space-y-6">
           <div className="flex items-center justify-between">
-            <Select value={selectedLane} onValueChange={(value) => setSelectedLane(value === 'all' ? undefined : value)}>
+            <Select value={selectedLane} onValueChange={setSelectedLane}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="All Lanes" />
               </SelectTrigger>
