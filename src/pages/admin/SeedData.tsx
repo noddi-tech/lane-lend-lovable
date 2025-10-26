@@ -331,7 +331,7 @@ export default function SeedData() {
     const today = new Date();
     const shifts = [];
 
-    for (let dayOffset = 0; dayOffset < 3; dayOffset++) {
+    for (let dayOffset = 0; dayOffset < 35; dayOffset++) {
       const shiftDate = new Date(today);
       shiftDate.setDate(today.getDate() + dayOffset);
       const dateStr = shiftDate.toISOString().split('T')[0];
