@@ -52,17 +52,21 @@ export function useCapacityData(date: string, laneId: string) {
           (c: any) => c.worker_contributions?.lane_id === laneId
         ) || [];
 
-        const totalCapacity = laneContributions.reduce(
-          (sum: number, c: any) => sum + (c.worker_contributions?.available_seconds || 0),
-          0
-        );
-
         const remainingCapacity = laneContributions.reduce(
           (sum: number, c: any) => sum + (c.remaining_seconds || 0),
           0
         );
 
-        const bookedSeconds = totalCapacity - remainingCapacity;
+        // Get actual booked seconds from lane_interval_capacity
+        const { data: laneCapacity } = await supabase
+          .from('lane_interval_capacity')
+          .select('total_booked_seconds')
+          .eq('interval_id', interval.id)
+          .eq('lane_id', laneId)
+          .maybeSingle();
+
+        const bookedSeconds = laneCapacity?.total_booked_seconds || 0;
+        const totalCapacity = remainingCapacity + bookedSeconds;
 
         // Get bookings for this interval
         const { data: bookings, error: bookingsError } = await supabase
