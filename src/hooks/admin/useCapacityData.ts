@@ -38,7 +38,7 @@ export function useCapacityData(date: string, laneId: string) {
           .from('contribution_intervals')
           .select(`
             remaining_seconds,
-            contribution:contribution_id (
+            worker_contributions (
               lane_id,
               available_seconds
             )
@@ -49,11 +49,11 @@ export function useCapacityData(date: string, laneId: string) {
 
         // Filter for the specific lane
         const laneContributions = contributions?.filter(
-          (c: any) => c.contribution?.lane_id === laneId
+          (c: any) => c.worker_contributions?.lane_id === laneId
         ) || [];
 
         const totalCapacity = laneContributions.reduce(
-          (sum: number, c: any) => sum + (c.contribution?.available_seconds || 0),
+          (sum: number, c: any) => sum + (c.worker_contributions?.available_seconds || 0),
           0
         );
 
