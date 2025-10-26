@@ -737,6 +737,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_capacity_intervals: {
+        Args: { end_date: string; start_date: string }
+        Returns: undefined
+      }
       get_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
@@ -748,6 +752,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      sync_contribution_intervals: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "customer"
