@@ -12,8 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Plus, Edit, Trash2, Grid3x3, X } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, Grid3x3, X, LayoutGrid } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { GridBuilder } from '@/components/layouts/GridBuilder';
 import type { Station } from '@/hooks/admin/useStations';
 
 const STATION_TYPES = [
@@ -172,6 +174,18 @@ export default function DrivingGateLayout() {
     return capabilities?.filter(cap => !stationCapIds.includes(cap.id)) || [];
   };
 
+  const handleStationMove = async (stationId: string, x: number, y: number) => {
+    try {
+      await updateStation.mutateAsync({
+        id: stationId,
+        grid_position_x: x,
+        grid_position_y: y,
+      });
+    } catch (error) {
+      console.error('Failed to update station position:', error);
+    }
+  };
+
   if (!gate) {
     return (
       <div className="space-y-6">
@@ -210,8 +224,43 @@ export default function DrivingGateLayout() {
 
       <Separator />
 
-      {/* Lanes List */}
-      <div className="space-y-4">
+      <Tabs defaultValue="visual" className="w-full">
+        <TabsList>
+          <TabsTrigger value="visual">
+            <LayoutGrid className="h-4 w-4 mr-2" />
+            Visual Grid
+          </TabsTrigger>
+          <TabsTrigger value="list">List View</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="visual" className="mt-6">
+          {gate && (
+            <GridBuilder
+              gridWidth={gate.grid_width}
+              gridHeight={gate.grid_height}
+              lanes={lanes?.map(lane => ({
+                id: lane.id,
+                name: lane.name,
+                grid_position_y: lane.grid_position_y,
+                grid_height: lane.grid_height,
+              })) || []}
+              stations={gateStations?.map(station => ({
+                id: station.id,
+                name: station.name,
+                grid_position_x: station.grid_position_x,
+                grid_position_y: station.grid_position_y,
+                grid_width: station.grid_width,
+                grid_height: station.grid_height,
+                lane_id: station.lane_id,
+              })) || []}
+              onStationMove={handleStationMove}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="list" className="mt-6">
+          {/* Lanes List */}
+          <div className="space-y-4">
         {lanes?.length === 0 ? (
           <Card>
             <CardContent className="py-8 text-center text-muted-foreground">
@@ -353,7 +402,9 @@ export default function DrivingGateLayout() {
             </Card>
           ))
         )}
-      </div>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Add Lane Dialog */}
       <Dialog open={isAddLaneOpen} onOpenChange={setIsAddLaneOpen}>
