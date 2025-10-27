@@ -27,7 +27,7 @@ export default function Dashboard() {
 
   // Calculate warnings
   const workersWithoutSkills = workers?.filter(w => w.active && w.skills.length === 0) || [];
-  const lanesWithoutCapabilities = lanes?.filter(l => !l.closed_for_new_bookings_at && l.capabilities.length === 0) || [];
+  const lanesWithoutStations = lanes?.filter(l => !l.closed_for_new_bookings_at && l.stations.length === 0) || [];
 
   const stats = [
     {
@@ -88,7 +88,7 @@ export default function Dashboard() {
       </div>
 
       {/* Warnings */}
-      {(workersWithoutSkills.length > 0 || lanesWithoutCapabilities.length > 0) && (
+      {(workersWithoutSkills.length > 0 || lanesWithoutStations.length > 0) && (
         <div className="space-y-3">
           {workersWithoutSkills.length > 0 && (
             <Alert variant="destructive">
@@ -103,15 +103,15 @@ export default function Dashboard() {
             </Alert>
           )}
 
-          {lanesWithoutCapabilities.length > 0 && (
+          {lanesWithoutStations.length > 0 && (
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Lanes Without Capabilities</AlertTitle>
+              <AlertTitle>Lanes Without Stations</AlertTitle>
               <AlertDescription>
-                {lanesWithoutCapabilities.length} active lane{lanesWithoutCapabilities.length !== 1 ? 's' : ''} {lanesWithoutCapabilities.length === 1 ? 'has' : 'have'} no capabilities assigned:{' '}
-                {lanesWithoutCapabilities.slice(0, 3).map(l => l.name).join(', ')}
-                {lanesWithoutCapabilities.length > 3 && ` and ${lanesWithoutCapabilities.length - 3} more`}.
-                Lanes need capabilities to accept bookings.
+                {lanesWithoutStations.length} active lane{lanesWithoutStations.length !== 1 ? 's' : ''} {lanesWithoutStations.length === 1 ? 'has' : 'have'} no stations assigned:{' '}
+                {lanesWithoutStations.slice(0, 3).map(l => l.name).join(', ')}
+                {lanesWithoutStations.length > 3 && ` and ${lanesWithoutStations.length - 3} more`}.
+                Lanes need stations with capabilities to accept bookings.
               </AlertDescription>
             </Alert>
           )}

@@ -4,10 +4,9 @@ import {
   useCreateLane, 
   useUpdateLane, 
   useDeleteLane,
-  useAssignCapabilityToLane,
-  useRemoveCapabilityFromLane,
   type LaneWithCapabilities 
 } from '@/hooks/admin/useLanes';
+import { useDrivingGates } from '@/hooks/admin/useDrivingGates';
 import { useCapabilities } from '@/hooks/admin/useCapabilities';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

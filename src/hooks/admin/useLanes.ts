@@ -4,10 +4,13 @@ import { toast } from 'sonner';
 
 export interface Lane {
   id: string;
+  driving_gate_id: string;
   name: string;
-  open_time: string;
-  close_time: string;
-  time_zone: string;
+  position_order: number;
+  grid_position_y: number;
+  grid_height: number;
+  open_time: string | null;
+  close_time: string | null;
   closed_for_new_bookings_at: string | null;
   closed_for_cancellations_at: string | null;
   created_at: string;
@@ -15,30 +18,32 @@ export interface Lane {
 }
 
 export interface LaneWithCapabilities extends Lane {
-  capabilities: Array<{ id: string; name: string }>;
+  driving_gate: { id: string; name: string } | null;
+  stations: Array<{ id: string; name: string; station_type: string }>;
 }
 
-export function useLanes() {
+export function useLanes(drivingGateId?: string) {
   return useQuery({
-    queryKey: ['lanes'],
+    queryKey: ['lanes', drivingGateId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('lanes')
+      let query = supabase
+        .from('lanes_new')
         .select(`
           *,
-          lane_capabilities(
-            capability_id,
-            capabilities(id, name)
-          )
+          driving_gate:driving_gates!driving_gate_id(id, name),
+          stations!lane_id(id, name, station_type)
         `)
-        .order('name');
+        .order('position_order');
+
+      if (drivingGateId) {
+        query = query.eq('driving_gate_id', drivingGateId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       
-      return data.map(lane => ({
-        ...lane,
-        capabilities: lane.lane_capabilities?.map((lc: any) => lc.capabilities).filter(Boolean) || [],
-      })) as LaneWithCapabilities[];
+      return data as LaneWithCapabilities[];
     },
   });
 }
@@ -49,7 +54,7 @@ export function useCreateLane() {
   return useMutation({
     mutationFn: async (lane: Partial<Lane>) => {
       const { data, error } = await supabase
-        .from('lanes')
+        .from('lanes_new')
         .insert(lane as any)
         .select()
         .single();
@@ -73,7 +78,7 @@ export function useUpdateLane() {
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Lane> & { id: string }) => {
       const { data, error } = await supabase
-        .from('lanes')
+        .from('lanes_new')
         .update(updates)
         .eq('id', id)
         .select()
@@ -98,7 +103,7 @@ export function useDeleteLane() {
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
-        .from('lanes')
+        .from('lanes_new')
         .delete()
         .eq('id', id);
 
@@ -114,64 +119,5 @@ export function useDeleteLane() {
   });
 }
 
-export function useLaneCapabilities(laneId: string) {
-  return useQuery({
-    queryKey: ['lane-capabilities', laneId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('lane_capabilities')
-        .select('capability_id, capabilities(id, name)')
-        .eq('lane_id', laneId);
-
-      if (error) throw error;
-      return data.map((lc: any) => lc.capabilities).filter(Boolean) as Array<{ id: string; name: string }>;
-    },
-    enabled: !!laneId,
-  });
-}
-
-export function useAssignCapabilityToLane() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ laneId, capabilityId }: { laneId: string; capabilityId: string }) => {
-      const { error } = await supabase
-        .from('lane_capabilities')
-        .insert({ lane_id: laneId, capability_id: capabilityId });
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lanes'] });
-      queryClient.invalidateQueries({ queryKey: ['lane-capabilities'] });
-      toast.success('Capability assigned successfully');
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to assign capability: ${error.message}`);
-    },
-  });
-}
-
-export function useRemoveCapabilityFromLane() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ laneId, capabilityId }: { laneId: string; capabilityId: string }) => {
-      const { error } = await supabase
-        .from('lane_capabilities')
-        .delete()
-        .eq('lane_id', laneId)
-        .eq('capability_id', capabilityId);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lanes'] });
-      queryClient.invalidateQueries({ queryKey: ['lane-capabilities'] });
-      toast.success('Capability removed successfully');
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to remove capability: ${error.message}`);
-    },
-  });
-}
+// Lane capabilities are now managed at station level
+// These functions are deprecated but kept for backward compatibility

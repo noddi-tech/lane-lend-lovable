@@ -27,6 +27,8 @@ import Capabilities from './pages/admin/Capabilities';
 import Contributions from './pages/admin/Contributions';
 import SeedData from './pages/admin/SeedData';
 import Simulation from './pages/admin/Simulation';
+import DrivingGates from './pages/admin/DrivingGates';
+import Stations from './pages/admin/Stations';
 
 const queryClient = new QueryClient();
 
@@ -56,6 +58,8 @@ function AppContent() {
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="dashboard" element={<Dashboard />} />
+          <Route path="driving-gates" element={<DrivingGates />} />
+          <Route path="stations" element={<Stations />} />
           <Route path="lanes" element={<Lanes />} />
           <Route path="workers" element={<Workers />} />
           <Route path="contributions" element={<Contributions />} />
