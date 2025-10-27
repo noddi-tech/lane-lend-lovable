@@ -34,7 +34,7 @@ export const StationSelector = ({
   requiredCapabilities = []
 }: StationSelectorProps) => {
   const { data: allStations } = useStations();
-  const [selectedLaneId, setSelectedLaneId] = useState<string>('');
+  const [selectedLaneId, setSelectedLaneId] = useState<string>('all');
 
   // Get unique lanes from stations
   const lanes = Array.from(
@@ -48,7 +48,7 @@ export const StationSelector = ({
   // Filter stations by selected lane and capabilities
   const availableStations = allStations?.filter(station => {
     const alreadySelected = selectedStationIds.includes(station.id);
-    const matchesLane = !selectedLaneId || station.lane_id === selectedLaneId;
+    const matchesLane = selectedLaneId === 'all' || station.lane_id === selectedLaneId;
     
     // Check if station has all required capabilities
     const hasCapabilities = requiredCapabilities.length === 0 || 
@@ -71,7 +71,7 @@ export const StationSelector = ({
             <SelectValue placeholder="Filter by lane" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Lanes</SelectItem>
+            <SelectItem value="all">All Lanes</SelectItem>
             {lanes.map(lane => (
               <SelectItem key={lane.id} value={lane.id}>
                 {lane.name}
