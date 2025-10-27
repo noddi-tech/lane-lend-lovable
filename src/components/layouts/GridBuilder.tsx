@@ -131,11 +131,12 @@ export const GridBuilder = ({
         width: station.grid_width * CELL_SIZE,
         height: station.grid_height * CELL_SIZE,
         fill: 'hsl(var(--accent))',
-        stroke: 'hsl(var(--accent-foreground))',
+        stroke: 'hsl(var(--primary))',
         strokeWidth: 2,
         cornerColor: 'hsl(var(--primary))',
-        cornerSize: 8,
+        cornerSize: 10,
         transparentCorners: false,
+        hasRotatingPoint: false,
       });
 
       stationRect.set('data', { stationId: station.id });
@@ -152,28 +153,44 @@ export const GridBuilder = ({
       fabricCanvas.add(stationRect);
       fabricCanvas.add(stationLabel);
 
-      // Handle station movement
+      // Handle station movement with snap-to-grid
       stationRect.on('modified', () => {
         const newX = Math.round((stationRect.left! - GRID_PADDING) / CELL_SIZE);
         const newY = Math.round((stationRect.top! - GRID_PADDING) / CELL_SIZE);
         
+        // Ensure station stays within grid bounds
+        const boundedX = Math.max(0, Math.min(newX, gridWidth - station.grid_width));
+        const boundedY = Math.max(0, Math.min(newY, gridHeight - station.grid_height));
+        
         // Snap to grid
         stationRect.set({
-          left: GRID_PADDING + newX * CELL_SIZE,
-          top: GRID_PADDING + newY * CELL_SIZE,
+          left: GRID_PADDING + boundedX * CELL_SIZE,
+          top: GRID_PADDING + boundedY * CELL_SIZE,
         });
-        
         stationLabel.set({
-          left: GRID_PADDING + newX * CELL_SIZE + 5,
-          top: GRID_PADDING + newY * CELL_SIZE + 5,
+          left: GRID_PADDING + boundedX * CELL_SIZE + 5,
+          top: GRID_PADDING + boundedY * CELL_SIZE + 5,
         });
 
         fabricCanvas.renderAll();
 
         const stationId = (stationRect.get('data') as any)?.stationId;
-        if (stationId) {
-          onStationMove(stationId, newX, newY);
+        if (stationId && (boundedX !== newX || boundedY !== newY || newX !== station.grid_position_x || newY !== station.grid_position_y)) {
+          onStationMove(stationId, boundedX, boundedY);
         }
+      });
+
+      // Add hover effect
+      stationRect.on('mouseover', () => {
+        stationRect.set('stroke', 'hsl(var(--ring))');
+        stationRect.set('strokeWidth', 3);
+        fabricCanvas.renderAll();
+      });
+
+      stationRect.on('mouseout', () => {
+        stationRect.set('stroke', 'hsl(var(--primary))');
+        stationRect.set('strokeWidth', 2);
+        fabricCanvas.renderAll();
       });
     });
 
@@ -205,7 +222,7 @@ export const GridBuilder = ({
 
   return (
     <Card className="p-4">
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4 flex-wrap items-center">
         <Button onClick={handleZoomIn} variant="outline" size="sm">
           <ZoomIn className="w-4 h-4 mr-2" />
           Zoom In
@@ -222,12 +239,17 @@ export const GridBuilder = ({
           Zoom: {Math.round(zoom * 100)}%
         </span>
       </div>
-      <div className="overflow-auto border rounded-lg">
+      <div className="overflow-auto border rounded-lg bg-background">
         <canvas ref={canvasRef} />
       </div>
-      <p className="text-sm text-muted-foreground mt-4">
-        Drag stations to reposition them on the grid. Changes are saved automatically.
-      </p>
+      <div className="mt-4 space-y-2">
+        <p className="text-sm text-muted-foreground">
+          💡 <strong>Tip:</strong> Drag stations to reposition them on the grid. Changes are saved automatically.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Stations will snap to the grid. Lanes are shown in light blue with their names.
+        </p>
+      </div>
     </Card>
   );
 };
