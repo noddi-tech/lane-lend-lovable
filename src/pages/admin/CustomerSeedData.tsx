@@ -413,14 +413,32 @@ export default function CustomerSeedData({ onNavigateToBaseData }: CustomerSeedD
                           {results.attemptedBookings} booking{results.attemptedBookings !== 1 ? 's' : ''} attempted, 
                           {results.skippedBookings} failed capacity checks
                         </p>
-                        {results.bookings === 0 && (
+                        <p className="text-sm mt-2">
+                          <strong>Common reasons:</strong>
+                        </p>
+                        <ul className="list-disc list-inside text-sm space-y-1">
+                          <li>Existing bookings already consumed available capacity</li>
+                          <li>Insufficient worker capacity for the selected date range</li>
+                          <li>Booking density too high for current capacity</li>
+                        </ul>
+                        {results.bookings === 0 ? (
                           <>
                             <p className="text-sm font-medium mt-2">Recommended Actions:</p>
                             <ol className="list-decimal list-inside text-sm space-y-1">
-                              <li>Go to "Setup: Lanes & Workers" tab</li>
-                              <li>Click "Seed Base Data" to regenerate 35 days of capacity</li>
-                              <li>Return here and try again</li>
+                              <li>Clear existing bookings by deleting from the Bookings page</li>
+                              <li>Go to "Setup: Lanes & Workers" and ensure capacity exists</li>
+                              <li>Reduce booking density to 0.5x or 1.0x</li>
+                              <li>Try a date range with more worker capacity</li>
                             </ol>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-sm font-medium mt-2">Suggestions:</p>
+                            <ul className="list-disc list-inside text-sm space-y-1">
+                              <li>Clear existing bookings before generating new ones</li>
+                              <li>Reduce booking density to fit more bookings</li>
+                              <li>Generate workers with more capacity on the Setup page</li>
+                            </ul>
                           </>
                         )}
                       </div>

@@ -12,6 +12,11 @@ interface TimelineBooking {
   customerName?: string;
   serviceName?: string;
   utilizationPercent?: number;
+  assignedWorkers?: Array<{
+    workerId: string;
+    workerName: string;
+    allocatedSeconds: number;
+  }>;
 }
 
 interface TimelineVisualizationProps {
@@ -106,17 +111,24 @@ export default function TimelineVisualization({ bookings, lanes }: TimelineVisua
                     return (
                       <div
                         key={booking.id}
-                        className={`absolute h-full ${color} rounded cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center text-xs text-white font-medium`}
+                        className={`absolute h-full ${color} rounded cursor-pointer hover:opacity-80 transition-opacity flex flex-col items-center justify-center text-xs text-white font-medium overflow-hidden`}
                         style={{
                           left: `${left}%`,
                           width: `${width}%`,
                         }}
-                        title={`${booking.customerName || 'Customer'} - ${booking.serviceName || 'Service'}\n${booking.startHour}:${booking.startMinute.toString().padStart(2, '0')} (${booking.durationMinutes}m)`}
+                        title={`${booking.customerName || 'Customer'} - ${booking.serviceName || 'Service'}\n${booking.startHour}:${booking.startMinute.toString().padStart(2, '0')} (${booking.durationMinutes}m)${booking.assignedWorkers && booking.assignedWorkers.length > 0 ? `\nWorkers: ${booking.assignedWorkers.map(w => w.workerName).join(', ')}` : ''}`}
                       >
                         {width > 8 && (
-                          <span className="truncate px-1">
-                            {booking.startHour}:{booking.startMinute.toString().padStart(2, '0')}
-                          </span>
+                          <>
+                            <span className="truncate px-1">
+                              {booking.startHour}:{booking.startMinute.toString().padStart(2, '0')}
+                            </span>
+                            {booking.assignedWorkers && booking.assignedWorkers.length > 0 && width > 12 && (
+                              <span className="truncate px-1 text-[10px] opacity-90">
+                                {booking.assignedWorkers.map(w => w.workerName.split(' ').map(n => n[0]).join('')).join(',')}
+                              </span>
+                            )}
+                          </>
                         )}
                       </div>
                     );

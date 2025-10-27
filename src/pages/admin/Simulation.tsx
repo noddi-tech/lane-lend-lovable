@@ -167,21 +167,59 @@ export default function Simulation() {
       }
 
       // Transform bookings for timeline (already loaded earlier)
-      setProgressMessage('Calculating metrics...');
-      const timelineBookings = dayBookings.map((booking: any) => {
-        const startTime = new Date(booking.delivery_window_starts_at);
-        return {
-          id: booking.id,
-          laneId: booking.lane_id,
-          laneName: booking.lane?.name || 'Unknown',
-          startHour: startTime.getHours(),
-          startMinute: startTime.getMinutes(),
-          durationMinutes: Math.floor(booking.service_time_seconds / 60),
-          status: booking.status,
-          customerName: 'Customer',
-          serviceName: booking.booking_sales_items?.[0]?.sales_item?.name || 'Service',
-        };
-      });
+      setProgressMessage('Loading worker assignments...');
+      const timelineBookings = await Promise.all(
+        dayBookings.map(async (booking: any) => {
+          const startTime = new Date(booking.delivery_window_starts_at);
+          
+          // Fetch worker assignments for this booking
+          const { data: bookingIntervals } = await supabase
+            .from('booking_intervals')
+            .select(`
+              booked_seconds,
+              interval_id,
+              contribution_intervals!inner(
+                contribution:worker_contributions!inner(
+                  worker_id,
+                  worker:service_workers(first_name, last_name)
+                )
+              )
+            `)
+            .eq('booking_id', booking.id);
+
+          // Extract unique workers
+          const workersMap = new Map();
+          bookingIntervals?.forEach((bi: any) => {
+            bi.contribution_intervals?.forEach((ci: any) => {
+              const workerId = ci.contribution?.worker_id;
+              const worker = ci.contribution?.worker;
+              if (workerId && worker) {
+                if (!workersMap.has(workerId)) {
+                  workersMap.set(workerId, {
+                    workerId,
+                    workerName: `${worker.first_name} ${worker.last_name}`,
+                    allocatedSeconds: 0
+                  });
+                }
+                workersMap.get(workerId).allocatedSeconds += bi.booked_seconds || 0;
+              }
+            });
+          });
+
+          return {
+            id: booking.id,
+            laneId: booking.lane_id,
+            laneName: booking.lane?.name || 'Unknown',
+            startHour: startTime.getHours(),
+            startMinute: startTime.getMinutes(),
+            durationMinutes: Math.floor(booking.service_time_seconds / 60),
+            status: booking.status,
+            customerName: 'Customer',
+            serviceName: booking.booking_sales_items?.[0]?.sales_item?.name || 'Service',
+            assignedWorkers: Array.from(workersMap.values())
+          };
+        })
+      );
 
       setBookings(timelineBookings);
 

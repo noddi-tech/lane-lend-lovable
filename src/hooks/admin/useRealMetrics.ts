@@ -30,7 +30,13 @@ export const useRealMetrics = (selectedDate: Date | null) => {
           id,
           starts_at,
           ends_at,
-          contribution_intervals(remaining_seconds)
+          contribution_intervals(
+            remaining_seconds,
+            contribution:worker_contributions!inner(
+              available_seconds,
+              worker_id
+            )
+          )
         `)
         .gte('starts_at', startOfDay.toISOString())
         .lte('starts_at', endOfDay.toISOString());
@@ -60,10 +66,10 @@ export const useRealMetrics = (selectedDate: Date | null) => {
           hourlyData[hour] = { capacity: 0, booked: 0 };
         }
 
-        // Sum capacity from all contributions in this interval
+        // Sum ORIGINAL capacity from worker_contributions (not remaining_seconds)
         const contributions = interval.contribution_intervals as any[];
         const intervalCapacity = contributions?.reduce(
-          (sum, contrib) => sum + (contrib.remaining_seconds || 0),
+          (sum, contrib) => sum + (contrib.contribution?.available_seconds || 0),
           0
         ) || 0;
 
