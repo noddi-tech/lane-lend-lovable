@@ -27,7 +27,7 @@ export function useLanes(drivingGateId?: string) {
     queryKey: ['lanes', drivingGateId],
     queryFn: async () => {
       let query = supabase
-        .from('lanes_new')
+        .from('lanes_new' as any)
         .select(`
           *,
           driving_gate:driving_gates!driving_gate_id(id, name),
@@ -43,7 +43,7 @@ export function useLanes(drivingGateId?: string) {
 
       if (error) throw error;
       
-      return data as LaneWithCapabilities[];
+      return data as any as LaneWithCapabilities[];
     },
   });
 }
@@ -54,7 +54,7 @@ export function useCreateLane() {
   return useMutation({
     mutationFn: async (lane: Partial<Lane>) => {
       const { data, error } = await supabase
-        .from('lanes_new')
+        .from('lanes_new' as any)
         .insert(lane as any)
         .select()
         .single();
@@ -78,7 +78,7 @@ export function useUpdateLane() {
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Lane> & { id: string }) => {
       const { data, error } = await supabase
-        .from('lanes_new')
+        .from('lanes_new' as any)
         .update(updates)
         .eq('id', id)
         .select()
@@ -103,7 +103,7 @@ export function useDeleteLane() {
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
-        .from('lanes_new')
+        .from('lanes_new' as any)
         .delete()
         .eq('id', id);
 

@@ -1,334 +1,233 @@
 import { useState } from 'react';
-import { 
-  useLanes, 
-  useCreateLane, 
-  useUpdateLane, 
-  useDeleteLane,
-  type LaneWithCapabilities 
-} from '@/hooks/admin/useLanes';
-import { useDrivingGates } from '@/hooks/admin/useDrivingGates';
-import { useCapabilities } from '@/hooks/admin/useCapabilities';
+import { AdminLayout } from '@/components/layouts/AdminLayout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useLanes, useCreateLane, useUpdateLane, useDeleteLane, type LaneWithCapabilities } from '@/hooks/admin/useLanes';
+import { useDrivingGates } from '@/hooks/admin/useDrivingGates';
+import { Plus, Edit, Trash2, MapPin } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { Lane } from '@/hooks/admin/useLanes';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Pencil, Trash2, Clock, Zap, X } from 'lucide-react';
-import { useForm } from 'react-hook-form';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 export default function Lanes() {
   const { data: lanes, isLoading } = useLanes();
-  const { data: allCapabilities } = useCapabilities();
+  const { data: drivingGates } = useDrivingGates();
   const createLane = useCreateLane();
   const updateLane = useUpdateLane();
   const deleteLane = useDeleteLane();
-  const assignCapability = useAssignCapabilityToLane();
-  const removeCapability = useRemoveCapabilityFromLane();
 
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingLane, setEditingLane] = useState<LaneWithCapabilities | null>(null);
-  const [deletingLaneId, setDeletingLaneId] = useState<string | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [expandedLaneId, setExpandedLaneId] = useState<string | null>(null);
-  const [selectedCapabilityId, setSelectedCapabilityId] = useState<string>('');
+  const [formData, setFormData] = useState({
+    driving_gate_id: '',
+    name: '',
+    position_order: 0,
+    grid_position_y: 0,
+    grid_height: 2,
+    open_time: '',
+    close_time: '',
+  });
 
-  const { register, handleSubmit, reset } = useForm<Partial<LaneWithCapabilities>>();
-
-  const onSubmit = async (data: Partial<LaneWithCapabilities>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const submitData = {
+      ...formData,
+      open_time: formData.open_time || null,
+      close_time: formData.close_time || null,
+    };
+    
     if (editingLane) {
-      await updateLane.mutateAsync({ ...data, id: editingLane.id });
+      await updateLane.mutateAsync({ id: editingLane.id, ...submitData });
+      setEditingLane(null);
     } else {
-      await createLane.mutateAsync(data);
+      await createLane.mutateAsync(submitData);
+      setIsCreateOpen(false);
     }
-    setIsDialogOpen(false);
-    setEditingLane(null);
-    reset();
+    
+    setFormData({
+      driving_gate_id: '',
+      name: '',
+      position_order: 0,
+      grid_position_y: 0,
+      grid_height: 2,
+      open_time: '',
+      close_time: '',
+    });
   };
 
   const handleEdit = (lane: LaneWithCapabilities) => {
     setEditingLane(lane);
-    reset(lane);
-    setIsDialogOpen(true);
+    setFormData({
+      driving_gate_id: lane.driving_gate_id,
+      name: lane.name,
+      position_order: lane.position_order,
+      grid_position_y: lane.grid_position_y,
+      grid_height: lane.grid_height,
+      open_time: lane.open_time || '',
+      close_time: lane.close_time || '',
+    });
   };
 
-  const handleAssignCapability = async (laneId: string) => {
-    if (!selectedCapabilityId) return;
-    await assignCapability.mutateAsync({ laneId, capabilityId: selectedCapabilityId });
-    setSelectedCapabilityId('');
-  };
-
-  const handleRemoveCapability = async (laneId: string, capabilityId: string) => {
-    await removeCapability.mutateAsync({ laneId, capabilityId });
-  };
-
-  const getAvailableCapabilities = (lane: LaneWithCapabilities) => {
-    const laneCapabilityIds = lane.capabilities.map(c => c.id);
-    return allCapabilities?.filter(cap => !laneCapabilityIds.includes(cap.id)) || [];
-  };
-
-  const handleDelete = async () => {
-    if (deletingLaneId) {
-      await deleteLane.mutateAsync(deletingLaneId);
-      setDeletingLaneId(null);
+  const handleDelete = async (id: string) => {
+    if (confirm('Are you sure you want to delete this lane? All stations will be removed.')) {
+      await deleteLane.mutateAsync(id);
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Lanes Management</h1>
-          <p className="text-muted-foreground mt-1">Manage service lanes and their operating hours</p>
+          <h1 className="text-3xl font-bold">Lanes</h1>
+          <p className="text-muted-foreground mt-1">Manage service lanes within driving gates</p>
         </div>
+        
+        <Button onClick={() => setIsCreateOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Lane
+        </Button>
+      </div>
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => { setEditingLane(null); reset({}); }}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Lane
-            </Button>
-          </DialogTrigger>
+      {isLoading ? (
+        <div>Loading...</div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {lanes?.map((lane) => (
+            <Card key={lane.id}>
+              <CardHeader>
+                <CardTitle>{lane.name}</CardTitle>
+                <CardDescription>
+                  {lane.driving_gate?.name || 'No driving gate'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm space-y-1">
+                  <p><strong>Position:</strong> {lane.position_order}</p>
+                  <p><strong>Stations:</strong> {lane.stations?.length || 0}</p>
+                  {lane.open_time && lane.close_time && (
+                    <p><strong>Hours:</strong> {lane.open_time} - {lane.close_time}</p>
+                  )}
+                  {lane.closed_for_new_bookings_at && (
+                    <Badge variant="destructive">Closed for new bookings</Badge>
+                  )}
+                </div>
+                
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleEdit(lane)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleDelete(lane.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {(isCreateOpen || editingLane) && (
+        <Dialog open={isCreateOpen || !!editingLane} onOpenChange={(open) => {
+          if (!open) {
+            setIsCreateOpen(false);
+            setEditingLane(null);
+          }
+        }}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{editingLane ? 'Edit Lane' : 'Create New Lane'}</DialogTitle>
+              <DialogTitle>{editingLane ? 'Edit Lane' : 'Create Lane'}</DialogTitle>
+              <DialogDescription>
+                {editingLane ? 'Update lane details' : 'Add a new lane to a driving gate'}
+              </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="driving_gate_id">Driving Gate</Label>
+                <Select 
+                  value={formData.driving_gate_id} 
+                  onValueChange={(value) => setFormData({ ...formData, driving_gate_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select driving gate" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {drivingGates?.map((gate) => (
+                      <SelectItem key={gate.id} value={gate.id}>
+                        {gate.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div>
                 <Label htmlFor="name">Lane Name</Label>
-                <Input id="name" {...register('name', { required: true })} placeholder="e.g., Express Lane 1" />
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="open_time">Open Time</Label>
-                  <Input id="open_time" type="time" {...register('open_time', { required: true })} />
+                  <Label htmlFor="position_order">Position Order</Label>
+                  <Input
+                    id="position_order"
+                    type="number"
+                    value={formData.position_order}
+                    onChange={(e) => setFormData({ ...formData, position_order: parseInt(e.target.value) })}
+                  />
                 </div>
                 <div>
-                  <Label htmlFor="close_time">Close Time</Label>
-                  <Input id="close_time" type="time" {...register('close_time', { required: true })} />
+                  <Label htmlFor="grid_height">Grid Height</Label>
+                  <Input
+                    id="grid_height"
+                    type="number"
+                    min="1"
+                    value={formData.grid_height}
+                    onChange={(e) => setFormData({ ...formData, grid_height: parseInt(e.target.value) })}
+                  />
                 </div>
               </div>
-
-              <div>
-                <Label htmlFor="time_zone">Time Zone</Label>
-                <Input id="time_zone" {...register('time_zone')} placeholder="e.g., Europe/Oslo" defaultValue="Europe/Oslo" />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="open_time">Open Time (optional)</Label>
+                  <Input
+                    id="open_time"
+                    type="time"
+                    value={formData.open_time}
+                    onChange={(e) => setFormData({ ...formData, open_time: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="close_time">Close Time (optional)</Label>
+                  <Input
+                    id="close_time"
+                    type="time"
+                    value={formData.close_time}
+                    onChange={(e) => setFormData({ ...formData, close_time: e.target.value })}
+                  />
+                </div>
               </div>
-
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={createLane.isPending || updateLane.isPending}>
-                  {editingLane ? 'Update' : 'Create'}
-                </Button>
-              </div>
+              <Button type="submit" className="w-full" disabled={createLane.isPending || updateLane.isPending}>
+                {editingLane ? 'Update Lane' : 'Create Lane'}
+              </Button>
             </form>
           </DialogContent>
         </Dialog>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            Active Lanes
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Operating Hours</TableHead>
-                <TableHead>Time Zone</TableHead>
-                <TableHead>Capabilities</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {lanes?.map((lane) => (
-                <Collapsible
-                  key={lane.id}
-                  open={expandedLaneId === lane.id}
-                  onOpenChange={(open) => setExpandedLaneId(open ? lane.id : null)}
-                  asChild
-                >
-                  <>
-                    <TableRow>
-                      <TableCell className="font-medium">{lane.name}</TableCell>
-                      <TableCell>
-                        {lane.open_time} - {lane.close_time}
-                      </TableCell>
-                      <TableCell>{lane.time_zone}</TableCell>
-                      <TableCell>
-                        <CollapsibleTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-auto p-0 hover:bg-transparent">
-                            <div className="flex items-center gap-2">
-                              <Zap className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-sm">
-                                {lane.capabilities.length} capabilit{lane.capabilities.length !== 1 ? 'ies' : 'y'}
-                              </span>
-                            </div>
-                          </Button>
-                        </CollapsibleTrigger>
-                      </TableCell>
-                      <TableCell>
-                        {lane.closed_for_new_bookings_at ? (
-                          <Badge variant="destructive">Closed</Badge>
-                        ) : (
-                          <Badge variant="default">Open</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEdit(lane)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setDeletingLaneId(lane.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    <CollapsibleContent asChild>
-                      <TableRow>
-                        <TableCell colSpan={6} className="bg-muted/50">
-                          <div className="p-4 space-y-4">
-                            <div>
-                              <h4 className="text-sm font-medium mb-3">Assigned Capabilities</h4>
-                              <div className="flex flex-wrap gap-2 mb-4">
-                                {lane.capabilities.length === 0 ? (
-                                  <p className="text-sm text-muted-foreground">No capabilities assigned yet</p>
-                                ) : (
-                                  lane.capabilities.map((capability) => (
-                                    <Badge key={capability.id} variant="secondary" className="gap-1">
-                                      {capability.name}
-                                      <button
-                                        onClick={() => handleRemoveCapability(lane.id, capability.id)}
-                                        className="ml-1 hover:text-destructive"
-                                      >
-                                        <X className="h-3 w-3" />
-                                      </button>
-                                    </Badge>
-                                  ))
-                                )}
-                              </div>
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-medium mb-3">Add Capability</h4>
-                              <div className="flex gap-2 max-w-md">
-                                <Select 
-                                  value={selectedCapabilityId} 
-                                  onValueChange={setSelectedCapabilityId}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select a capability to add" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {getAvailableCapabilities(lane).length === 0 ? (
-                                      <div className="p-2 text-sm text-muted-foreground">
-                                        All capabilities assigned
-                                      </div>
-                                    ) : (
-                                      getAvailableCapabilities(lane).map((capability) => (
-                                        <SelectItem key={capability.id} value={capability.id}>
-                                          {capability.name}
-                                        </SelectItem>
-                                      ))
-                                    )}
-                                  </SelectContent>
-                                </Select>
-                                <Button
-                                  onClick={() => handleAssignCapability(lane.id)}
-                                  disabled={!selectedCapabilityId}
-                                >
-                                  Add
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    </CollapsibleContent>
-                  </>
-                </Collapsible>
-              ))}
-            </TableBody>
-          </Table>
-
-          {!lanes?.length && (
-            <div className="text-center py-8 text-muted-foreground">
-              No lanes created yet. Click "Add Lane" to get started.
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <AlertDialog open={!!deletingLaneId} onOpenChange={() => setDeletingLaneId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Lane</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this lane? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      )}
     </div>
   );
 }

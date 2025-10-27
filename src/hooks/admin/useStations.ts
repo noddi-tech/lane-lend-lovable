@@ -29,7 +29,7 @@ export function useStations(laneId?: string) {
     queryKey: ['stations', laneId],
     queryFn: async () => {
       let query = supabase
-        .from('stations')
+        .from('stations' as any)
         .select(`
           *,
           station_capabilities(
@@ -54,10 +54,10 @@ export function useStations(laneId?: string) {
 
       if (error) throw error;
       
-      return data.map(station => ({
+      return data.map((station: any) => ({
         ...station,
         capabilities: station.station_capabilities?.map((sc: any) => sc.capabilities).filter(Boolean) || [],
-      })) as StationWithCapabilities[];
+      })) as any as StationWithCapabilities[];
     },
   });
 }
@@ -68,7 +68,7 @@ export function useCreateStation() {
   return useMutation({
     mutationFn: async (station: Partial<Station>) => {
       const { data, error } = await supabase
-        .from('stations')
+        .from('stations' as any)
         .insert(station as any)
         .select()
         .single();
@@ -92,8 +92,9 @@ export function useUpdateStation() {
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Station> & { id: string }) => {
       const { data, error } = await supabase
-        .from('stations')
+        .from('stations' as any)
         .update(updates)
+        .eq('id', id)
         .select()
         .single();
 
@@ -116,7 +117,7 @@ export function useDeleteStation() {
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
-        .from('stations')
+        .from('stations' as any)
         .delete()
         .eq('id', id);
 
@@ -138,8 +139,8 @@ export function useAssignCapabilityToStation() {
   return useMutation({
     mutationFn: async ({ stationId, capabilityId }: { stationId: string; capabilityId: string }) => {
       const { error } = await supabase
-        .from('station_capabilities')
-        .insert({ station_id: stationId, capability_id: capabilityId });
+        .from('station_capabilities' as any)
+        .insert({ station_id: stationId, capability_id: capabilityId } as any);
 
       if (error) throw error;
     },
@@ -159,7 +160,7 @@ export function useRemoveCapabilityFromStation() {
   return useMutation({
     mutationFn: async ({ stationId, capabilityId }: { stationId: string; capabilityId: string }) => {
       const { error } = await supabase
-        .from('station_capabilities')
+        .from('station_capabilities' as any)
         .delete()
         .eq('station_id', stationId)
         .eq('capability_id', capabilityId);
