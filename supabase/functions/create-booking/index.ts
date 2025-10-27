@@ -9,7 +9,7 @@ interface CreateBookingRequest {
   sales_item_ids: string[];
   delivery_window_starts_at: string;
   delivery_window_ends_at: string;
-  station_ids: string[];
+  lane_id: string;
   address_id?: string;
   vehicle_make?: string;
   vehicle_model?: string;
@@ -44,37 +44,64 @@ Deno.serve(async (req) => {
     const bookingData: CreateBookingRequest = await req.json();
     console.log('Creating booking for user:', user.id, bookingData);
 
-    if (!bookingData.station_ids || bookingData.station_ids.length === 0) {
-      throw new Error('At least one station is required');
+    // Validate lane exists and is not closed
+    const { data: lane, error: laneError } = await supabase
+      .from('lanes')
+      .select('id, name, closed_for_new_bookings_at')
+      .eq('id', bookingData.lane_id)
+      .single();
+
+    if (laneError || !lane) {
+      throw new Error('Lane not found');
     }
 
-    // Fetch all stations and their lanes
-    const { data: stations, error: stationsError } = await supabase
+    if (lane.closed_for_new_bookings_at && new Date(lane.closed_for_new_bookings_at) < new Date()) {
+      throw new Error(`Lane "${lane.name}" is closed for new bookings`);
+    }
+
+    // Get required capabilities from selected services
+    const { data: requiredCapabilities } = await supabase
+      .from('sales_item_capabilities')
+      .select('capability_id')
+      .in('sales_item_id', bookingData.sales_item_ids);
+
+    const requiredCapabilityIds = [...new Set(requiredCapabilities?.map(c => c.capability_id) || [])];
+    console.log('Required capabilities:', requiredCapabilityIds);
+
+    // Find active stations in this lane that have all required capabilities
+    const { data: allStations } = await supabase
       .from('stations')
-      .select('id, lane_id, active, lanes_new!inner(id, name, closed_for_new_bookings_at)')
-      .in('id', bookingData.station_ids);
+      .select(`
+        id,
+        name,
+        grid_position_x,
+        grid_position_y,
+        station_capabilities!inner(capability_id)
+      `)
+      .eq('lane_id', bookingData.lane_id)
+      .eq('active', true);
 
-    if (stationsError || !stations || stations.length !== bookingData.station_ids.length) {
-      throw new Error('One or more stations not found');
+    // Filter stations that have ALL required capabilities
+    const compatibleStations = (allStations || []).filter((station: any) => {
+      const stationCapIds = station.station_capabilities.map((sc: any) => sc.capability_id);
+      return requiredCapabilityIds.every(capId => stationCapIds.includes(capId));
+    });
+
+    if (compatibleStations.length === 0) {
+      throw new Error('No stations available with required capabilities');
     }
 
-    // Check if any station is inactive
-    const inactiveStation = stations.find((s: any) => !s.active);
-    if (inactiveStation) {
-      throw new Error('One or more stations are inactive');
-    }
+    // Sort by grid position for logical flow through facility
+    compatibleStations.sort((a: any, b: any) => {
+      if (a.grid_position_x !== b.grid_position_x) {
+        return a.grid_position_x - b.grid_position_x;
+      }
+      return a.grid_position_y - b.grid_position_y;
+    });
 
-    // Check if any lane is closed
-    const closedLane = stations.find((s: any) => 
-      s.lanes_new.closed_for_new_bookings_at && 
-      new Date(s.lanes_new.closed_for_new_bookings_at) < new Date()
-    );
-    if (closedLane) {
-      throw new Error(`Lane "${(closedLane as any).lanes_new.name}" is closed for new bookings`);
-    }
-
-    // Get first station's lane for backward compatibility
-    const firstLane = (stations[0] as any).lanes_new;
+    // Automatically assign station sequence (use all compatible stations)
+    const assignedStationIds = compatibleStations.map((s: any) => s.id);
+    console.log('Auto-assigned stations:', assignedStationIds);
 
     // Calculate total service time
     const { data: salesItems } = await supabase
@@ -103,7 +130,7 @@ Deno.serve(async (req) => {
       .from('bookings')
       .insert({
         user_id: user.id,
-        lane_id: (stations[0] as any).lane_id, // Use first station's lane
+        lane_id: bookingData.lane_id,
         address_id: bookingData.address_id,
         delivery_window_starts_at: bookingData.delivery_window_starts_at,
         delivery_window_ends_at: bookingData.delivery_window_ends_at,
@@ -125,11 +152,11 @@ Deno.serve(async (req) => {
 
     console.log('Booking created:', booking.id);
 
-    // Insert booking_stations records with sequence order and estimated times
-    const stationServiceTime = Math.floor(totalServiceTime / bookingData.station_ids.length);
+    // Insert booking_stations records with automatically assigned sequence
+    const stationServiceTime = Math.floor(totalServiceTime / assignedStationIds.length);
     let cumulativeTime = 0;
     
-    const bookingStationsData = bookingData.station_ids.map((stId, index) => {
+    const bookingStationsData = assignedStationIds.map((stId, index) => {
       const startTime = new Date(new Date(bookingData.delivery_window_starts_at).getTime() + cumulativeTime * 1000);
       const endTime = new Date(startTime.getTime() + stationServiceTime * 1000);
       cumulativeTime += stationServiceTime;
@@ -152,7 +179,7 @@ Deno.serve(async (req) => {
       throw new Error('Failed to create booking station sequence');
     }
 
-    console.log(`Created ${bookingData.station_ids.length} booking stations`);
+    console.log(`Auto-assigned ${assignedStationIds.length} stations to booking`);
 
     // Calculate total window duration for pro-rata distribution
     const windowStart = new Date(bookingData.delivery_window_starts_at).getTime();
@@ -188,12 +215,12 @@ Deno.serve(async (req) => {
         throw new Error('Failed to create booking intervals');
       }
 
-      // Update capacity for first lane (backward compatibility)
+      // Update lane capacity
       const { data: existingCapacity } = await supabase
         .from('lane_interval_capacity')
         .select('total_booked_seconds')
         .eq('interval_id', interval.id)
-        .eq('lane_id', (stations[0] as any).lane_id)
+        .eq('lane_id', bookingData.lane_id)
         .maybeSingle();
 
       const newBookedSeconds = (existingCapacity?.total_booked_seconds || 0) + proRataSeconds;
@@ -202,7 +229,7 @@ Deno.serve(async (req) => {
         .from('lane_interval_capacity')
         .upsert({
           interval_id: interval.id,
-          lane_id: (stations[0] as any).lane_id,
+          lane_id: bookingData.lane_id,
           total_booked_seconds: newBookedSeconds,
         });
 
@@ -229,7 +256,11 @@ Deno.serve(async (req) => {
     console.log('Booking created successfully:', booking.id);
 
     return new Response(
-      JSON.stringify({ booking_id: booking.id, status: 'confirmed' }),
+      JSON.stringify({ 
+        booking_id: booking.id, 
+        status: 'confirmed',
+        assigned_stations: assignedStationIds 
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

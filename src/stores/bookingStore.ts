@@ -9,24 +9,24 @@ interface VehicleInfo {
 }
 
 interface AvailabilitySlot {
+  interval_id: string;
   starts_at: string;
   ends_at: string;
   lane_id: string;
+  lane_name: string;
   available_seconds: number;
 }
 
 interface BookingState {
   selectedServices: string[];
   selectedDate: Date | null;
-  selectedStations: string[];
+  selectedSlot: AvailabilitySlot | null;
   vehicleInfo: VehicleInfo | null;
   currentStep: number;
   addService: (id: string) => void;
   removeService: (id: string) => void;
   setDate: (date: Date) => void;
-  addStation: (id: string) => void;
-  removeStation: (id: string) => void;
-  clearStations: () => void;
+  setSlot: (slot: AvailabilitySlot | null) => void;
   setVehicleInfo: (info: VehicleInfo) => void;
   nextStep: () => void;
   prevStep: () => void;
@@ -36,7 +36,7 @@ interface BookingState {
 export const useBookingStore = create<BookingState>((set) => ({
   selectedServices: [],
   selectedDate: null,
-  selectedStations: [],
+  selectedSlot: null,
   vehicleInfo: null,
   currentStep: 1,
 
@@ -50,20 +50,12 @@ export const useBookingStore = create<BookingState>((set) => ({
 
   setDate: (date) => set({ selectedDate: date }),
 
-  addStation: (id) => set((state) => ({
-    selectedStations: [...state.selectedStations, id],
-  })),
-
-  removeStation: (id) => set((state) => ({
-    selectedStations: state.selectedStations.filter((s) => s !== id),
-  })),
-
-  clearStations: () => set({ selectedStations: [] }),
+  setSlot: (slot) => set({ selectedSlot: slot }),
 
   setVehicleInfo: (info) => set({ vehicleInfo: info }),
 
   nextStep: () => set((state) => ({
-    currentStep: Math.min(state.currentStep + 1, 5),
+    currentStep: Math.min(state.currentStep + 1, 4),
   })),
 
   prevStep: () => set((state) => ({
@@ -73,7 +65,7 @@ export const useBookingStore = create<BookingState>((set) => ({
   reset: () => set({
     selectedServices: [],
     selectedDate: null,
-    selectedStations: [],
+    selectedSlot: null,
     vehicleInfo: null,
     currentStep: 1,
   }),

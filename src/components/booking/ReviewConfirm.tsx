@@ -10,7 +10,7 @@ import { toast } from '@/hooks/use-toast';
 
 export const ReviewConfirm = () => {
   const navigate = useNavigate();
-  const { selectedServices, selectedDate, selectedStations, vehicleInfo, reset, prevStep } = useBookingStore();
+  const { selectedServices, selectedSlot, vehicleInfo, reset, prevStep } = useBookingStore();
   const { data: salesItems } = useSalesItems();
   const createBooking = useCreateBooking();
 
@@ -29,7 +29,7 @@ export const ReviewConfirm = () => {
   };
 
   const handleConfirm = async () => {
-    if (!selectedDate || !selectedStations.length || !vehicleInfo) {
+    if (!selectedSlot || !vehicleInfo) {
       toast({
         title: 'Error',
         description: 'Missing booking information',
@@ -39,17 +39,11 @@ export const ReviewConfirm = () => {
     }
 
     try {
-      // Use selected date for delivery window
-      const startOfDay = new Date(selectedDate);
-      startOfDay.setHours(8, 0, 0, 0);
-      const endOfDay = new Date(selectedDate);
-      endOfDay.setHours(17, 0, 0, 0);
-
       await createBooking.mutateAsync({
         sales_item_ids: selectedServices,
-        delivery_window_starts_at: startOfDay.toISOString(),
-        delivery_window_ends_at: endOfDay.toISOString(),
-        station_ids: selectedStations,
+        delivery_window_starts_at: selectedSlot.starts_at,
+        delivery_window_ends_at: selectedSlot.ends_at,
+        lane_id: selectedSlot.lane_id,
         vehicle_make: vehicleInfo.make,
         vehicle_model: vehicleInfo.model,
         vehicle_year: vehicleInfo.year,
@@ -113,16 +107,21 @@ export const ReviewConfirm = () => {
           <CardContent>
             <div className="space-y-3">
               <div>
-                <p className="text-sm text-muted-foreground">Date</p>
+                <p className="text-sm text-muted-foreground">Date & Time</p>
                 <p className="font-medium">
-                  {selectedDate ? format(selectedDate, 'EEEE, MMMM d, yyyy') : '-'}
+                  {selectedSlot
+                    ? format(new Date(selectedSlot.starts_at), 'EEEE, MMMM d, yyyy')
+                    : '-'}
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {selectedSlot
+                    ? `${format(new Date(selectedSlot.starts_at), 'HH:mm')} - ${format(new Date(selectedSlot.ends_at), 'HH:mm')}`
+                    : '-'}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Stations</p>
-                <p className="font-medium">
-                  {selectedStations.length} station{selectedStations.length !== 1 ? 's' : ''} selected
-                </p>
+                <p className="text-sm text-muted-foreground">Lane</p>
+                <p className="font-medium">{selectedSlot?.lane_name || '-'}</p>
               </div>
             </div>
           </CardContent>
