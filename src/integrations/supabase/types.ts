@@ -107,6 +107,51 @@ export type Database = {
           },
         ]
       }
+      booking_stations: {
+        Row: {
+          booking_id: string
+          created_at: string | null
+          estimated_end_time: string | null
+          estimated_start_time: string | null
+          id: string
+          sequence_order: number
+          station_id: string
+        }
+        Insert: {
+          booking_id: string
+          created_at?: string | null
+          estimated_end_time?: string | null
+          estimated_start_time?: string | null
+          id?: string
+          sequence_order: number
+          station_id: string
+        }
+        Update: {
+          booking_id?: string
+          created_at?: string | null
+          estimated_end_time?: string | null
+          estimated_start_time?: string | null
+          id?: string
+          sequence_order?: number
+          station_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_stations_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_stations_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "stations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bookings: {
         Row: {
           address_id: string | null
@@ -291,6 +336,42 @@ export type Database = {
           },
         ]
       }
+      driving_gates: {
+        Row: {
+          close_time: string
+          created_at: string | null
+          description: string | null
+          grid_height: number
+          grid_width: number
+          id: string
+          name: string
+          open_time: string
+          updated_at: string | null
+        }
+        Insert: {
+          close_time?: string
+          created_at?: string | null
+          description?: string | null
+          grid_height?: number
+          grid_width?: number
+          id?: string
+          name: string
+          open_time?: string
+          updated_at?: string | null
+        }
+        Update: {
+          close_time?: string
+          created_at?: string | null
+          description?: string | null
+          grid_height?: number
+          grid_width?: number
+          id?: string
+          name?: string
+          open_time?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       lane_capabilities: {
         Row: {
           capability_id: string
@@ -397,6 +478,53 @@ export type Database = {
             columns: ["service_department_id"]
             isOneToOne: false
             referencedRelation: "service_departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lanes_new: {
+        Row: {
+          close_time: string | null
+          created_at: string | null
+          driving_gate_id: string
+          grid_height: number
+          grid_position_y: number
+          id: string
+          name: string
+          open_time: string | null
+          position_order: number
+          updated_at: string | null
+        }
+        Insert: {
+          close_time?: string | null
+          created_at?: string | null
+          driving_gate_id: string
+          grid_height?: number
+          grid_position_y?: number
+          id?: string
+          name: string
+          open_time?: string | null
+          position_order?: number
+          updated_at?: string | null
+        }
+        Update: {
+          close_time?: string | null
+          created_at?: string | null
+          driving_gate_id?: string
+          grid_height?: number
+          grid_position_y?: number
+          id?: string
+          name?: string
+          open_time?: string | null
+          position_order?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lanes_new_driving_gate_id_fkey"
+            columns: ["driving_gate_id"]
+            isOneToOne: false
+            referencedRelation: "driving_gates"
             referencedColumns: ["id"]
           },
         ]
@@ -573,6 +701,95 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      station_capabilities: {
+        Row: {
+          capability_id: string
+          station_id: string
+        }
+        Insert: {
+          capability_id: string
+          station_id: string
+        }
+        Update: {
+          capability_id?: string
+          station_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "station_capabilities_capability_id_fkey"
+            columns: ["capability_id"]
+            isOneToOne: false
+            referencedRelation: "capabilities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "station_capabilities_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "stations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stations: {
+        Row: {
+          active: boolean | null
+          close_time: string | null
+          created_at: string | null
+          description: string | null
+          grid_height: number
+          grid_position_x: number
+          grid_position_y: number
+          grid_width: number
+          id: string
+          lane_id: string
+          name: string
+          open_time: string | null
+          station_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          close_time?: string | null
+          created_at?: string | null
+          description?: string | null
+          grid_height?: number
+          grid_position_x?: number
+          grid_position_y?: number
+          grid_width?: number
+          id?: string
+          lane_id: string
+          name: string
+          open_time?: string | null
+          station_type?: string
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          close_time?: string | null
+          created_at?: string | null
+          description?: string | null
+          grid_height?: number
+          grid_position_x?: number
+          grid_position_y?: number
+          grid_width?: number
+          id?: string
+          lane_id?: string
+          name?: string
+          open_time?: string | null
+          station_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stations_lane_id_fkey"
+            columns: ["lane_id"]
+            isOneToOne: false
+            referencedRelation: "lanes_new"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {

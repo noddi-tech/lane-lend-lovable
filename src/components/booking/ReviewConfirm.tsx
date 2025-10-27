@@ -43,7 +43,7 @@ export const ReviewConfirm = () => {
         sales_item_ids: selectedServices,
         delivery_window_starts_at: selectedSlot.starts_at,
         delivery_window_ends_at: selectedSlot.ends_at,
-        lane_id: selectedSlot.lane_id,
+        station_ids: [selectedSlot.lane_id], // Temporary: use lane_id as station until UI is updated
         vehicle_make: vehicleInfo.make,
         vehicle_model: vehicleInfo.model,
         vehicle_year: vehicleInfo.year,

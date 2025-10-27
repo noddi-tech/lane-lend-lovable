@@ -9,7 +9,7 @@ interface CreateBookingRequest {
   sales_item_ids: string[];
   delivery_window_starts_at: string;
   delivery_window_ends_at: string;
-  lane_id: string;
+  station_ids: string[];
   address_id?: string;
   vehicle_make?: string;
   vehicle_model?: string;
@@ -44,40 +44,37 @@ Deno.serve(async (req) => {
     const bookingData: CreateBookingRequest = await req.json();
     console.log('Creating booking for user:', user.id, bookingData);
 
-    // Fetch lane details
-    const { data: lane, error: laneError } = await supabase
-      .from('lanes')
-      .select('*')
-      .eq('id', bookingData.lane_id)
-      .single();
-
-    if (laneError || !lane) {
-      throw new Error('Lane not found');
+    if (!bookingData.station_ids || bookingData.station_ids.length === 0) {
+      throw new Error('At least one station is required');
     }
 
-    if (lane.closed_for_new_bookings_at && new Date(lane.closed_for_new_bookings_at) < new Date()) {
-      throw new Error('Lane is closed for new bookings');
+    // Fetch all stations and their lanes
+    const { data: stations, error: stationsError } = await supabase
+      .from('stations')
+      .select('id, lane_id, active, lanes_new!inner(id, name, closed_for_new_bookings_at)')
+      .in('id', bookingData.station_ids);
+
+    if (stationsError || !stations || stations.length !== bookingData.station_ids.length) {
+      throw new Error('One or more stations not found');
     }
 
-    // Verify lane has required capabilities
-    const { data: requiredCaps } = await supabase
-      .from('sales_item_capabilities')
-      .select('capability_id')
-      .in('sales_item_id', bookingData.sales_item_ids);
-
-    const requiredCapabilityIds = [...new Set(requiredCaps?.map(c => c.capability_id) || [])];
-
-    const { data: laneCaps } = await supabase
-      .from('lane_capabilities')
-      .select('capability_id')
-      .eq('lane_id', lane.id);
-
-    const laneCapabilityIds = laneCaps?.map(c => c.capability_id) || [];
-    const hasAllCapabilities = requiredCapabilityIds.every(capId => laneCapabilityIds.includes(capId));
-
-    if (!hasAllCapabilities) {
-      throw new Error('Lane does not have required capabilities');
+    // Check if any station is inactive
+    const inactiveStation = stations.find((s: any) => !s.active);
+    if (inactiveStation) {
+      throw new Error('One or more stations are inactive');
     }
+
+    // Check if any lane is closed
+    const closedLane = stations.find((s: any) => 
+      s.lanes_new.closed_for_new_bookings_at && 
+      new Date(s.lanes_new.closed_for_new_bookings_at) < new Date()
+    );
+    if (closedLane) {
+      throw new Error(`Lane "${(closedLane as any).lanes_new.name}" is closed for new bookings`);
+    }
+
+    // Get first station's lane for backward compatibility
+    const firstLane = (stations[0] as any).lanes_new;
 
     // Calculate total service time
     const { data: salesItems } = await supabase
@@ -106,7 +103,7 @@ Deno.serve(async (req) => {
       .from('bookings')
       .insert({
         user_id: user.id,
-        lane_id: bookingData.lane_id,
+        lane_id: (stations[0] as any).lane_id, // Use first station's lane
         address_id: bookingData.address_id,
         delivery_window_starts_at: bookingData.delivery_window_starts_at,
         delivery_window_ends_at: bookingData.delivery_window_ends_at,
@@ -128,25 +125,51 @@ Deno.serve(async (req) => {
 
     console.log('Booking created:', booking.id);
 
+    // Insert booking_stations records with sequence order and estimated times
+    const stationServiceTime = Math.floor(totalServiceTime / bookingData.station_ids.length);
+    let cumulativeTime = 0;
+    
+    const bookingStationsData = bookingData.station_ids.map((stId, index) => {
+      const startTime = new Date(new Date(bookingData.delivery_window_starts_at).getTime() + cumulativeTime * 1000);
+      const endTime = new Date(startTime.getTime() + stationServiceTime * 1000);
+      cumulativeTime += stationServiceTime;
+      
+      return {
+        booking_id: booking.id,
+        station_id: stId,
+        sequence_order: index + 1,
+        estimated_start_time: startTime.toISOString(),
+        estimated_end_time: endTime.toISOString(),
+      };
+    });
+
+    const { error: bookingStationsError } = await supabase
+      .from('booking_stations')
+      .insert(bookingStationsData);
+
+    if (bookingStationsError) {
+      console.error('Failed to insert booking stations:', bookingStationsError);
+      throw new Error('Failed to create booking station sequence');
+    }
+
+    console.log(`Created ${bookingData.station_ids.length} booking stations`);
+
     // Calculate total window duration for pro-rata distribution
     const windowStart = new Date(bookingData.delivery_window_starts_at).getTime();
     const windowEnd = new Date(bookingData.delivery_window_ends_at).getTime();
-    const totalWindowDuration = (windowEnd - windowStart) / 1000; // in seconds
+    const totalWindowDuration = (windowEnd - windowStart) / 1000;
 
     // Distribute service time across intervals
     for (const interval of intervals) {
       const intervalStart = new Date(interval.starts_at).getTime();
       const intervalEnd = new Date(interval.ends_at).getTime();
-      const intervalDuration = (intervalEnd - intervalStart) / 1000;
 
-      // Calculate overlap
       const overlapStart = Math.max(windowStart, intervalStart);
       const overlapEnd = Math.min(windowEnd, intervalEnd);
       const overlapDuration = (overlapEnd - overlapStart) / 1000;
 
       if (overlapDuration <= 0) continue;
 
-      // Pro-rata service time
       const proRataSeconds = Math.round((overlapDuration / totalWindowDuration) * totalServiceTime);
 
       console.log(`Interval ${interval.id}: allocating ${proRataSeconds}s`);
@@ -165,62 +188,26 @@ Deno.serve(async (req) => {
         throw new Error('Failed to create booking intervals');
       }
 
-      // Get worker contributions for this interval + lane
-      const { data: contributions } = await supabase
-        .from('contribution_intervals')
-        .select('*, contribution:worker_contributions!inner(lane_id)')
-        .eq('interval_id', interval.id);
-
-      const laneContributions = contributions?.filter(
-        (c: any) => c.contribution.lane_id === lane.id
-      ) || [];
-
-      // Upsert lane_interval_capacity (use proRataSeconds, not multiplied by worker count)
+      // Update capacity for first lane (backward compatibility)
       const { data: existingCapacity } = await supabase
         .from('lane_interval_capacity')
         .select('total_booked_seconds')
         .eq('interval_id', interval.id)
-        .eq('lane_id', lane.id)
+        .eq('lane_id', (stations[0] as any).lane_id)
         .maybeSingle();
 
       const newBookedSeconds = (existingCapacity?.total_booked_seconds || 0) + proRataSeconds;
-      
-      console.log(`📊 Interval ${interval.id}: Adding ${proRataSeconds}s to lane capacity (${laneContributions.length} workers)`);
 
       const { error: licError } = await supabase
         .from('lane_interval_capacity')
         .upsert({
           interval_id: interval.id,
-          lane_id: lane.id,
+          lane_id: (stations[0] as any).lane_id,
           total_booked_seconds: newBookedSeconds,
         });
 
       if (licError) {
         console.error('Error updating lane_interval_capacity:', licError);
-        throw new Error('Failed to update capacity');
-      }
-
-      // Update contribution_intervals - distribute evenly among workers
-      const perWorker = laneContributions.length > 0 
-        ? Math.floor(proRataSeconds / laneContributions.length)
-        : proRataSeconds;
-      
-      for (const contrib of laneContributions) {
-        const newRemaining = Math.max(0, contrib.remaining_seconds - perWorker);
-        
-        console.log(`  ✅ Worker ${contrib.contribution_id}: ${contrib.remaining_seconds}s → ${newRemaining}s (-${perWorker}s)`);
-        
-        const { error: ciError } = await supabase
-          .from('contribution_intervals')
-          .update({
-            remaining_seconds: newRemaining,
-          })
-          .eq('contribution_id', contrib.contribution_id)
-          .eq('interval_id', interval.id);
-
-        if (ciError) {
-          console.error('Error updating contribution_intervals:', ciError);
-        }
       }
     }
 

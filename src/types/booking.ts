@@ -37,7 +37,7 @@ export interface CreateBookingInput {
   sales_item_ids: string[];
   delivery_window_starts_at: string;
   delivery_window_ends_at: string;
-  lane_id: string;
+  station_ids: string[]; // Array of station IDs in sequence order
   address_id?: string;
   vehicle_make?: string;
   vehicle_model?: string;
