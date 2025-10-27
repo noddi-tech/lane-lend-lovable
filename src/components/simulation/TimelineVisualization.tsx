@@ -124,8 +124,8 @@ export default function TimelineVisualization({ bookings, lanes }: TimelineVisua
                               {booking.startHour}:{booking.startMinute.toString().padStart(2, '0')}
                             </span>
                             {booking.assignedWorkers && booking.assignedWorkers.length > 0 && width > 8 && (
-                              <span className="truncate px-1 text-[10px] opacity-90">
-                                {booking.assignedWorkers.map(w => w.workerName.split(' ').map(n => n[0]).join('')).join(',')}
+                              <span className="truncate px-1 text-[11px] font-medium opacity-90">
+                                {booking.assignedWorkers.map(w => w.workerName.split(' ').map(n => n[0]).join('')).join(' · ')}
                               </span>
                             )}
                           </>

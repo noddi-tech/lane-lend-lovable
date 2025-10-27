@@ -186,6 +186,86 @@ export default function Simulation() {
         }
       }
 
+      // Overbooking Detection scenario
+      if (config.edgeCaseTriggers.overbooking) {
+        setProgressMessage('Detecting overbooking scenarios...');
+        toast.info('Analyzing capacity for overbooking...');
+        
+        const { data: busyIntervals } = await supabase
+          .from('lane_interval_capacity')
+          .select('interval_id, lane_id, total_booked_seconds, capacity_intervals!inner(starts_at)')
+          .gte('capacity_intervals.starts_at', startOfDay.toISOString())
+          .lt('capacity_intervals.starts_at', endOfDay.toISOString())
+          .order('total_booked_seconds', { ascending: false })
+          .limit(10);
+
+        let overbookingCount = 0;
+        const overbookedDetails: string[] = [];
+        
+        if (busyIntervals && busyIntervals.length > 0) {
+          for (const interval of busyIntervals) {
+            const { detectOverbooking } = await import('@/utils/simulation/overbookingScenario');
+            const result = await detectOverbooking(interval.interval_id, interval.lane_id);
+            
+            if (result.isOverbooked) {
+              overbookingCount++;
+              const hour = new Date(interval.capacity_intervals.starts_at).getHours();
+              overbookedDetails.push(`${hour}:00 (${result.utilizationPercent.toFixed(0)}%)`);
+            }
+          }
+        }
+        
+        setAlerts(prev => [...prev, {
+          id: crypto.randomUUID(),
+          timestamp: new Date(),
+          severity: overbookingCount > 0 ? 'critical' : 'info',
+          category: 'overbooking',
+          title: 'Overbooking Detection',
+          description: overbookingCount > 0
+            ? `${overbookingCount} overbooked intervals detected: ${overbookedDetails.slice(0, 3).join(', ')}`
+            : 'No overbooking detected in current bookings',
+        }]);
+      }
+
+      // Worker Unavailability scenario
+      if (config.edgeCaseTriggers.workerUnavailability) {
+        setProgressMessage('Simulating worker unavailability...');
+        toast.info('Simulating worker unavailability...');
+        
+        const { data: workers } = await supabase
+          .from('service_workers')
+          .select('id, first_name, last_name')
+          .eq('active', true)
+          .limit(10);
+        
+        if (workers && workers.length > 0) {
+          const unavailableWorker = workers[Math.floor(Math.random() * workers.length)];
+          
+          const unavailableStart = new Date(selectedDate);
+          unavailableStart.setHours(11, 0, 0, 0);
+          const unavailableEnd = new Date(selectedDate);
+          unavailableEnd.setHours(15, 0, 0, 0);
+          
+          const { data: contributions } = await supabase
+            .from('worker_contributions')
+            .select('id, lane_id')
+            .eq('worker_id', unavailableWorker.id)
+            .gte('starts_at', unavailableStart.toISOString())
+            .lt('ends_at', unavailableEnd.toISOString());
+          
+          const affectedContributions = contributions?.length || 0;
+          
+          setAlerts(prev => [...prev, {
+            id: crypto.randomUUID(),
+            timestamp: new Date(),
+            severity: affectedContributions > 0 ? 'warning' : 'info',
+            category: 'worker',
+            title: 'Worker Unavailability Simulation',
+            description: `${unavailableWorker.first_name} ${unavailableWorker.last_name} unavailable 11:00-15:00 (${affectedContributions} shifts affected)`,
+          }]);
+        }
+      }
+
       // NOW load bookings AFTER edge cases have modified the database
       setProgressMessage('Loading updated bookings...');
       const dayBookings = await loadBookingsForDate(selectedDate);
@@ -215,10 +295,12 @@ export default function Simulation() {
                 interval_id,
                 worker_contributions!inner(
                   worker_id,
+                  lane_id,
                   service_workers!inner(first_name, last_name)
                 )
               `)
-              .in('interval_id', intervalIds);
+              .in('interval_id', intervalIds)
+              .eq('worker_contributions.lane_id', booking.lane_id);
 
             if (workerError) {
               console.error('Error fetching workers for booking:', booking.id, workerError);
