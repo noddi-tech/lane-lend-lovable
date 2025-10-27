@@ -759,6 +759,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      set_trigger_enabled: {
+        Args: { enabled: boolean; table_name: string; trigger_name: string }
+        Returns: undefined
+      }
       sync_contribution_intervals: { Args: never; Returns: undefined }
     }
     Enums: {

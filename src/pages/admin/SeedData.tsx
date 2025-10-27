@@ -125,13 +125,23 @@ export default function SeedData() {
       console.log('Clearing existing sample data...');
       toast.info('Clearing existing data...');
       
+      // Delete bookings and related data FIRST (they reference lanes, addresses)
+      await supabase.from('booking_sales_items').delete().neq('booking_id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('booking_intervals').delete().neq('booking_id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('bookings').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('addresses').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      
+      // Now safe to delete worker contributions and intervals
       await supabase.from('worker_contributions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       await supabase.from('contribution_intervals').delete().neq('contribution_id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('booking_intervals').delete().neq('booking_id', '00000000-0000-0000-0000-000000000000');
+      
+      // Delete junction tables
       await supabase.from('lane_capabilities').delete().neq('lane_id', '00000000-0000-0000-0000-000000000000');
       await supabase.from('worker_skills').delete().neq('worker_id', '00000000-0000-0000-0000-000000000000');
       await supabase.from('capability_skills').delete().neq('capability_id', '00000000-0000-0000-0000-000000000000');
       await supabase.from('worker_capabilities').delete().neq('worker_id', '00000000-0000-0000-0000-000000000000');
+      
+      // Now safe to delete base entities
       await supabase.from('lanes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       await supabase.from('service_workers').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       await supabase.from('capabilities').delete().neq('id', '00000000-0000-0000-0000-000000000000');
@@ -370,14 +380,38 @@ export default function SeedData() {
       });
     }
 
-    const { data: createdContributions, error: contribError } = await supabase
-      .from('worker_contributions')
-      .insert(shifts)
-      .select();
+    // Disable trigger during bulk insert to prevent timeout
+    console.log('Disabling sync trigger for bulk insert...');
+    await supabase.rpc('set_trigger_enabled', {
+      trigger_name: 'sync_intervals_on_contribution_change',
+      table_name: 'worker_contributions',
+      enabled: false
+    });
 
-    if (contribError) throw new Error(`Contributions: ${contribError.message}`);
-    results.contributions = createdContributions?.length || 0;
-    console.log(`Created ${results.contributions} worker shifts`);
+    try {
+      const { data: createdContributions, error: contribError } = await supabase
+        .from('worker_contributions')
+        .insert(shifts)
+        .select();
+
+      if (contribError) throw new Error(`Contributions: ${contribError.message}`);
+      results.contributions = createdContributions?.length || 0;
+      console.log(`Created ${results.contributions} worker shifts`);
+    } finally {
+      // Re-enable trigger
+      console.log('Re-enabling sync trigger...');
+      await supabase.rpc('set_trigger_enabled', {
+        trigger_name: 'sync_intervals_on_contribution_change',
+        table_name: 'worker_contributions',
+        enabled: true
+      });
+
+      // Manually sync once at the end
+      console.log('Syncing capacity intervals (this may take a moment)...');
+      const { error: syncError } = await supabase.rpc('sync_contribution_intervals' as any);
+      if (syncError) throw new Error(`Sync intervals: ${syncError.message}`);
+      console.log('Capacity intervals synced successfully');
+    }
   };
 
   return (
