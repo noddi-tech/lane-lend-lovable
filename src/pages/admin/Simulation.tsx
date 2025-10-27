@@ -196,46 +196,60 @@ export default function Simulation() {
         dayBookings.map(async (booking: any) => {
           const startTime = new Date(booking.delivery_window_starts_at);
           
-          // Fetch worker assignments for this booking
-          const { data: bookingIntervals, error: workerError } = await supabase
+          // Fetch worker assignments for this booking (2-step approach)
+          // Step 1: Get interval IDs for this booking
+          const { data: bookingIntervals } = await supabase
             .from('booking_intervals')
-            .select(`
-              booked_seconds,
-              interval_id,
-              contribution_intervals!inner(
-                contribution:worker_contributions!inner(
-                  worker_id,
-                  worker:service_workers(first_name, last_name)
-                )
-              )
-            `)
+            .select('interval_id, booked_seconds')
             .eq('booking_id', booking.id);
 
-          if (workerError) {
-            console.error('Error fetching workers for booking:', booking.id, workerError);
-          }
-
-          // Extract unique workers
           const workersMap = new Map();
+          
           if (bookingIntervals && bookingIntervals.length > 0) {
-            bookingIntervals.forEach((bi: any) => {
-            bi.contribution_intervals?.forEach((ci: any) => {
-              const workerId = ci.contribution?.worker_id;
-              const worker = ci.contribution?.worker;
-              if (workerId && worker) {
-                if (!workersMap.has(workerId)) {
-                  workersMap.set(workerId, {
-                    workerId,
-                    workerName: `${worker.first_name} ${worker.last_name}`,
-                    allocatedSeconds: 0
-                  });
+            // Step 2: Get contribution intervals and workers for these interval IDs
+            const intervalIds = bookingIntervals.map(bi => bi.interval_id);
+            const { data: contributionData, error: workerError } = await supabase
+              .from('contribution_intervals')
+              .select(`
+                contribution_id,
+                interval_id,
+                worker_contributions!inner(
+                  worker_id,
+                  service_workers!inner(first_name, last_name)
+                )
+              `)
+              .in('interval_id', intervalIds);
+
+            if (workerError) {
+              console.error('Error fetching workers for booking:', booking.id, workerError);
+            }
+
+            // Build unique worker list with allocated time
+            if (contributionData && contributionData.length > 0) {
+              contributionData.forEach((contrib: any) => {
+                const worker = contrib.worker_contributions?.service_workers;
+                if (worker) {
+                  const workerId = contrib.worker_contributions.worker_id;
+                  if (!workersMap.has(workerId)) {
+                    workersMap.set(workerId, {
+                      workerId,
+                      workerName: `${worker.first_name} ${worker.last_name}`,
+                      allocatedSeconds: 0
+                    });
+                  }
+                  // Find booked seconds for this interval
+                  const intervalBooking = bookingIntervals.find(bi => bi.interval_id === contrib.interval_id);
+                  if (intervalBooking) {
+                    workersMap.get(workerId).allocatedSeconds += intervalBooking.booked_seconds || 0;
+                  }
                 }
-                workersMap.get(workerId).allocatedSeconds += bi.booked_seconds || 0;
-              }
-            });
-            });
+              });
+              console.log(`✅ Found ${workersMap.size} workers for booking ${booking.id}`);
+            } else {
+              console.warn(`⚠️ No workers found for booking ${booking.id}`);
+            }
           } else {
-            console.warn(`No workers found for booking ${booking.id}`);
+            console.warn(`⚠️ No booking intervals found for booking ${booking.id}`);
           }
 
           return {
