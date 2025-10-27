@@ -118,12 +118,12 @@ export default function TimelineVisualization({ bookings, lanes }: TimelineVisua
                         }}
                         title={`${booking.customerName || 'Customer'} - ${booking.serviceName || 'Service'}\n${booking.startHour}:${booking.startMinute.toString().padStart(2, '0')} (${booking.durationMinutes}m)${booking.assignedWorkers && booking.assignedWorkers.length > 0 ? `\nWorkers: ${booking.assignedWorkers.map(w => w.workerName).join(', ')}` : ''}`}
                       >
-                        {width > 8 && (
+                        {width > 6 && (
                           <>
                             <span className="truncate px-1">
                               {booking.startHour}:{booking.startMinute.toString().padStart(2, '0')}
                             </span>
-                            {booking.assignedWorkers && booking.assignedWorkers.length > 0 && width > 12 && (
+                            {booking.assignedWorkers && booking.assignedWorkers.length > 0 && width > 8 && (
                               <span className="truncate px-1 text-[10px] opacity-90">
                                 {booking.assignedWorkers.map(w => w.workerName.split(' ').map(n => n[0]).join('')).join(',')}
                               </span>

@@ -56,11 +56,13 @@ export async function simulateRushHour(
           vehicle_year: 2020,
         },
       });
+      console.log(`✅ Created rush hour booking at ${bookingTime.toLocaleTimeString()}`);
       inRushHour++;
     } catch (error) {
       console.error('Failed to create rush hour booking:', error);
     }
   }
 
+  console.log(`📊 Rush hour: Created ${inRushHour}/${rushBookingsCount} bookings between ${config.startHour}:00-${config.endHour}:00`);
   return { totalBookings: rushBookingsCount, inRushHour };
 }

@@ -51,6 +51,7 @@ export async function simulateExtendedServices(
       .eq('id', booking.id);
 
     if (!error) {
+      console.log(`✅ Extended booking ${booking.id}: ${originalDuration}s → ${extendedDuration}s (+${extensionMinutes}m)`);
       extensions.push({
         bookingId: booking.id,
         originalDuration,
@@ -61,8 +62,11 @@ export async function simulateExtendedServices(
           totalDelayMinutes: extensionMinutes,
         },
       });
+    } else {
+      console.error(`❌ Failed to extend booking ${booking.id}:`, error);
     }
   }
 
+  console.log(`📊 Extended ${extensions.length} bookings. Total extension: ${extensions.reduce((sum, e) => sum + e.extensionMinutes, 0)} minutes`);
   return extensions;
 }

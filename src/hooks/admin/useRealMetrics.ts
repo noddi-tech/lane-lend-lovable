@@ -10,6 +10,15 @@ interface RealMetricsData {
   workersOnShift: number;
   avgWorkerUtilization: number;
   hourlyUtilization: Record<number, number>;
+  workers: Array<{
+    workerId: string;
+    workerName: string;
+    totalCapacity: number;
+    totalBooked: number;
+    utilization: number;
+    shiftStart: string;
+    shiftEnd: string;
+  }>;
 }
 
 export const useRealMetrics = (selectedDate: Date | null) => {
@@ -131,6 +140,41 @@ export const useRealMetrics = (selectedDate: Date | null) => {
       // Calculate per-worker utilization
       const avgWorkerUtilization = workersOnShift > 0 ? averageUtilization : 0;
 
+      // Calculate detailed worker statistics
+      const workerStats = new Map();
+      
+      for (const interval of intervals) {
+        const contributions = interval.contribution_intervals as any[];
+        
+        contributions?.forEach((c: any) => {
+          const contribution = c.contribution;
+          const worker = contribution?.worker;
+          const workerId = contribution?.worker_id;
+          
+          if (!workerId || !worker) return;
+          
+          if (!workerStats.has(workerId)) {
+            workerStats.set(workerId, {
+              workerId,
+              workerName: `${worker.first_name} ${worker.last_name}`,
+              totalCapacity: 0,
+              totalBooked: 0,
+              shiftStart: new Date(contribution.starts_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+              shiftEnd: new Date(contribution.ends_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+            });
+          }
+          
+          const stats = workerStats.get(workerId);
+          stats.totalCapacity += contribution.available_seconds || 0;
+          stats.totalBooked += (contribution.available_seconds - c.remaining_seconds) || 0;
+        });
+      }
+      
+      const workers = Array.from(workerStats.values()).map(w => ({
+        ...w,
+        utilization: w.totalCapacity > 0 ? (w.totalBooked / w.totalCapacity) * 100 : 0,
+      }));
+
       return {
         totalCapacitySeconds: totalCapacity,
         totalBookedSeconds: totalBooked,
@@ -140,6 +184,7 @@ export const useRealMetrics = (selectedDate: Date | null) => {
         workersOnShift,
         avgWorkerUtilization,
         hourlyUtilization,
+        workers,
       };
     },
     enabled: !!selectedDate,

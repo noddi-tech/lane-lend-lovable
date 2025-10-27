@@ -11,11 +11,13 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import SimulationConfig, { SimulationConfigData } from '@/components/simulation/SimulationConfig';
 import TimelineVisualization from '@/components/simulation/TimelineVisualization';
 import MetricsPanel, { SimulationMetrics } from '@/components/simulation/MetricsPanel';
+import WorkerUtilizationPanel from '@/components/simulation/WorkerUtilizationPanel';
 import EdgeCaseAlerts, { EdgeCaseAlert } from '@/components/simulation/EdgeCaseAlerts';
 import SimulationReadinessCard from '@/components/simulation/SimulationReadinessCard';
 import AvailableDatesCard from '@/components/simulation/AvailableDatesCard';
 import SimulationEmptyState from '@/components/simulation/SimulationEmptyState';
 import SimulationGuide from '@/components/simulation/SimulationGuide';
+import SimulationDebugPanel from '@/components/simulation/SimulationDebugPanel';
 import { DateBookingIndicator } from '@/components/simulation/DateBookingIndicator';
 import SystemStatusBadge from '@/components/seed-data/SystemStatusBadge';
 import { useSimulationReadiness } from '@/hooks/admin/useSimulationReadiness';
@@ -36,6 +38,7 @@ export default function Simulation() {
   const [alerts, setAlerts] = useState<EdgeCaseAlert[]>([]);
   const [progressMessage, setProgressMessage] = useState('');
   const [activeTab, setActiveTab] = useState<'config' | 'results'>('config');
+  const [workerUtilization, setWorkerUtilization] = useState<any[]>([]);
   const [config, setConfig] = useState<SimulationConfigData>({
     customerVolume: { mode: 'normal', multiplier: 1.0 },
     timeDistribution: { mode: 'realistic' },
@@ -89,17 +92,26 @@ export default function Simulation() {
     try {
       toast.info('Starting simulation...');
 
-      // Load bookings first to check count
-      setProgressMessage('Loading bookings...');
-      const dayBookings = await loadBookingsForDate(selectedDate);
+      // Check booking count WITHOUT loading full data first
+      setProgressMessage('Checking prerequisites...');
+      const startOfDay = new Date(selectedDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(selectedDate);
+      endOfDay.setHours(23, 59, 59, 999);
       
-      if (dayBookings.length === 0) {
+      const { count } = await supabase
+        .from('bookings')
+        .select('*', { count: 'exact', head: true })
+        .gte('delivery_window_starts_at', startOfDay.toISOString())
+        .lte('delivery_window_starts_at', endOfDay.toISOString());
+      
+      if (!count || count === 0) {
         toast.error('No bookings found for selected date');
         setIsRunning(false);
         return;
       }
 
-      // Run edge case scenarios
+      // Run edge case scenarios FIRST (they modify the database)
       if (config.edgeCaseTriggers.rushHour) {
         setProgressMessage('Simulating rush hour...');
         toast.info('Simulating rush hour...');
@@ -108,15 +120,17 @@ export default function Simulation() {
           endHour: config.timeDistribution.rushEnd ? parseInt(config.timeDistribution.rushEnd.split(':')[0]) : 12,
           concentrationPercent: 70,
         };
-        await simulateRushHour(rushConfig, selectedDate, lanes.map(l => l.id));
+        const rushResult = await simulateRushHour(rushConfig, selectedDate, lanes.map(l => l.id));
         
         setAlerts(prev => [...prev, {
           id: crypto.randomUUID(),
           timestamp: new Date(),
-          severity: 'warning',
+          severity: rushResult.inRushHour > 0 ? 'warning' : 'info',
           category: 'timing',
-          title: 'Rush Hour Simulation Complete',
-          description: '70% of bookings concentrated in 2-hour window',
+          title: 'Rush Hour Simulation',
+          description: rushResult.inRushHour > 0 
+            ? `Created ${rushResult.inRushHour} bookings in rush window (${rushConfig.startHour}:00-${rushConfig.endHour}:00)`
+            : 'Rush hour simulation attempted but no bookings created',
         }]);
       }
 
@@ -140,13 +154,17 @@ export default function Simulation() {
         toast.info('Simulating extended services...');
         const extensions = await simulateExtendedServices(selectedDate, 0.15);
         
+        const totalMinutes = extensions.reduce((sum, e) => sum + e.extensionMinutes, 0);
+        
         setAlerts(prev => [...prev, {
           id: crypto.randomUUID(),
           timestamp: new Date(),
-          severity: 'info',
+          severity: extensions.length > 0 ? 'info' : 'warning',
           category: 'timing',
-          title: 'Services Extended',
-          description: `${extensions.length} bookings extended by 30-60 minutes`,
+          title: 'Extended Services Simulation',
+          description: extensions.length > 0 
+            ? `${extensions.length} bookings extended by total of ${totalMinutes} minutes`
+            : 'No confirmed bookings available to extend',
         }]);
       }
 
@@ -168,14 +186,18 @@ export default function Simulation() {
         }
       }
 
-      // Transform bookings for timeline (already loaded earlier)
+      // NOW load bookings AFTER edge cases have modified the database
+      setProgressMessage('Loading updated bookings...');
+      const dayBookings = await loadBookingsForDate(selectedDate);
+      
+      // Transform bookings for timeline with worker assignments
       setProgressMessage('Loading worker assignments...');
       const timelineBookings = await Promise.all(
         dayBookings.map(async (booking: any) => {
           const startTime = new Date(booking.delivery_window_starts_at);
           
           // Fetch worker assignments for this booking
-          const { data: bookingIntervals } = await supabase
+          const { data: bookingIntervals, error: workerError } = await supabase
             .from('booking_intervals')
             .select(`
               booked_seconds,
@@ -189,9 +211,14 @@ export default function Simulation() {
             `)
             .eq('booking_id', booking.id);
 
+          if (workerError) {
+            console.error('Error fetching workers for booking:', booking.id, workerError);
+          }
+
           // Extract unique workers
           const workersMap = new Map();
-          bookingIntervals?.forEach((bi: any) => {
+          if (bookingIntervals && bookingIntervals.length > 0) {
+            bookingIntervals.forEach((bi: any) => {
             bi.contribution_intervals?.forEach((ci: any) => {
               const workerId = ci.contribution?.worker_id;
               const worker = ci.contribution?.worker;
@@ -206,7 +233,10 @@ export default function Simulation() {
                 workersMap.get(workerId).allocatedSeconds += bi.booked_seconds || 0;
               }
             });
-          });
+            });
+          } else {
+            console.warn(`No workers found for booking ${booking.id}`);
+          }
 
           return {
             id: booking.id,
@@ -243,6 +273,12 @@ export default function Simulation() {
       };
 
       setMetrics(calculatedMetrics);
+      
+      // Calculate and set worker utilization from realMetrics
+      if (realMetrics?.workers && realMetrics.workers.length > 0) {
+        setWorkerUtilization(realMetrics.workers);
+      }
+      
       setProgressMessage('');
       
       // Auto-switch to results tab
@@ -427,6 +463,11 @@ export default function Simulation() {
                 <MetricsPanel metrics={metrics} realMetrics={realMetrics} />
               </div>
 
+              {/* Worker Utilization Panel */}
+              {workerUtilization.length > 0 && (
+                <WorkerUtilizationPanel workers={workerUtilization} />
+              )}
+
               {/* Export Button */}
               <Card>
                 <CardContent className="pt-6">
@@ -441,6 +482,13 @@ export default function Simulation() {
                   </Button>
                 </CardContent>
               </Card>
+
+              {/* Debug Panel */}
+              <SimulationDebugPanel 
+                bookings={bookings} 
+                alerts={alerts} 
+                metrics={metrics} 
+              />
             </>
           )}
         </TabsContent>
