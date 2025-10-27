@@ -9,6 +9,9 @@ export interface DrivingGate {
   time_zone: string;
   grid_width: number;
   grid_height: number;
+  grid_position_x: number;
+  grid_position_y: number;
+  facility_id: string;
   open_time: string;
   close_time: string;
   created_at: string;

@@ -341,7 +341,10 @@ export type Database = {
           close_time: string
           created_at: string | null
           description: string | null
+          facility_id: string
           grid_height: number
+          grid_position_x: number | null
+          grid_position_y: number | null
           grid_width: number
           id: string
           name: string
@@ -352,7 +355,10 @@ export type Database = {
           close_time?: string
           created_at?: string | null
           description?: string | null
+          facility_id: string
           grid_height?: number
+          grid_position_x?: number | null
+          grid_position_y?: number | null
           grid_width?: number
           id?: string
           name: string
@@ -363,11 +369,55 @@ export type Database = {
           close_time?: string
           created_at?: string | null
           description?: string | null
+          facility_id?: string
           grid_height?: number
+          grid_position_x?: number | null
+          grid_position_y?: number | null
           grid_width?: number
           id?: string
           name?: string
           open_time?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driving_gates_facility_id_fkey"
+            columns: ["facility_id"]
+            isOneToOne: false
+            referencedRelation: "facilities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      facilities: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          grid_height: number
+          grid_width: number
+          id: string
+          name: string
+          time_zone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          grid_height?: number
+          grid_width?: number
+          id?: string
+          name: string
+          time_zone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          grid_height?: number
+          grid_width?: number
+          id?: string
+          name?: string
+          time_zone?: string | null
           updated_at?: string | null
         }
         Relationships: []

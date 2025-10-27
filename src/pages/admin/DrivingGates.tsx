@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { AdminLayout } from '@/components/layouts/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useDrivingGates, useCreateDrivingGate, useUpdateDrivingGate, useDeleteDrivingGate } from '@/hooks/admin/useDrivingGates';
+import { useFacilities } from '@/hooks/admin/useFacilities';
 import { Plus, Edit, Trash2, LayoutGrid } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { DrivingGate } from '@/hooks/admin/useDrivingGates';
@@ -14,6 +15,7 @@ import type { DrivingGate } from '@/hooks/admin/useDrivingGates';
 export default function DrivingGates() {
   const navigate = useNavigate();
   const { data: gates, isLoading } = useDrivingGates();
+  const { data: facilities } = useFacilities();
   const createGate = useCreateDrivingGate();
   const updateGate = useUpdateDrivingGate();
   const deleteGate = useDeleteDrivingGate();
@@ -23,9 +25,12 @@ export default function DrivingGates() {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
+    facility_id: '',
     time_zone: 'Europe/Oslo',
     grid_width: 30,
     grid_height: 20,
+    grid_position_x: 0,
+    grid_position_y: 0,
     open_time: '08:00:00',
     close_time: '17:00:00',
   });
@@ -44,9 +49,12 @@ export default function DrivingGates() {
     setFormData({
       name: '',
       description: '',
+      facility_id: '',
       time_zone: 'Europe/Oslo',
       grid_width: 30,
       grid_height: 20,
+      grid_position_x: 0,
+      grid_position_y: 0,
       open_time: '08:00:00',
       close_time: '17:00:00',
     });
@@ -57,9 +65,12 @@ export default function DrivingGates() {
     setFormData({
       name: gate.name,
       description: gate.description || '',
+      facility_id: gate.facility_id,
       time_zone: gate.time_zone,
       grid_width: gate.grid_width,
       grid_height: gate.grid_height,
+      grid_position_x: gate.grid_position_x,
+      grid_position_y: gate.grid_position_y,
       open_time: gate.open_time,
       close_time: gate.close_time,
     });
@@ -108,7 +119,7 @@ export default function DrivingGates() {
                       variant="outline"
                       size="sm"
                       className="flex-1"
-                      onClick={() => navigate(`/admin/driving-gates/${gate.id}/layout`)}
+                      onClick={() => navigate(`/admin/driving-gates/${gate.id}`)}
                     >
                       <LayoutGrid className="h-4 w-4 mr-2" />
                       Layout
@@ -149,6 +160,25 @@ export default function DrivingGates() {
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <Label htmlFor="facility_id">Facility</Label>
+                  <Select
+                    value={formData.facility_id}
+                    onValueChange={(value) => setFormData({ ...formData, facility_id: value })}
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select facility" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {facilities?.map((facility) => (
+                        <SelectItem key={facility.id} value={facility.id}>
+                          {facility.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div>
                   <Label htmlFor="name">Name</Label>
                   <Input

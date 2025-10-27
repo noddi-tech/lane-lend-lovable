@@ -22,6 +22,23 @@ export default function DrivingGateTest() {
     const errors: string[] = [];
 
     try {
+      // 0. Get or create default facility
+      toast.info('Getting default facility...');
+      const { data: facilities, error: facilityError } = await supabase
+        .from('facilities')
+        .select('id')
+        .limit(1);
+
+      if (facilityError || !facilities || facilities.length === 0) {
+        errors.push(`No facility found. Please create a facility first.`);
+        setTestResults({ errors });
+        setLoading(false);
+        toast.error('No facility found');
+        return;
+      }
+
+      const facilityId = facilities[0].id;
+
       // 1. Create Driving Gate
       toast.info('Creating test driving gate...');
       const { data: gate, error: gateError } = await supabase
@@ -29,8 +46,11 @@ export default function DrivingGateTest() {
         .insert({
           name: 'Test Auto Service Center',
           description: 'Automated test facility',
+          facility_id: facilityId,
           grid_width: 30,
           grid_height: 20,
+          grid_position_x: 0,
+          grid_position_y: 0,
           open_time: '07:00:00',
           close_time: '19:00:00',
         })

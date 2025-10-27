@@ -31,6 +31,8 @@ import DrivingGates from './pages/admin/DrivingGates';
 import Stations from './pages/admin/Stations';
 import DrivingGateLayout from './pages/admin/DrivingGateLayout';
 import DrivingGateTest from './pages/admin/DrivingGateTest';
+import Facilities from './pages/admin/Facilities';
+import FacilityLayout from './pages/admin/FacilityLayout';
 
 const queryClient = new QueryClient();
 
@@ -60,9 +62,11 @@ function AppContent() {
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="dashboard" element={<Dashboard />} />
+          <Route path="facilities" element={<Facilities />} />
+          <Route path="facilities/:facilityId" element={<FacilityLayout />} />
           <Route path="driving-gates" element={<DrivingGates />} />
-                <Route path="driving-gates/:id/layout" element={<DrivingGateLayout />} />
-                <Route path="driving-gate-test" element={<DrivingGateTest />} />
+          <Route path="driving-gates/:id" element={<DrivingGateLayout />} />
+          <Route path="driving-gate-test" element={<DrivingGateTest />} />
           <Route path="stations" element={<Stations />} />
           <Route path="lanes" element={<Lanes />} />
           <Route path="workers" element={<Workers />} />

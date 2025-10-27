@@ -21,13 +21,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, Settings, Users, Calendar, Gauge, LogOut, User, Award, Zap, Clock, Database, BarChart3, TestTube } from 'lucide-react';
+import { LayoutDashboard, Settings, Users, Calendar, Gauge, LogOut, User, Award, Zap, Clock, Database, BarChart3, TestTube, Building2 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 const menuItems = [
   { title: 'Dashboard', url: '/admin', icon: LayoutDashboard },
   { title: 'Bookings', url: '/admin/bookings', icon: Calendar },
   { title: 'Analytics', url: '/admin/analytics', icon: BarChart3 },
+  { title: 'Facilities', url: '/admin/facilities', icon: Building2 },
+  { title: 'Driving Gates', url: '/admin/driving-gates', icon: Building2 },
   { title: 'Capacity', url: '/admin/capacity', icon: Gauge },
   { title: 'Lanes', url: '/admin/lanes', icon: Gauge },
   { title: 'Workers', url: '/admin/workers', icon: Users },
