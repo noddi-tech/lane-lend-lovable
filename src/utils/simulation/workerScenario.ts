@@ -55,3 +55,38 @@ export async function simulateWorkerUnavailability(
     capacityReduction,
   };
 }
+
+export async function removeWorkerFromShifts(
+  workerId: string,
+  startTime: Date,
+  endTime: Date
+): Promise<WorkerRemovalImpact> {
+  // First get the impact before removal
+  const impact = await simulateWorkerUnavailability(workerId, startTime, endTime);
+  
+  // Get worker contributions in the time range
+  const { data: contributions } = await supabase
+    .from('worker_contributions')
+    .select('id')
+    .eq('worker_id', workerId)
+    .gte('starts_at', startTime.toISOString())
+    .lt('ends_at', endTime.toISOString());
+  
+  if (contributions && contributions.length > 0) {
+    const contributionIds = contributions.map(c => c.id);
+    
+    // Delete contribution intervals (removes capacity)
+    await supabase
+      .from('contribution_intervals')
+      .delete()
+      .in('contribution_id', contributionIds);
+    
+    // Delete worker contributions
+    await supabase
+      .from('worker_contributions')
+      .delete()
+      .in('id', contributionIds);
+  }
+  
+  return impact;
+}

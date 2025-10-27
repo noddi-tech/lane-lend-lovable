@@ -53,16 +53,19 @@ export default function TimelineVisualization({ bookings, lanes }: TimelineVisua
           </div>
           <div className="flex gap-2 text-xs flex-wrap justify-end">
             <Badge variant="outline" className="bg-blue-500/10 border-blue-500/50 text-blue-400">
-              Express
+              Express (Oil, Tire, Inspection)
             </Badge>
             <Badge variant="outline" className="bg-purple-500/10 border-purple-500/50 text-purple-400">
-              Full Service
+              Full (Brake, Engine, Transmission)
             </Badge>
             <Badge variant="outline" className="bg-teal-500/10 border-teal-500/50 text-teal-400">
-              EV
+              EV (Battery, Charging, Electric)
             </Badge>
-            <Badge variant="outline" className="bg-red-500/10 border-red-500/50 text-red-400">
-              Overbooked
+            <Badge variant="outline" className="bg-gray-500/10 border-gray-500/50 text-gray-400">
+              Cancelled
+            </Badge>
+            <Badge variant="outline" className="border-red-500/50 text-red-400">
+              Red Border = Overbooked (&gt;100%)
             </Badge>
           </div>
         </div>

@@ -83,10 +83,130 @@ export default function Simulation() {
     return data || [];
   };
 
+  const loadTimeline = async () => {
+    setIsRunning(true);
+    setProgressMessage('Loading timeline...');
+
+    try {
+      toast.info('Loading timeline...');
+
+      const dayBookings = await loadBookingsForDate(selectedDate);
+      
+      if (dayBookings.length === 0) {
+        toast.error('No bookings found for selected date');
+        setIsRunning(false);
+        return;
+      }
+
+      // Transform bookings for timeline
+      setProgressMessage('Loading worker assignments...');
+      const timelineBookings = await transformBookingsForTimeline(dayBookings);
+      setBookings(timelineBookings);
+
+      // Calculate metrics
+      const confirmed = dayBookings.filter((b: any) => b.status === 'confirmed').length;
+      const cancelled = dayBookings.filter((b: any) => b.status === 'cancelled').length;
+
+      const calculatedMetrics: SimulationMetrics = {
+        totalBookings: dayBookings.length,
+        confirmedBookings: confirmed,
+        cancelledBookings: cancelled,
+        averageUtilization: realMetrics?.averageUtilization || 0,
+        peakUtilization: realMetrics?.peakUtilization || 0,
+        peakHour: realMetrics?.peakHour || 8,
+        overbookings: 0,
+        warnings: 0,
+        workersOnShift: realMetrics?.workersOnShift || 0,
+        avgWorkerUtilization: realMetrics?.avgWorkerUtilization || 0,
+      };
+
+      setMetrics(calculatedMetrics);
+      
+      if (realMetrics?.workers && realMetrics.workers.length > 0) {
+        setWorkerUtilization(realMetrics.workers);
+      }
+      
+      setProgressMessage('');
+      setActiveTab('results');
+      toast.success(`Timeline loaded! ${dayBookings.length} bookings`);
+
+    } catch (error) {
+      console.error('Timeline load error:', error);
+      toast.error('Failed to load timeline');
+      setProgressMessage('');
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  const transformBookingsForTimeline = async (dayBookings: any[]) => {
+    return await Promise.all(
+      dayBookings.map(async (booking: any) => {
+        const startTime = new Date(booking.delivery_window_starts_at);
+        
+        const { data: bookingIntervals } = await supabase
+          .from('booking_intervals')
+          .select('interval_id, booked_seconds')
+          .eq('booking_id', booking.id);
+
+        const workersMap = new Map();
+        
+        if (bookingIntervals && bookingIntervals.length > 0) {
+          const intervalIds = bookingIntervals.map(bi => bi.interval_id);
+          const { data: contributionData } = await supabase
+            .from('contribution_intervals')
+            .select(`
+              contribution_id,
+              interval_id,
+              worker_contributions!inner(
+                worker_id,
+                lane_id,
+                service_workers!inner(first_name, last_name)
+              )
+            `)
+            .in('interval_id', intervalIds)
+            .eq('worker_contributions.lane_id', booking.lane_id);
+
+          if (contributionData && contributionData.length > 0) {
+            contributionData.forEach((contrib: any) => {
+              const worker = contrib.worker_contributions?.service_workers;
+              if (worker) {
+                const workerId = contrib.worker_contributions.worker_id;
+                if (!workersMap.has(workerId)) {
+                  workersMap.set(workerId, {
+                    workerId,
+                    workerName: `${worker.first_name} ${worker.last_name}`,
+                    allocatedSeconds: 0
+                  });
+                }
+                const intervalBooking = bookingIntervals.find(bi => bi.interval_id === contrib.interval_id);
+                if (intervalBooking) {
+                  workersMap.get(workerId).allocatedSeconds += intervalBooking.booked_seconds || 0;
+                }
+              }
+            });
+          }
+        }
+
+        return {
+          id: booking.id,
+          laneId: booking.lane_id,
+          laneName: booking.lane?.name || 'Unknown',
+          startHour: startTime.getHours(),
+          startMinute: startTime.getMinutes(),
+          durationMinutes: Math.floor(booking.service_time_seconds / 60),
+          status: booking.status,
+          customerName: 'Customer',
+          serviceName: booking.booking_sales_items?.[0]?.sales_item?.name || 'Service',
+          assignedWorkers: Array.from(workersMap.values())
+        };
+      })
+    );
+  };
+
   const runSimulation = async () => {
     setIsRunning(true);
     setAlerts([]);
-    setMetrics(null);
     setProgressMessage('Starting simulation...');
 
     try {
@@ -246,22 +366,22 @@ export default function Simulation() {
           const unavailableEnd = new Date(selectedDate);
           unavailableEnd.setHours(15, 0, 0, 0);
           
-          const { data: contributions } = await supabase
-            .from('worker_contributions')
-            .select('id, lane_id')
-            .eq('worker_id', unavailableWorker.id)
-            .gte('starts_at', unavailableStart.toISOString())
-            .lt('ends_at', unavailableEnd.toISOString());
-          
-          const affectedContributions = contributions?.length || 0;
+          // Actually remove worker from shifts
+          const { removeWorkerFromShifts } = await import('@/utils/simulation/workerScenario');
+          const impact = await removeWorkerFromShifts(
+            unavailableWorker.id, 
+            unavailableStart, 
+            unavailableEnd
+          );
           
           setAlerts(prev => [...prev, {
             id: crypto.randomUUID(),
             timestamp: new Date(),
-            severity: affectedContributions > 0 ? 'warning' : 'info',
+            severity: impact.affectedBookings.length > 0 ? 'critical' : 'info',
             category: 'worker',
             title: 'Worker Unavailability Simulation',
-            description: `${unavailableWorker.first_name} ${unavailableWorker.last_name} unavailable 11:00-15:00 (${affectedContributions} shifts affected)`,
+            description: `${unavailableWorker.first_name} ${unavailableWorker.last_name} unavailable 11:00-15:00 (${impact.affectedIntervals} intervals removed, ${impact.affectedBookings.length} bookings affected)`,
+            affectedBookings: impact.affectedBookings,
           }]);
         }
       }
@@ -270,85 +390,9 @@ export default function Simulation() {
       setProgressMessage('Loading updated bookings...');
       const dayBookings = await loadBookingsForDate(selectedDate);
       
-      // Transform bookings for timeline with worker assignments
+      // Transform bookings for timeline
       setProgressMessage('Loading worker assignments...');
-      const timelineBookings = await Promise.all(
-        dayBookings.map(async (booking: any) => {
-          const startTime = new Date(booking.delivery_window_starts_at);
-          
-          // Fetch worker assignments for this booking (2-step approach)
-          // Step 1: Get interval IDs for this booking
-          const { data: bookingIntervals } = await supabase
-            .from('booking_intervals')
-            .select('interval_id, booked_seconds')
-            .eq('booking_id', booking.id);
-
-          const workersMap = new Map();
-          
-          if (bookingIntervals && bookingIntervals.length > 0) {
-            // Step 2: Get contribution intervals and workers for these interval IDs
-            const intervalIds = bookingIntervals.map(bi => bi.interval_id);
-            const { data: contributionData, error: workerError } = await supabase
-              .from('contribution_intervals')
-              .select(`
-                contribution_id,
-                interval_id,
-                worker_contributions!inner(
-                  worker_id,
-                  lane_id,
-                  service_workers!inner(first_name, last_name)
-                )
-              `)
-              .in('interval_id', intervalIds)
-              .eq('worker_contributions.lane_id', booking.lane_id);
-
-            if (workerError) {
-              console.error('Error fetching workers for booking:', booking.id, workerError);
-            }
-
-            // Build unique worker list with allocated time
-            if (contributionData && contributionData.length > 0) {
-              contributionData.forEach((contrib: any) => {
-                const worker = contrib.worker_contributions?.service_workers;
-                if (worker) {
-                  const workerId = contrib.worker_contributions.worker_id;
-                  if (!workersMap.has(workerId)) {
-                    workersMap.set(workerId, {
-                      workerId,
-                      workerName: `${worker.first_name} ${worker.last_name}`,
-                      allocatedSeconds: 0
-                    });
-                  }
-                  // Find booked seconds for this interval
-                  const intervalBooking = bookingIntervals.find(bi => bi.interval_id === contrib.interval_id);
-                  if (intervalBooking) {
-                    workersMap.get(workerId).allocatedSeconds += intervalBooking.booked_seconds || 0;
-                  }
-                }
-              });
-              console.log(`✅ Found ${workersMap.size} workers for booking ${booking.id}`);
-            } else {
-              console.warn(`⚠️ No workers found for booking ${booking.id}`);
-            }
-          } else {
-            console.warn(`⚠️ No booking intervals found for booking ${booking.id}`);
-          }
-
-          return {
-            id: booking.id,
-            laneId: booking.lane_id,
-            laneName: booking.lane?.name || 'Unknown',
-            startHour: startTime.getHours(),
-            startMinute: startTime.getMinutes(),
-            durationMinutes: Math.floor(booking.service_time_seconds / 60),
-            status: booking.status,
-            customerName: 'Customer',
-            serviceName: booking.booking_sales_items?.[0]?.sales_item?.name || 'Service',
-            assignedWorkers: Array.from(workersMap.values())
-          };
-        })
-      );
-
+      const timelineBookings = await transformBookingsForTimeline(dayBookings);
       setBookings(timelineBookings);
 
       // Calculate metrics using real data
@@ -488,25 +532,51 @@ export default function Simulation() {
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <div>
+                        <div className="space-y-2">
                           <Button
-                            onClick={runSimulation}
+                            onClick={loadTimeline}
                             disabled={isRunning || !readiness?.isReady}
                             size="lg"
                             className="w-full"
+                            variant="outline"
                           >
-                            {isRunning ? (
+                            {isRunning && !alerts.length ? (
                               <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                {progressMessage || 'Running...'}
+                                {progressMessage || 'Loading...'}
                               </>
                             ) : (
                               <>
                                 <PlayCircle className="mr-2 h-4 w-4" />
-                                Run Simulation
+                                View Current Timeline
                               </>
                             )}
                           </Button>
+
+                          <Button
+                            onClick={runSimulation}
+                            disabled={isRunning || !readiness?.isReady || bookings.length === 0}
+                            size="lg"
+                            className="w-full"
+                          >
+                            {isRunning && alerts.length > 0 ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                {progressMessage || 'Applying...'}
+                              </>
+                            ) : (
+                              <>
+                                <PlayCircle className="mr-2 h-4 w-4" />
+                                Apply Edge Cases
+                              </>
+                            )}
+                          </Button>
+
+                          {bookings.length === 0 && (
+                            <p className="text-xs text-muted-foreground text-center">
+                              Load timeline first to enable edge cases
+                            </p>
+                          )}
                         </div>
                       </TooltipTrigger>
                       {!readiness?.isReady && (
