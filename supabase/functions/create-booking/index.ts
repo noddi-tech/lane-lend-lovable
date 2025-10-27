@@ -175,10 +175,7 @@ Deno.serve(async (req) => {
         (c: any) => c.contribution.lane_id === lane.id
       ) || [];
 
-      const contributionCount = laneContributions.length || 1;
-      const totalSecondsToBook = proRataSeconds * contributionCount;
-
-      // Upsert lane_interval_capacity
+      // Upsert lane_interval_capacity (use proRataSeconds, not multiplied by worker count)
       const { data: existingCapacity } = await supabase
         .from('lane_interval_capacity')
         .select('total_booked_seconds')
@@ -186,7 +183,9 @@ Deno.serve(async (req) => {
         .eq('lane_id', lane.id)
         .maybeSingle();
 
-      const newBookedSeconds = (existingCapacity?.total_booked_seconds || 0) + totalSecondsToBook;
+      const newBookedSeconds = (existingCapacity?.total_booked_seconds || 0) + proRataSeconds;
+      
+      console.log(`📊 Interval ${interval.id}: Adding ${proRataSeconds}s to lane capacity (${laneContributions.length} workers)`);
 
       const { error: licError } = await supabase
         .from('lane_interval_capacity')
@@ -201,12 +200,20 @@ Deno.serve(async (req) => {
         throw new Error('Failed to update capacity');
       }
 
-      // Update contribution_intervals
+      // Update contribution_intervals - distribute evenly among workers
+      const perWorker = laneContributions.length > 0 
+        ? Math.floor(proRataSeconds / laneContributions.length)
+        : proRataSeconds;
+      
       for (const contrib of laneContributions) {
+        const newRemaining = Math.max(0, contrib.remaining_seconds - perWorker);
+        
+        console.log(`  ✅ Worker ${contrib.contribution_id}: ${contrib.remaining_seconds}s → ${newRemaining}s (-${perWorker}s)`);
+        
         const { error: ciError } = await supabase
           .from('contribution_intervals')
           .update({
-            remaining_seconds: contrib.remaining_seconds - proRataSeconds,
+            remaining_seconds: newRemaining,
           })
           .eq('contribution_id', contrib.contribution_id)
           .eq('interval_id', interval.id);

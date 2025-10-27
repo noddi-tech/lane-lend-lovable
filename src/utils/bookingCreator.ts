@@ -128,21 +128,21 @@ async function updateCapacityTables(
       .eq('contribution.lane_id', laneId);
     
     if (contributions && contributions.length > 0) {
-      // Distribute the booked seconds among contributors proportionally
-      const totalRemaining = contributions.reduce((sum, c) => sum + c.remaining_seconds, 0);
+      // Distribute booked seconds evenly among all contributors
+      const perContribution = Math.floor(allocation.bookedSeconds / contributions.length);
+      
+      console.log(`📊 Interval ${allocation.intervalId}: Deducting ${perContribution}s from each of ${contributions.length} workers (total: ${allocation.bookedSeconds}s)`);
       
       for (const contrib of contributions) {
-        if (totalRemaining > 0) {
-          const proportion = contrib.remaining_seconds / totalRemaining;
-          const deduction = Math.floor(allocation.bookedSeconds * proportion);
-          const newRemaining = Math.max(0, contrib.remaining_seconds - deduction);
-          
-          await supabase
-            .from('contribution_intervals')
-            .update({ remaining_seconds: newRemaining })
-            .eq('contribution_id', contrib.contribution_id)
-            .eq('interval_id', allocation.intervalId);
-        }
+        const newRemaining = Math.max(0, contrib.remaining_seconds - perContribution);
+        
+        console.log(`  ✅ Worker ${contrib.contribution_id}: ${contrib.remaining_seconds}s → ${newRemaining}s (-${perContribution}s)`);
+        
+        await supabase
+          .from('contribution_intervals')
+          .update({ remaining_seconds: newRemaining })
+          .eq('contribution_id', contrib.contribution_id)
+          .eq('interval_id', allocation.intervalId);
       }
     }
   }
