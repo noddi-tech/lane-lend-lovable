@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PlayCircle, Download, Loader2, Info } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -34,6 +35,7 @@ export default function Simulation() {
   const [metrics, setMetrics] = useState<SimulationMetrics | null>(null);
   const [alerts, setAlerts] = useState<EdgeCaseAlert[]>([]);
   const [progressMessage, setProgressMessage] = useState('');
+  const [activeTab, setActiveTab] = useState<'config' | 'results'>('config');
   const [config, setConfig] = useState<SimulationConfigData>({
     customerVolume: { mode: 'normal', multiplier: 1.0 },
     timeDistribution: { mode: 'realistic' },
@@ -242,6 +244,9 @@ export default function Simulation() {
 
       setMetrics(calculatedMetrics);
       setProgressMessage('');
+      
+      // Auto-switch to results tab
+      setActiveTab('results');
 
       toast.success(`Simulation complete! ${dayBookings.length} bookings analyzed`);
 
@@ -288,114 +293,158 @@ export default function Simulation() {
         </div>
       </div>
 
-      <Alert>
-        <Info className="h-4 w-4" />
-        <AlertDescription>
-          Select a date with existing bookings to run simulations and analyze capacity, utilization, and edge cases.
-        </AlertDescription>
-      </Alert>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'config' | 'results')}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="config">1. Configuration</TabsTrigger>
+          <TabsTrigger value="results">2. Results</TabsTrigger>
+        </TabsList>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1 space-y-6">
-          <SimulationReadinessCard selectedDate={selectedDate} />
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Select Date</CardTitle>
-              <CardDescription>Choose a day to simulate</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={(date) => date && setSelectedDate(date)}
-                className="rounded-md border pointer-events-auto"
-                components={{
-                  DayContent: DateBookingIndicator,
-                }}
-              />
-              {readiness?.hasBookingsForDate && (
-                <Alert>
-                  <AlertDescription className="text-sm">
-                    {readiness.bookingsCount} bookings available for simulation
-                  </AlertDescription>
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
-
-          <AvailableDatesCard onSelectDate={setSelectedDate} />
-
-          <SimulationConfig 
-            config={config} 
-            onChange={setConfig}
-            selectedDate={selectedDate}
-            currentBookings={readiness?.bookingsCount || 0}
-          />
-
-          <Card>
-            <CardContent className="pt-6 space-y-3">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div>
-                      <Button
-                        onClick={runSimulation}
-                        disabled={isRunning || !readiness?.isReady}
-                        size="lg"
-                        className="w-full"
-                      >
-                        {isRunning ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            {progressMessage || 'Running...'}
-                          </>
-                        ) : (
-                          <>
-                            <PlayCircle className="mr-2 h-4 w-4" />
-                            Run Simulation
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </TooltipTrigger>
-                  {!readiness?.isReady && (
-                    <TooltipContent>
-                      <p className="text-sm">{readiness?.message}</p>
-                    </TooltipContent>
-                  )}
-                </Tooltip>
-              </TooltipProvider>
-              
-              <Button
-                onClick={handleExportReport}
-                disabled={!metrics}
-                variant="outline"
-                size="lg"
-                className="w-full"
-              >
-                <Download className="mr-2 h-4 w-4" />
-                Export Report
-              </Button>
-            </CardContent>
-          </Card>
-
-          <SimulationGuide />
-        </div>
-
-        <div className="lg:col-span-2 space-y-6">
-          {showEmptyState ? (
-            <SimulationEmptyState selectedDate={selectedDate} />
-          ) : (
-            <TimelineVisualization bookings={bookings} lanes={lanes} />
-          )}
+        {/* TAB 1: CONFIGURATION */}
+        <TabsContent value="config" className="space-y-6">
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              Select a date with existing bookings, configure edge cases, then run the simulation.
+            </AlertDescription>
+          </Alert>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <EdgeCaseAlerts alerts={alerts} />
-            <MetricsPanel metrics={metrics} realMetrics={realMetrics} />
+            {/* Left Column: Date Selection */}
+            <div className="space-y-6">
+              <SimulationReadinessCard selectedDate={selectedDate} />
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Select Date</CardTitle>
+                  <CardDescription>Choose a day to simulate</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={(date) => date && setSelectedDate(date)}
+                    className="rounded-md border pointer-events-auto"
+                    components={{
+                      DayContent: DateBookingIndicator,
+                    }}
+                  />
+                  {readiness?.hasBookingsForDate && (
+                    <Alert>
+                      <AlertDescription className="text-sm">
+                        {readiness.bookingsCount} bookings available for simulation
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </CardContent>
+              </Card>
+
+              <AvailableDatesCard onSelectDate={setSelectedDate} />
+            </div>
+
+            {/* Right Column: Configuration */}
+            <div className="space-y-6">
+              <SimulationConfig 
+                config={config} 
+                onChange={setConfig}
+                selectedDate={selectedDate}
+                currentBookings={readiness?.bookingsCount || 0}
+              />
+
+              {/* Run Button Card */}
+              <Card>
+                <CardContent className="pt-6 space-y-3">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div>
+                          <Button
+                            onClick={runSimulation}
+                            disabled={isRunning || !readiness?.isReady}
+                            size="lg"
+                            className="w-full"
+                          >
+                            {isRunning ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                {progressMessage || 'Running...'}
+                              </>
+                            ) : (
+                              <>
+                                <PlayCircle className="mr-2 h-4 w-4" />
+                                Run Simulation
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </TooltipTrigger>
+                      {!readiness?.isReady && (
+                        <TooltipContent>
+                          <p className="text-sm">{readiness?.message}</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
+                  {!readiness?.isReady && (
+                    <p className="text-sm text-muted-foreground text-center">
+                      {readiness?.message}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <SimulationGuide />
+            </div>
           </div>
-        </div>
-      </div>
+        </TabsContent>
+
+        {/* TAB 2: RESULTS */}
+        <TabsContent value="results" className="space-y-6">
+          {!metrics ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <PlayCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Simulation Results Yet</h3>
+                <p className="text-muted-foreground mb-4">
+                  Configure and run a simulation to see results here
+                </p>
+                <Button onClick={() => setActiveTab('config')}>
+                  Go to Configuration
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {/* Timeline Visualization */}
+              {showEmptyState ? (
+                <SimulationEmptyState selectedDate={selectedDate} />
+              ) : (
+                <TimelineVisualization bookings={bookings} lanes={lanes} />
+              )}
+
+              {/* Metrics and Alerts Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <EdgeCaseAlerts alerts={alerts} />
+                <MetricsPanel metrics={metrics} realMetrics={realMetrics} />
+              </div>
+
+              {/* Export Button */}
+              <Card>
+                <CardContent className="pt-6">
+                  <Button
+                    onClick={handleExportReport}
+                    variant="outline"
+                    size="lg"
+                    className="w-full"
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Export Simulation Report
+                  </Button>
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
