@@ -1,5 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { User, Clock, MapPin } from 'lucide-react';
 
 interface TimelineBooking {
   id: string;
@@ -24,6 +26,30 @@ function getServiceAbbreviation(serviceName?: string): string {
   return serviceName.split(' ').map(word => word[0]).join('').toUpperCase();
 }
 
+function getBookingGradient(status: string, utilization?: number): string {
+  if (status === 'cancelled') 
+    return 'bg-gradient-to-br from-gray-400 to-gray-500';
+  
+  if (utilization && utilization >= 100) 
+    return 'bg-gradient-to-br from-red-500 to-red-600';
+  
+  if (utilization && utilization >= 80) 
+    return 'bg-gradient-to-br from-yellow-500 to-orange-500';
+  
+  return 'bg-gradient-to-br from-green-500 to-green-600';
+}
+
+function formatTime(hour: number, minute: number): string {
+  return `${hour}:${minute.toString().padStart(2, '0')}`;
+}
+
+function getEndTime(startHour: number, startMinute: number, durationMinutes: number): string {
+  const totalMinutes = startHour * 60 + startMinute + durationMinutes;
+  const endHour = Math.floor(totalMinutes / 60);
+  const endMinute = totalMinutes % 60;
+  return formatTime(endHour, endMinute);
+}
+
 interface TimelineVisualizationProps {
   bookings: TimelineBooking[];
   lanes: Array<{ id: string; name: string }>;
@@ -31,13 +57,6 @@ interface TimelineVisualizationProps {
 
 export default function TimelineVisualization({ bookings, lanes }: TimelineVisualizationProps) {
   const workingHours = Array.from({ length: 10 }, (_, i) => 8 + i);
-
-  const getBookingColor = (status: string, utilization?: number) => {
-    if (status === 'cancelled') return 'bg-gray-400';
-    if (utilization && utilization >= 100) return 'bg-red-500';
-    if (utilization && utilization >= 80) return 'bg-yellow-500';
-    return 'bg-green-500';
-  };
 
   const getBookingPosition = (startHour: number, startMinute: number) => {
     const totalMinutes = (startHour - 8) * 60 + startMinute;
@@ -105,51 +124,101 @@ export default function TimelineVisualization({ bookings, lanes }: TimelineVisua
             const laneBookings = bookings.filter((b) => b.laneId === lane.id);
 
             return (
-              <div key={lane.id} className="flex items-center py-3 border-b">
-                <div className="w-40 flex-shrink-0 font-medium text-sm pr-2" title={lane.name}>
-                  <span className="truncate block">{lane.name}</span>
+              <div key={lane.id} className="flex items-start py-3 border-b">
+                <div className="w-48 flex-shrink-0 pr-4">
+                  <div className="font-semibold text-base">{lane.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {laneBookings.length} booking{laneBookings.length !== 1 ? 's' : ''}
+                  </div>
                 </div>
-                <div className="flex-1 relative h-12 bg-muted/20 rounded">
+                <div className="flex-1 relative h-20 bg-muted/20 rounded">
                   {laneBookings.map((booking) => {
                     const left = getBookingPosition(booking.startHour, booking.startMinute);
                     const width = getBookingWidth(booking.durationMinutes);
-                    const color = getBookingColor(booking.status, booking.utilizationPercent);
-                    const serviceAbbrev = getServiceAbbreviation(booking.serviceName);
+                    const gradient = getBookingGradient(booking.status, booking.utilizationPercent);
+                    const startTime = formatTime(booking.startHour, booking.startMinute);
+                    const endTime = getEndTime(booking.startHour, booking.startMinute, booking.durationMinutes);
+                    const workerNames = booking.assignedWorkers?.map(w => w.workerName).join(', ') || 'No workers';
 
                     return (
-                      <div
-                        key={booking.id}
-                        className={`absolute h-full ${color} rounded cursor-pointer hover:opacity-80 hover:shadow-lg transition-all flex flex-col items-center justify-center text-xs text-white font-medium overflow-hidden px-1.5 py-1`}
-                        style={{
-                          left: `${left}%`,
-                          width: `${width}%`,
-                        }}
-                        title={`${booking.serviceName || 'Service'} - ${booking.customerName || 'Customer'}
-Time: ${booking.startHour}:${booking.startMinute.toString().padStart(2, '0')} (${booking.durationMinutes}m)
-Status: ${booking.status}
-${booking.assignedWorkers && booking.assignedWorkers.length > 0 ? `Workers:\n${booking.assignedWorkers.map(w => `  • ${w.workerName} (${Math.round(w.allocatedSeconds / 60)}m)`).join('\n')}` : 'No workers assigned'}`}
-                      >
-                        {/* Time - always show if width > 5% */}
-                        {width > 5 && (
-                          <span className="text-[10px] leading-tight">
-                            {booking.startHour}:{booking.startMinute.toString().padStart(2, '0')}
-                          </span>
-                        )}
-                        
-                        {/* Workers - show if width > 8% */}
-                        {booking.assignedWorkers && booking.assignedWorkers.length > 0 && width > 8 && (
-                          <span className="text-[11px] font-semibold leading-tight">
-                            {booking.assignedWorkers.map(w => w.workerName.split(' ').map(n => n[0]).join('')).join(' · ')}
-                          </span>
-                        )}
-                        
-                        {/* Service abbreviation - show if width > 10% */}
-                        {width > 10 && serviceAbbrev && (
-                          <span className="text-[9px] opacity-75 leading-tight">
-                            {serviceAbbrev}
-                          </span>
-                        )}
-                      </div>
+                      <Popover key={booking.id}>
+                        <PopoverTrigger asChild>
+                          <div
+                            className={`absolute h-full ${gradient} rounded-lg border-2 border-white/20 cursor-pointer hover:border-white/40 hover:shadow-xl hover:z-10 transition-all duration-200 flex flex-col justify-between p-2 gap-1 overflow-hidden`}
+                            style={{
+                              left: `${left}%`,
+                              width: `${width}%`,
+                            }}
+                          >
+                            {/* Header: Time + Duration Badge */}
+                            <div className="flex items-center justify-between text-xs font-bold text-white">
+                              <span>{startTime}-{endTime}</span>
+                              <span className="bg-black/20 px-1.5 py-0.5 rounded">{booking.durationMinutes}m</span>
+                            </div>
+                            
+                            {/* Service Name - Show if width > 8% */}
+                            {width > 8 && (
+                              <div className="text-sm font-semibold leading-tight truncate text-white">
+                                {booking.serviceName || 'Service'}
+                              </div>
+                            )}
+                            
+                            {/* Worker - Show if width > 12% */}
+                            {width > 12 && booking.assignedWorkers && booking.assignedWorkers.length > 0 && (
+                              <div className="flex items-center gap-1 text-xs text-white">
+                                <User className="w-3 h-3 flex-shrink-0" />
+                                <span className="truncate">
+                                  {booking.assignedWorkers[0].workerName}
+                                  {booking.assignedWorkers.length > 1 && ` +${booking.assignedWorkers.length - 1}`}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80">
+                          <div className="space-y-3">
+                            <div className="font-semibold text-base border-b pb-2">
+                              {booking.serviceName || 'Service'}
+                            </div>
+                            
+                            <div className="space-y-2 text-sm">
+                              <div className="flex items-center gap-2">
+                                <Clock className="w-4 h-4 text-muted-foreground" />
+                                <span>{startTime} - {endTime} ({booking.durationMinutes} minutes)</span>
+                              </div>
+                              
+                              <div className="flex items-center gap-2">
+                                <User className="w-4 h-4 text-muted-foreground" />
+                                <span>{booking.customerName || 'Customer'}</span>
+                              </div>
+                              
+                              <div className="flex items-center gap-2">
+                                <MapPin className="w-4 h-4 text-muted-foreground" />
+                                <span>{lane.name}</span>
+                              </div>
+                            </div>
+                            
+                            {booking.assignedWorkers && booking.assignedWorkers.length > 0 && (
+                              <div className="border-t pt-2">
+                                <div className="font-medium text-sm mb-1">Assigned Workers:</div>
+                                <div className="space-y-1">
+                                  {booking.assignedWorkers.map((worker) => (
+                                    <div key={worker.workerId} className="text-sm flex items-center justify-between">
+                                      <span>{worker.workerName}</span>
+                                      <span className="text-muted-foreground">{Math.round(worker.allocatedSeconds / 60)}m</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            
+                            <div className="text-xs text-muted-foreground border-t pt-2">
+                              Status: {booking.status}
+                              {booking.utilizationPercent && ` | Utilization: ${booking.utilizationPercent.toFixed(1)}%`}
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     );
                   })}
                 </div>
