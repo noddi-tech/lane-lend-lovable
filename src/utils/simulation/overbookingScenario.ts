@@ -11,14 +11,14 @@ export async function detectOverbooking(
   intervalId: string,
   laneId: string
 ): Promise<OverbookingResult> {
-  // Get total worker capacity for this interval
+  // Get remaining worker capacity for this interval
   const { data: contributions } = await supabase
     .from('contribution_intervals')
     .select('remaining_seconds, contribution:worker_contributions!inner(lane_id)')
     .eq('interval_id', intervalId)
     .eq('contribution.lane_id', laneId);
   
-  const totalCapacity = contributions?.reduce((sum, c) => sum + c.remaining_seconds, 0) || 0;
+  const remainingCapacity = contributions?.reduce((sum, c) => sum + c.remaining_seconds, 0) || 0;
   
   // Get total booked seconds
   const { data: capacity } = await supabase
@@ -30,6 +30,9 @@ export async function detectOverbooking(
   
   const bookedSeconds = capacity?.total_booked_seconds || 0;
   
+  // Calculate INITIAL capacity (remaining + booked = initial)
+  const initialCapacity = remainingCapacity + bookedSeconds;
+  
   // Get affected bookings
   const { data: bookingIntervals } = await supabase
     .from('booking_intervals')
@@ -38,11 +41,12 @@ export async function detectOverbooking(
   
   const affectedBookings = bookingIntervals?.map(bi => bi.booking_id) || [];
   
-  const utilizationPercent = totalCapacity > 0 ? (bookedSeconds / totalCapacity) * 100 : 0;
-  const excessSeconds = Math.max(0, bookedSeconds - totalCapacity);
+  // Calculate utilization against INITIAL capacity
+  const utilizationPercent = initialCapacity > 0 ? (bookedSeconds / initialCapacity) * 100 : 0;
+  const excessSeconds = Math.max(0, bookedSeconds - initialCapacity);
   
   return {
-    isOverbooked: utilizationPercent >= 100,
+    isOverbooked: utilizationPercent > 100, // Changed from >= to > (100% is OK, >100% is overbooked)
     utilizationPercent,
     excessSeconds,
     affectedBookings,

@@ -19,6 +19,11 @@ interface TimelineBooking {
   }>;
 }
 
+function getServiceAbbreviation(serviceName?: string): string {
+  if (!serviceName) return '';
+  return serviceName.split(' ').map(word => word[0]).join('').toUpperCase();
+}
+
 interface TimelineVisualizationProps {
   bookings: TimelineBooking[];
   lanes: Array<{ id: string; name: string }>;
@@ -83,11 +88,13 @@ export default function TimelineVisualization({ bookings, lanes }: TimelineVisua
         <div className="space-y-1">
           {/* Time axis */}
           <div className="flex border-b pb-2 mb-4">
-            <div className="w-32 flex-shrink-0" />
-            <div className="flex-1 flex">
+            <div className="w-40 flex-shrink-0" />
+            <div className="flex-1 flex relative">
               {workingHours.map((hour) => (
-                <div key={hour} className="flex-1 text-xs text-center text-muted-foreground">
+                <div key={hour} className="flex-1 text-xs text-center text-muted-foreground relative">
                   {hour}:00
+                  {/* Vertical grid line */}
+                  <div className="absolute left-0 top-0 h-[500px] w-px bg-border/30 -translate-y-6" />
                 </div>
               ))}
             </div>
@@ -99,36 +106,48 @@ export default function TimelineVisualization({ bookings, lanes }: TimelineVisua
 
             return (
               <div key={lane.id} className="flex items-center py-3 border-b">
-                <div className="w-32 flex-shrink-0 font-medium text-sm truncate pr-2">
-                  {lane.name}
+                <div className="w-40 flex-shrink-0 font-medium text-sm pr-2" title={lane.name}>
+                  <span className="truncate block">{lane.name}</span>
                 </div>
-                <div className="flex-1 relative h-8 bg-muted/20 rounded">
+                <div className="flex-1 relative h-12 bg-muted/20 rounded">
                   {laneBookings.map((booking) => {
                     const left = getBookingPosition(booking.startHour, booking.startMinute);
                     const width = getBookingWidth(booking.durationMinutes);
                     const color = getBookingColor(booking.status, booking.utilizationPercent);
+                    const serviceAbbrev = getServiceAbbreviation(booking.serviceName);
 
                     return (
                       <div
                         key={booking.id}
-                        className={`absolute h-full ${color} rounded cursor-pointer hover:opacity-80 transition-opacity flex flex-col items-center justify-center text-xs text-white font-medium overflow-hidden`}
+                        className={`absolute h-full ${color} rounded cursor-pointer hover:opacity-80 hover:shadow-lg transition-all flex flex-col items-center justify-center text-xs text-white font-medium overflow-hidden px-1.5 py-1`}
                         style={{
                           left: `${left}%`,
                           width: `${width}%`,
                         }}
-                        title={`${booking.customerName || 'Customer'} - ${booking.serviceName || 'Service'}\n${booking.startHour}:${booking.startMinute.toString().padStart(2, '0')} (${booking.durationMinutes}m)${booking.assignedWorkers && booking.assignedWorkers.length > 0 ? `\nWorkers: ${booking.assignedWorkers.map(w => w.workerName).join(', ')}` : ''}`}
+                        title={`${booking.serviceName || 'Service'} - ${booking.customerName || 'Customer'}
+Time: ${booking.startHour}:${booking.startMinute.toString().padStart(2, '0')} (${booking.durationMinutes}m)
+Status: ${booking.status}
+${booking.assignedWorkers && booking.assignedWorkers.length > 0 ? `Workers:\n${booking.assignedWorkers.map(w => `  • ${w.workerName} (${Math.round(w.allocatedSeconds / 60)}m)`).join('\n')}` : 'No workers assigned'}`}
                       >
-                        {width > 6 && (
-                          <>
-                            <span className="truncate px-1">
-                              {booking.startHour}:{booking.startMinute.toString().padStart(2, '0')}
-                            </span>
-                            {booking.assignedWorkers && booking.assignedWorkers.length > 0 && width > 8 && (
-                              <span className="truncate px-1 text-[11px] font-medium opacity-90">
-                                {booking.assignedWorkers.map(w => w.workerName.split(' ').map(n => n[0]).join('')).join(' · ')}
-                              </span>
-                            )}
-                          </>
+                        {/* Time - always show if width > 5% */}
+                        {width > 5 && (
+                          <span className="text-[10px] leading-tight">
+                            {booking.startHour}:{booking.startMinute.toString().padStart(2, '0')}
+                          </span>
+                        )}
+                        
+                        {/* Workers - show if width > 8% */}
+                        {booking.assignedWorkers && booking.assignedWorkers.length > 0 && width > 8 && (
+                          <span className="text-[11px] font-semibold leading-tight">
+                            {booking.assignedWorkers.map(w => w.workerName.split(' ').map(n => n[0]).join('')).join(' · ')}
+                          </span>
+                        )}
+                        
+                        {/* Service abbreviation - show if width > 10% */}
+                        {width > 10 && serviceAbbrev && (
+                          <span className="text-[9px] opacity-75 leading-tight">
+                            {serviceAbbrev}
+                          </span>
                         )}
                       </div>
                     );
