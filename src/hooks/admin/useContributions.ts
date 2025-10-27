@@ -6,6 +6,7 @@ export interface WorkerContribution {
   id: string;
   worker_id: string;
   lane_id: string;
+  station_id: string;
   starts_at: string;
   ends_at: string;
   available_seconds: number;
@@ -80,7 +81,7 @@ export function useCreateContribution() {
     mutationFn: async (contribution: Omit<WorkerContribution, 'id' | 'created_at' | 'updated_at'>) => {
       const { data, error } = await supabase
         .from('worker_contributions')
-        .insert(contribution)
+        .insert([contribution])
         .select()
         .single();
 

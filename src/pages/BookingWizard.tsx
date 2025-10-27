@@ -2,15 +2,17 @@ import { useEffect } from 'react';
 import { useBookingStore } from '@/stores/bookingStore';
 import { ServiceSelection } from '@/components/booking/ServiceSelection';
 import { DateTimeSelection } from '@/components/booking/DateTimeSelection';
+import { StationSelection } from '@/components/booking/StationSelection';
 import { VehicleInfo } from '@/components/booking/VehicleInfo';
 import { ReviewConfirm } from '@/components/booking/ReviewConfirm';
 import { Progress } from '@/components/ui/progress';
 
 const STEPS = [
   { number: 1, title: 'Services', component: ServiceSelection },
-  { number: 2, title: 'Date & Time', component: DateTimeSelection },
-  { number: 3, title: 'Vehicle Info', component: VehicleInfo },
-  { number: 4, title: 'Review', component: ReviewConfirm },
+  { number: 2, title: 'Date', component: DateTimeSelection },
+  { number: 3, title: 'Stations', component: StationSelection },
+  { number: 4, title: 'Vehicle Info', component: VehicleInfo },
+  { number: 5, title: 'Review', component: ReviewConfirm },
 ];
 
 export default function BookingWizard() {

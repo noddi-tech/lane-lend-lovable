@@ -115,6 +115,7 @@ export default function Contributions() {
 
     const contributionData = {
       ...formData,
+      station_id: formData.lane_id, // Temporary: use lane_id as station_id until proper station selection is implemented
       starts_at: new Date(formData.starts_at).toISOString(),
       ends_at: new Date(formData.ends_at).toISOString(),
     };

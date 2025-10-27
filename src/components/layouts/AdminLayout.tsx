@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, Settings, Users, Calendar, Gauge, LogOut, User, Award, Zap, Clock, Database, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Settings, Users, Calendar, Gauge, LogOut, User, Award, Zap, Clock, Database, BarChart3, TestTube } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 const menuItems = [
@@ -36,6 +36,7 @@ const menuItems = [
   { title: 'Capabilities', url: '/admin/capabilities', icon: Zap },
   { title: 'Seed Data', url: '/admin/seed-data', icon: Database },
   { title: 'Simulation', url: '/admin/simulation', icon: Zap },
+  { title: 'Test Data', url: '/admin/driving-gate-test', icon: TestTube },
   { title: 'Settings', url: '/admin/settings', icon: Settings },
 ];
 

@@ -10,7 +10,7 @@ import { toast } from '@/hooks/use-toast';
 
 export const ReviewConfirm = () => {
   const navigate = useNavigate();
-  const { selectedServices, selectedDate, selectedSlot, vehicleInfo, reset, prevStep } = useBookingStore();
+  const { selectedServices, selectedDate, selectedStations, vehicleInfo, reset, prevStep } = useBookingStore();
   const { data: salesItems } = useSalesItems();
   const createBooking = useCreateBooking();
 
@@ -29,7 +29,7 @@ export const ReviewConfirm = () => {
   };
 
   const handleConfirm = async () => {
-    if (!selectedSlot || !vehicleInfo) {
+    if (!selectedDate || !selectedStations.length || !vehicleInfo) {
       toast({
         title: 'Error',
         description: 'Missing booking information',
@@ -39,11 +39,17 @@ export const ReviewConfirm = () => {
     }
 
     try {
+      // Use selected date for delivery window
+      const startOfDay = new Date(selectedDate);
+      startOfDay.setHours(8, 0, 0, 0);
+      const endOfDay = new Date(selectedDate);
+      endOfDay.setHours(17, 0, 0, 0);
+
       await createBooking.mutateAsync({
         sales_item_ids: selectedServices,
-        delivery_window_starts_at: selectedSlot.starts_at,
-        delivery_window_ends_at: selectedSlot.ends_at,
-        station_ids: [selectedSlot.lane_id], // Temporary: use lane_id as station until UI is updated
+        delivery_window_starts_at: startOfDay.toISOString(),
+        delivery_window_ends_at: endOfDay.toISOString(),
+        station_ids: selectedStations,
         vehicle_make: vehicleInfo.make,
         vehicle_model: vehicleInfo.model,
         vehicle_year: vehicleInfo.year,
@@ -57,7 +63,7 @@ export const ReviewConfirm = () => {
       });
 
       reset();
-      navigate('/bookings');
+      navigate('/my-bookings');
     } catch (error) {
       toast({
         title: 'Booking Failed',
@@ -113,19 +119,10 @@ export const ReviewConfirm = () => {
                 </p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Time</p>
+                <p className="text-sm text-muted-foreground">Stations</p>
                 <p className="font-medium">
-                  {selectedSlot
-                    ? `${format(new Date(selectedSlot.starts_at), 'HH:mm')} - ${format(
-                        new Date(selectedSlot.ends_at),
-                        'HH:mm'
-                      )}`
-                    : '-'}
+                  {selectedStations.length} station{selectedStations.length !== 1 ? 's' : ''} selected
                 </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Service Lane</p>
-                <p className="font-medium">{selectedSlot ? 'Service Lane' : '-'}</p>
               </div>
             </div>
           </CardContent>

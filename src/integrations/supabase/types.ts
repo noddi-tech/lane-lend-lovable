@@ -851,6 +851,7 @@ export type Database = {
           lane_id: string
           performance_factor: number | null
           starts_at: string
+          station_id: string
           travel_factor: number | null
           updated_at: string | null
           worker_id: string
@@ -863,6 +864,7 @@ export type Database = {
           lane_id: string
           performance_factor?: number | null
           starts_at: string
+          station_id: string
           travel_factor?: number | null
           updated_at?: string | null
           worker_id: string
@@ -875,6 +877,7 @@ export type Database = {
           lane_id?: string
           performance_factor?: number | null
           starts_at?: string
+          station_id?: string
           travel_factor?: number | null
           updated_at?: string | null
           worker_id?: string
@@ -885,6 +888,13 @@ export type Database = {
             columns: ["lane_id"]
             isOneToOne: false
             referencedRelation: "lanes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_contributions_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "stations"
             referencedColumns: ["id"]
           },
           {
