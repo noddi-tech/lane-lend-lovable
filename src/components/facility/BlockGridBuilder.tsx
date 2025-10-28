@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Canvas as FabricCanvas, Rect, Text, Group } from 'fabric';
 import { Button } from '@/components/ui/button';
-import { ZoomIn, ZoomOut, Maximize2, Grid3x3, Move } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { ZoomIn, ZoomOut, Maximize2, Grid3x3 } from 'lucide-react';
 
 export type EditMode = 'view' | 'facility' | 'gate' | 'lane' | 'station';
 
@@ -53,9 +52,6 @@ export function BlockGridBuilder({
   const [zoom, setZoom] = useState(1);
   const [showGrid, setShowGrid] = useState(true);
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 1000, height: 700 });
-  const [isPanning, setIsPanning] = useState(false);
-  const [lastPosX, setLastPosX] = useState(0);
-  const [lastPosY, setLastPosY] = useState(0);
 
   // Calculate responsive canvas size
   useEffect(() => {
@@ -392,52 +388,6 @@ export function BlockGridBuilder({
     };
   }, [canvas, facility, onBlockMove, onBlockResize, onBlockSelect]);
 
-  // Panning
-  useEffect(() => {
-    if (!canvas) return;
-
-    const handleMouseDown = (e: any) => {
-      // Only pan if Alt is pressed AND we're clicking on the canvas background (not an object)
-      if (e.e.altKey && !e.target) {
-        setIsPanning(true);
-        setLastPosX(e.e.clientX);
-        setLastPosY(e.e.clientY);
-        canvas.selection = false;
-      }
-    };
-
-    const handleMouseMove = (e: any) => {
-      if (isPanning) {
-        const deltaX = e.e.clientX - lastPosX;
-        const deltaY = e.e.clientY - lastPosY;
-        const vpt = canvas.viewportTransform;
-        if (vpt) {
-          vpt[4] += deltaX;
-          vpt[5] += deltaY;
-          canvas.requestRenderAll();
-        }
-        setLastPosX(e.e.clientX);
-        setLastPosY(e.e.clientY);
-      }
-    };
-
-    const handleMouseUp = () => {
-      if (isPanning) {
-        setIsPanning(false);
-        canvas.selection = true;
-      }
-    };
-
-    canvas.on('mouse:down', handleMouseDown);
-    canvas.on('mouse:move', handleMouseMove);
-    canvas.on('mouse:up', handleMouseUp);
-
-    return () => {
-      canvas.off('mouse:down', handleMouseDown);
-      canvas.off('mouse:move', handleMouseMove);
-      canvas.off('mouse:up', handleMouseUp);
-    };
-  }, [canvas, isPanning, lastPosX, lastPosY]);
 
   const handleZoomIn = () => {
     if (!canvas) return;
@@ -486,10 +436,6 @@ export function BlockGridBuilder({
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-muted-foreground">Zoom: {Math.round(zoom * 100)}%</span>
-          <Badge variant="outline" className="gap-1">
-            <Move className="h-3 w-3" />
-            Hold Alt to Pan
-          </Badge>
         </div>
       </div>
 
