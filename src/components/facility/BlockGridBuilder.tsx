@@ -3,17 +3,19 @@ import { Canvas as FabricCanvas, Rect, Text, Group } from 'fabric';
 import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, Maximize2, Grid3x3 } from 'lucide-react';
 
-export type EditMode = 'view' | 'facility' | 'gate' | 'lane' | 'station';
+export type EditMode = 'view' | 'facility' | 'gate' | 'lane' | 'station' | 'room';
 
 export interface LayoutBlock {
   id: string;
-  type: 'facility' | 'gate' | 'lane' | 'station';
+  type: 'facility' | 'gate' | 'lane' | 'station' | 'room';
   name: string;
   grid_x: number;
   grid_y: number;
   grid_width: number;
   grid_height: number;
   parent_id?: string;
+  color?: string; // For rooms
+  is_library?: boolean; // True if not yet assigned to facility
 }
 
 interface BlockGridBuilderProps {
@@ -21,10 +23,12 @@ interface BlockGridBuilderProps {
   gates: LayoutBlock[];
   lanes: LayoutBlock[];
   stations: LayoutBlock[];
+  rooms?: LayoutBlock[];
   editMode: EditMode;
   onBlockMove: (blockId: string, gridX: number, gridY: number) => void;
   onBlockResize: (blockId: string, gridWidth: number, gridHeight: number) => void;
   onBlockSelect: (block: LayoutBlock | null) => void;
+  onDrop?: (e: React.DragEvent) => void;
 }
 
 const CELL_SIZE = 15;
@@ -34,6 +38,7 @@ const COLORS = {
   gate: { fill: 'rgba(34, 197, 94, 0.2)', stroke: '#22c55e', text: '#22c55e' },
   lane: { fill: 'rgba(168, 85, 247, 0.2)', stroke: '#a855f7', text: '#a855f7' },
   station: { fill: 'rgba(251, 146, 60, 0.25)', stroke: '#fb923c', text: '#fb923c' },
+  room: { fill: 'rgba(99, 102, 241, 0.15)', stroke: '#6366f1', text: '#6366f1' },
 };
 
 export function BlockGridBuilder({
@@ -41,10 +46,12 @@ export function BlockGridBuilder({
   gates,
   lanes,
   stations,
+  rooms = [],
   editMode,
   onBlockMove,
   onBlockResize,
   onBlockSelect,
+  onDrop,
 }: BlockGridBuilderProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -100,12 +107,13 @@ export function BlockGridBuilder({
   }, [canvas, canvasDimensions]);
 
   // Helper: Generate stable hash of data for change detection
-  const generateDataHash = (gates: LayoutBlock[], lanes: LayoutBlock[], stations: LayoutBlock[], mode: EditMode) => {
+  const generateDataHash = (gates: LayoutBlock[], lanes: LayoutBlock[], stations: LayoutBlock[], rooms: LayoutBlock[], mode: EditMode) => {
     return JSON.stringify({
       editMode: mode,
       gates: gates.map(g => `${g.id}-${g.grid_x}-${g.grid_y}-${g.grid_width}-${g.grid_height}`),
       lanes: lanes.map(l => `${l.id}-${l.grid_x}-${l.grid_y}-${l.grid_width}-${l.grid_height}`),
       stations: stations.map(s => `${s.id}-${s.grid_x}-${s.grid_y}-${s.grid_width}-${s.grid_height}`),
+      rooms: rooms.map(r => `${r.id}-${r.grid_x}-${r.grid_y}-${r.grid_width}-${r.grid_height}-${r.color}`),
     });
   };
 
@@ -149,7 +157,7 @@ export function BlockGridBuilder({
     }
     
     // Check if data actually changed
-    const currentHash = generateDataHash(gates, lanes, stations, editMode);
+    const currentHash = generateDataHash(gates, lanes, stations, rooms, editMode);
     const dataChanged = currentHash !== lastDataHashRef.current;
     lastDataHashRef.current = currentHash;
     
@@ -163,7 +171,7 @@ export function BlockGridBuilder({
     // Clear only static elements (grid, facility boundary)
     const interactiveObjects = canvas.getObjects().filter(obj => {
       const block = (obj as any).data as LayoutBlock | undefined;
-      return block && (block.type === 'gate' || block.type === 'lane' || block.type === 'station');
+      return block && (block.type === 'gate' || block.type === 'lane' || block.type === 'station' || block.type === 'room');
     });
     
     canvas.getObjects().forEach(obj => {
@@ -228,15 +236,25 @@ export function BlockGridBuilder({
     const createBlock = (block: LayoutBlock) => {
       const isEditable = block.type === editMode;
       const isLane = block.type === 'lane';
+      const isRoom = block.type === 'room';
+      
+      // Use custom color for rooms if provided
+      const colors = block.color && isRoom 
+        ? { 
+            fill: `${block.color}26`, // Add alpha
+            stroke: block.color, 
+            text: block.color 
+          }
+        : COLORS[block.type];
       
       const rect = new Rect({
         left: 0,
         top: 0,
         width: block.grid_width * CELL_SIZE,
         height: block.grid_height * CELL_SIZE,
-        fill: COLORS[block.type].fill,
-        stroke: COLORS[block.type].stroke,
-        strokeWidth: 2,
+        fill: colors.fill,
+        stroke: colors.stroke,
+        strokeWidth: isRoom ? 3 : 2,
         rx: 4,
         ry: 4,
       });
@@ -272,8 +290,8 @@ export function BlockGridBuilder({
       return group;
     };
 
-    // Process blocks: Update existing or create new
-    const allBlocks = [...lanes, ...gates, ...stations];
+    // Process blocks: Update existing or create new (maintain Z-order: rooms, lanes, gates, stations)
+    const allBlocks = [...rooms, ...lanes, ...gates, ...stations];
     const currentBlockIds = new Set(allBlocks.map(b => b.id));
     
     // Remove deleted blocks
@@ -591,7 +609,11 @@ export function BlockGridBuilder({
         </div>
       </div>
 
-      <div className="border rounded-lg overflow-auto bg-card">
+      <div 
+        className="border rounded-lg overflow-auto bg-card"
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={onDrop}
+      >
         <canvas ref={canvasRef} />
       </div>
 

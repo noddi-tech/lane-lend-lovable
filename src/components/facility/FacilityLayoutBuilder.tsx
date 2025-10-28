@@ -2,16 +2,17 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Layers, Plus, MapPin, LayoutGrid, Box } from 'lucide-react';
+import { Layers, Plus, MapPin, LayoutGrid, Box, DoorOpen } from 'lucide-react';
 import { BlockGridBuilder, type EditMode, type LayoutBlock } from '@/components/facility/BlockGridBuilder';
 import { BlockProperties } from '@/components/facility/BlockProperties';
+import { LibraryPalette, type LibraryItem } from '@/components/facility/LibraryPalette';
 import { CreateGateDialog } from '@/components/facility/dialogs/CreateGateDialog';
 import { CreateLaneDialog } from '@/components/facility/dialogs/CreateLaneDialog';
 import { CreateStationDialog } from '@/components/facility/dialogs/CreateStationDialog';
-import { useUpdateDrivingGate } from '@/hooks/admin/useDrivingGates';
-import { useUpdateLane } from '@/hooks/admin/useLanes';
+import { useUpdateDrivingGate, useAssignGateToFacility } from '@/hooks/admin/useDrivingGates';
+import { useUpdateLane, useAssignLaneToFacility } from '@/hooks/admin/useLanes';
 import { useLanes } from '@/hooks/admin/useLanes';
-import { useStations, useUpdateStation } from '@/hooks/admin/useStations';
+import { useStations, useUpdateStation, useAssignStationToLane } from '@/hooks/admin/useStations';
 import { toast } from 'sonner';
 import { useDebouncedCallback } from '@/hooks/useDebouncedMutation';
 import type { FacilityWithGates } from '@/hooks/admin/useFacilities';
@@ -32,6 +33,9 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
   const updateGate = useUpdateDrivingGate();
   const updateLane = useUpdateLane();
   const updateStation = useUpdateStation();
+  const assignGate = useAssignGateToFacility();
+  const assignLane = useAssignLaneToFacility();
+  const assignStation = useAssignStationToLane();
 
   const { data: allLanes } = useLanes();
   const { data: allStations } = useStations();
@@ -157,6 +161,78 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
     350
   );
 
+  const handleCanvasDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    
+    try {
+      const data = e.dataTransfer.getData('application/json');
+      if (!data) return;
+      
+      const { item, type } = JSON.parse(data) as { item: LibraryItem; type: 'gate' | 'lane' | 'station' };
+      
+      // Get canvas coordinates - simplified calculation
+      const rect = (e.target as HTMLElement).getBoundingClientRect();
+      const canvasX = e.clientX - rect.left;
+      const canvasY = e.clientY - rect.top;
+      
+      // Convert to grid coordinates (using CELL_SIZE from BlockGridBuilder)
+      const CELL_SIZE = 15;
+      const gridX = Math.floor(canvasX / CELL_SIZE);
+      const gridY = Math.floor(canvasY / CELL_SIZE);
+      
+      if (type === 'gate') {
+        await assignGate.mutateAsync({
+          gateId: item.id,
+          facilityId: facility.id,
+          gridX,
+          gridY,
+        });
+        toast.success(`Gate "${item.name}" placed in facility`);
+      } else if (type === 'lane') {
+        // For lanes, determine position order based on y position
+        const existingLanes = facilityLanes.filter(l => l.facility_id === facility.id);
+        const positionOrder = existingLanes.length;
+        
+        await assignLane.mutateAsync({
+          laneId: item.id,
+          facilityId: facility.id,
+          gridY,
+          positionOrder,
+        });
+        toast.success(`Lane "${item.name}" placed in facility`);
+      } else if (type === 'station') {
+        // For stations, need to assign to a lane
+        if (facilityLanes.length === 0) {
+          toast.error('Please create a lane first before adding stations');
+          return;
+        }
+        
+        // Find the lane at the drop position
+        const targetLane = facilityLanes.find(lane => {
+          const laneTop = lane.grid_position_y;
+          const laneBottom = laneTop + (lane.grid_height || 2);
+          return gridY >= laneTop && gridY < laneBottom;
+        });
+        
+        if (!targetLane) {
+          toast.error('Please drop the station inside a lane');
+          return;
+        }
+        
+        await assignStation.mutateAsync({
+          stationId: item.id,
+          laneId: targetLane.id,
+          gridX,
+          gridY,
+        });
+        toast.success(`Station "${item.name}" placed in lane`);
+      }
+    } catch (error) {
+      console.error('Failed to place item:', error);
+      toast.error('Failed to place item from library');
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -224,8 +300,14 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-6">
-          <div className="col-span-2">
+        <div className="flex gap-6">
+          {/* Library Palette */}
+          <div className="flex-shrink-0">
+            <LibraryPalette editMode={editMode} />
+          </div>
+
+          {/* Canvas */}
+          <div className="flex-1">
             <BlockGridBuilder
               facility={facilityBlock}
               gates={gateBlocks}
@@ -235,10 +317,12 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
               onBlockMove={handleBlockMove}
               onBlockResize={handleBlockResize}
               onBlockSelect={setSelectedBlock}
+              onDrop={handleCanvasDrop}
             />
           </div>
 
-          <div className="col-span-1">
+          {/* Properties Panel */}
+          <div className="flex-shrink-0 w-80">
             {selectedBlock ? (
               <BlockProperties
                 block={selectedBlock}
