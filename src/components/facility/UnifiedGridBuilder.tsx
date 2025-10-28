@@ -49,8 +49,6 @@ interface UnifiedGridBuilderProps {
 }
 
 const CELL_SIZE = 20;
-const CANVAS_WIDTH = 2000;
-const CANVAS_HEIGHT = 1000;
 
 const COLORS = {
   facility: {
@@ -100,10 +98,12 @@ export function UnifiedGridBuilder({
   onElementSelect,
 }: UnifiedGridBuilderProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [canvas, setCanvas] = useState<FabricCanvas | null>(null);
   const [zoom, setZoom] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
   const [lastPanPoint, setLastPanPoint] = useState<{ x: number; y: number } | null>(null);
+  const [canvasDimensions, setCanvasDimensions] = useState({ width: 1200, height: 800 });
   
   // Store callbacks in refs to prevent useEffect re-runs
   const callbacksRef = useRef({
@@ -131,18 +131,35 @@ export function UnifiedGridBuilder({
     };
   });
 
+  // Responsive canvas sizing
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      const { width } = entries[0].contentRect;
+      const aspectRatio = gridHeight / gridWidth;
+      const calculatedHeight = Math.min(width * aspectRatio, 800);
+      setCanvasDimensions({ 
+        width: Math.max(800, width - 40), 
+        height: Math.max(600, calculatedHeight) 
+      });
+    });
+
+    resizeObserver.observe(containerRef.current);
+    return () => resizeObserver.disconnect();
+  }, [gridWidth, gridHeight]);
+
   // Initialize canvas once on mount
   useEffect(() => {
     if (!canvasRef.current) return;
 
     const fabricCanvas = new FabricCanvas(canvasRef.current, {
-      width: CANVAS_WIDTH,
-      height: CANVAS_HEIGHT,
+      width: canvasDimensions.width,
+      height: canvasDimensions.height,
       backgroundColor: COLORS.facility.background,
       selection: false,
     });
 
-    fabricCanvas.viewportTransform = [1, 0, 0, 1, 100, 100];
     setCanvas(fabricCanvas);
 
     return () => {
@@ -150,18 +167,122 @@ export function UnifiedGridBuilder({
     };
   }, []); // Only create once
 
+  // Update canvas size when dimensions change
+  useEffect(() => {
+    if (!canvas) return;
+    canvas.setDimensions(canvasDimensions);
+    canvas.renderAll();
+  }, [canvas, canvasDimensions]);
+
   // Update selection mode when editMode changes
   useEffect(() => {
     if (!canvas) return;
     canvas.selection = editMode === 'facility';
   }, [canvas, editMode]);
 
+  // Canvas-level event handlers for element interaction
+  useEffect(() => {
+    if (!canvas) return;
+
+    const handleObjectMoving = (e: any) => {
+      const obj = e.target;
+      if (!obj?.data) return;
+
+      const { type } = obj.data;
+      const left = obj.left || 0;
+      const top = obj.top || 0;
+
+      const snappedLeft = Math.round(left / CELL_SIZE) * CELL_SIZE;
+      const snappedTop = Math.round(top / CELL_SIZE) * CELL_SIZE;
+
+      if (type === 'lane') {
+        obj.set({ left: 0, top: snappedTop });
+      } else {
+        obj.set({ left: snappedLeft, top: snappedTop });
+      }
+    };
+
+    const handleObjectScaling = (e: any) => {
+      const obj = e.target;
+      if (!obj?.data) return;
+
+      const rect = obj._objects?.[0];
+      const text = obj._objects?.[1];
+      if (!rect) return;
+
+      const scaleX = obj.scaleX || 1;
+      const scaleY = obj.scaleY || 1;
+      const baseWidth = rect.width || 0;
+      const baseHeight = rect.height || 0;
+
+      const newWidth = Math.round((baseWidth * scaleX) / CELL_SIZE) * CELL_SIZE;
+      const newHeight = Math.round((baseHeight * scaleY) / CELL_SIZE) * CELL_SIZE;
+
+      rect.set({ width: newWidth, height: newHeight });
+      obj.set({ scaleX: 1, scaleY: 1 });
+
+      if (text && obj.data.type === 'lane') {
+        text.set({ top: newHeight / 2 - 7 });
+      } else if (text && obj.data.type === 'gate') {
+        text.set({ left: newWidth / 2 - 6 });
+      } else if (text && obj.data.type === 'station') {
+        text.set({ left: newWidth / 2 - 20, top: newHeight / 2 - 8 });
+      }
+
+      canvas.renderAll();
+    };
+
+    const handleObjectModified = (e: any) => {
+      const obj = e.target;
+      if (!obj?.data) return;
+
+      const { type, id } = obj.data;
+      const gridX = Math.round((obj.left || 0) / CELL_SIZE);
+      const gridY = Math.round((obj.top || 0) / CELL_SIZE);
+
+      const rect = obj._objects?.[0];
+      const gridWidth = Math.round((rect?.width || 0) / CELL_SIZE);
+      const gridHeight = Math.round((rect?.height || 0) / CELL_SIZE);
+
+      if (type === 'gate') {
+        callbacksRef.current.onGateMove?.(id, gridX, gridY);
+        callbacksRef.current.onGateResize?.(id, gridWidth, gridHeight);
+      } else if (type === 'lane') {
+        callbacksRef.current.onLaneMove?.(id, 0, gridY);
+        callbacksRef.current.onLaneResize?.(id, gridHeight);
+      } else if (type === 'station') {
+        callbacksRef.current.onStationMove?.(id, gridX, gridY);
+        callbacksRef.current.onStationResize?.(id, gridWidth, gridHeight);
+      }
+    };
+
+    const handleSelectionCreated = (e: any) => {
+      const obj = e.selected?.[0];
+      if (obj?.data) {
+        callbacksRef.current.onElementSelect?.(obj.data);
+      }
+    };
+
+    canvas.on('object:moving', handleObjectMoving);
+    canvas.on('object:scaling', handleObjectScaling);
+    canvas.on('object:modified', handleObjectModified);
+    canvas.on('selection:created', handleSelectionCreated);
+    canvas.on('selection:updated', handleSelectionCreated);
+
+    return () => {
+      canvas.off('object:moving', handleObjectMoving);
+      canvas.off('object:scaling', handleObjectScaling);
+      canvas.off('object:modified', handleObjectModified);
+      canvas.off('selection:created', handleSelectionCreated);
+      canvas.off('selection:updated', handleSelectionCreated);
+    };
+  }, [canvas]);
+
   // Panning handlers
   useEffect(() => {
     if (!canvas) return;
 
     const handleMouseDown = (e: any) => {
-      // Don't start panning if clicking on an object
       if (e.target && e.target !== canvas) return;
       
       if (e.e.altKey || e.e.button === 1) {
@@ -221,27 +342,8 @@ export function UnifiedGridBuilder({
       hasControls: editMode === 'facility',
       lockRotation: true,
       evented: editMode === 'facility',
-    });
-
-    if (editMode === 'facility' && callbacksRef.current.onFacilityResize) {
-      facilityBoundary.on('scaling', () => {
-        const scaleX = facilityBoundary.scaleX || 1;
-        const scaleY = facilityBoundary.scaleY || 1;
-        facilityBoundary.set({
-          width: Math.round((gridWidth * CELL_SIZE * scaleX) / CELL_SIZE) * CELL_SIZE,
-          height: Math.round((gridHeight * CELL_SIZE * scaleY) / CELL_SIZE) * CELL_SIZE,
-          scaleX: 1,
-          scaleY: 1,
-        });
-        canvas.renderAll();
-      });
-
-      facilityBoundary.on('modified', () => {
-        const newGridWidth = Math.round((facilityBoundary.width || 0) / CELL_SIZE);
-        const newGridHeight = Math.round((facilityBoundary.height || 0) / CELL_SIZE);
-        callbacksRef.current.onFacilityResize?.(Math.max(10, newGridWidth), Math.max(10, newGridHeight));
-      });
-    }
+      data: { type: 'facility', id: 'facility-boundary' },
+    } as any);
 
     canvas.add(facilityBoundary);
 
@@ -274,65 +376,39 @@ export function UnifiedGridBuilder({
 
       const laneRect = new Rect({
         left: 0,
-        top: laneY,
+        top: 0,
         width: gridWidth * CELL_SIZE,
         height: laneHeight,
         fill: COLORS.lanes.fill,
         stroke: COLORS.lanes.stroke,
         strokeWidth: COLORS.lanes.strokeWidth,
         opacity,
-        selectable: false,
-        evented: false,
       });
 
       const laneText = new FabricText(lane.name || `Lane ${lane.position_order}`, {
         left: 10,
-        top: laneY + laneHeight / 2 - 7,
+        top: laneHeight / 2 - 7,
         fontSize: 16,
         fill: COLORS.lanes.text,
         fontWeight: 'bold',
-        selectable: false,
-        evented: false,
       });
 
       const laneGroup = new Group([laneRect, laneText], {
+        left: 0,
+        top: laneY,
         selectable: editMode === 'lanes',
         hasControls: editMode === 'lanes',
         lockRotation: true,
         lockScalingX: true,
+        lockMovementX: true,
         evented: editMode === 'lanes',
         cornerStyle: 'circle',
         borderColor: COLORS.selected.stroke,
         cornerColor: COLORS.selected.stroke,
-      });
-
-      if (editMode === 'lanes') {
-        laneGroup.on('moving', () => {
-          const top = laneGroup.top || 0;
-          const snappedTop = Math.round(top / CELL_SIZE) * CELL_SIZE;
-          laneGroup.set({ top: snappedTop, left: 0 });
-        });
-
-        laneGroup.on('scaling', () => {
-          const scaleY = laneGroup.scaleY || 1;
-          const newHeight = Math.round((laneHeight * scaleY) / CELL_SIZE) * CELL_SIZE;
-          laneRect.set({ height: newHeight });
-          laneGroup.set({ scaleY: 1 });
-          laneText.set({ top: newHeight / 2 - 7 });
-          canvas.renderAll();
-        });
-
-        laneGroup.on('modified', () => {
-          const gridY = Math.round((laneGroup.top || 0) / CELL_SIZE);
-          const gridHeight = Math.round((laneRect.height || 0) / CELL_SIZE);
-          callbacksRef.current.onLaneMove?.(lane.id, 0, gridY);
-          callbacksRef.current.onLaneResize?.(lane.id, gridHeight);
-        });
-
-        laneGroup.on('selected', () => {
-          callbacksRef.current.onElementSelect?.({ type: 'lane', id: lane.id, data: lane });
-        });
-      }
+        hoverCursor: editMode === 'lanes' ? 'move' : 'default',
+        moveCursor: 'ns-resize',
+        data: { type: 'lane', id: lane.id, originalData: lane },
+      } as any);
 
       canvas.add(laneGroup);
     });
@@ -346,30 +422,28 @@ export function UnifiedGridBuilder({
       const opacity = editMode === 'gates' ? 1 : 0.3;
 
       const gateRect = new Rect({
-        left: gateX,
-        top: gateY,
+        left: 0,
+        top: 0,
         width: gateWidth,
         height: gateHeight,
         fill: COLORS.gates.fill,
         stroke: COLORS.gates.stroke,
         strokeWidth: COLORS.gates.strokeWidth,
         opacity,
-        selectable: false,
-        evented: false,
       });
 
       const gateText = new FabricText(gate.name || 'Gate', {
-        left: gateX + gateWidth / 2 - 6,
-        top: gateY + 10,
+        left: gateWidth / 2 - 6,
+        top: 10,
         fontSize: 14,
         fill: COLORS.gates.text,
         fontWeight: 'bold',
         angle: 90,
-        selectable: false,
-        evented: false,
       });
 
       const gateGroup = new Group([gateRect, gateText], {
+        left: gateX,
+        top: gateY,
         selectable: editMode === 'gates',
         hasControls: editMode === 'gates',
         lockRotation: true,
@@ -377,41 +451,10 @@ export function UnifiedGridBuilder({
         cornerStyle: 'circle',
         borderColor: COLORS.selected.stroke,
         cornerColor: COLORS.selected.stroke,
-      });
-
-      if (editMode === 'gates') {
-        gateGroup.on('moving', () => {
-          const left = gateGroup.left || 0;
-          const top = gateGroup.top || 0;
-          const snappedLeft = Math.round(left / CELL_SIZE) * CELL_SIZE;
-          const snappedTop = Math.round(top / CELL_SIZE) * CELL_SIZE;
-          gateGroup.set({ left: snappedLeft, top: snappedTop });
-        });
-
-        gateGroup.on('scaling', () => {
-          const scaleX = gateGroup.scaleX || 1;
-          const scaleY = gateGroup.scaleY || 1;
-          const newWidth = Math.round((gateWidth * scaleX) / CELL_SIZE) * CELL_SIZE;
-          const newHeight = Math.round((gateHeight * scaleY) / CELL_SIZE) * CELL_SIZE;
-          gateRect.set({ width: newWidth, height: newHeight });
-          gateGroup.set({ scaleX: 1, scaleY: 1 });
-          gateText.set({ left: newWidth / 2 - 6 });
-          canvas.renderAll();
-        });
-
-        gateGroup.on('modified', () => {
-          const gridX = Math.round((gateGroup.left || 0) / CELL_SIZE);
-          const gridY = Math.round((gateGroup.top || 0) / CELL_SIZE);
-          const gridWidth = Math.round((gateRect.width || 0) / CELL_SIZE);
-          const gridHeight = Math.round((gateRect.height || 0) / CELL_SIZE);
-          callbacksRef.current.onGateMove?.(gate.id, gridX, gridY);
-          callbacksRef.current.onGateResize?.(gate.id, gridWidth, gridHeight);
-        });
-
-        gateGroup.on('selected', () => {
-          callbacksRef.current.onElementSelect?.({ type: 'gate', id: gate.id, data: gate });
-        });
-      }
+        hoverCursor: editMode === 'gates' ? 'move' : 'default',
+        moveCursor: 'move',
+        data: { type: 'gate', id: gate.id, originalData: gate },
+      } as any);
 
       canvas.add(gateGroup);
     });
@@ -425,8 +468,8 @@ export function UnifiedGridBuilder({
       const opacity = editMode === 'stations' ? 1 : 0.3;
 
       const stationRect = new Rect({
-        left: stationX,
-        top: stationY,
+        left: 0,
+        top: 0,
         width: stationWidth,
         height: stationHeight,
         fill: COLORS.stations.fill,
@@ -435,21 +478,19 @@ export function UnifiedGridBuilder({
         opacity,
         rx: 4,
         ry: 4,
-        selectable: false,
-        evented: false,
       });
 
       const stationText = new FabricText(station.name || 'Station', {
-        left: stationX + stationWidth / 2 - 20,
-        top: stationY + stationHeight / 2 - 8,
+        left: stationWidth / 2 - 20,
+        top: stationHeight / 2 - 8,
         fontSize: 13,
         fill: COLORS.stations.text,
         fontWeight: 'bold',
-        selectable: false,
-        evented: false,
       });
 
       const stationGroup = new Group([stationRect, stationText], {
+        left: stationX,
+        top: stationY,
         selectable: editMode === 'stations',
         hasControls: editMode === 'stations',
         lockRotation: true,
@@ -457,47 +498,61 @@ export function UnifiedGridBuilder({
         cornerStyle: 'circle',
         borderColor: COLORS.selected.stroke,
         cornerColor: COLORS.selected.stroke,
-      });
-
-      if (editMode === 'stations') {
-        stationGroup.on('moving', () => {
-          const left = stationGroup.left || 0;
-          const top = stationGroup.top || 0;
-          const snappedLeft = Math.round(left / CELL_SIZE) * CELL_SIZE;
-          const snappedTop = Math.round(top / CELL_SIZE) * CELL_SIZE;
-          stationGroup.set({ left: snappedLeft, top: snappedTop });
-        });
-
-        stationGroup.on('scaling', () => {
-          const scaleX = stationGroup.scaleX || 1;
-          const scaleY = stationGroup.scaleY || 1;
-          const newWidth = Math.round((stationWidth * scaleX) / CELL_SIZE) * CELL_SIZE;
-          const newHeight = Math.round((stationHeight * scaleY) / CELL_SIZE) * CELL_SIZE;
-          stationRect.set({ width: newWidth, height: newHeight });
-          stationGroup.set({ scaleX: 1, scaleY: 1 });
-          stationText.set({ left: newWidth / 2 - 20, top: newHeight / 2 - 8 });
-          canvas.renderAll();
-        });
-
-        stationGroup.on('modified', () => {
-          const gridX = Math.round((stationGroup.left || 0) / CELL_SIZE);
-          const gridY = Math.round((stationGroup.top || 0) / CELL_SIZE);
-          const gridWidth = Math.round((stationRect.width || 0) / CELL_SIZE);
-          const gridHeight = Math.round((stationRect.height || 0) / CELL_SIZE);
-          callbacksRef.current.onStationMove?.(station.id, gridX, gridY);
-          callbacksRef.current.onStationResize?.(station.id, gridWidth, gridHeight);
-        });
-
-        stationGroup.on('selected', () => {
-          callbacksRef.current.onElementSelect?.({ type: 'station', id: station.id, data: station });
-        });
-      }
+        hoverCursor: editMode === 'stations' ? 'move' : 'default',
+        moveCursor: 'move',
+        data: { type: 'station', id: station.id, originalData: station },
+      } as any);
 
       canvas.add(stationGroup);
     });
 
     canvas.renderAll();
   }, [canvas, gridWidth, gridHeight, gates, lanes, stations, editMode]);
+
+  // Update element properties when editMode changes
+  useEffect(() => {
+    if (!canvas) return;
+
+    canvas.getObjects().forEach((obj: any) => {
+      if (obj.data) {
+        const { type } = obj.data;
+        
+        if (type === 'gate') {
+          obj.set({
+            selectable: editMode === 'gates',
+            evented: editMode === 'gates',
+            hasControls: editMode === 'gates',
+            opacity: editMode === 'gates' ? 1 : 0.3,
+            hoverCursor: editMode === 'gates' ? 'move' : 'default',
+          });
+          const rect = obj._objects?.[0];
+          if (rect) rect.set({ opacity: editMode === 'gates' ? 1 : 0.3 });
+        } else if (type === 'lane') {
+          obj.set({
+            selectable: editMode === 'lanes',
+            evented: editMode === 'lanes',
+            hasControls: editMode === 'lanes',
+            opacity: editMode === 'lanes' ? 1 : 0.3,
+            hoverCursor: editMode === 'lanes' ? 'move' : 'default',
+          });
+          const rect = obj._objects?.[0];
+          if (rect) rect.set({ opacity: editMode === 'lanes' ? 1 : 0.3 });
+        } else if (type === 'station') {
+          obj.set({
+            selectable: editMode === 'stations',
+            evented: editMode === 'stations',
+            hasControls: editMode === 'stations',
+            opacity: editMode === 'stations' ? 1 : 0.3,
+            hoverCursor: editMode === 'stations' ? 'move' : 'default',
+          });
+          const rect = obj._objects?.[0];
+          if (rect) rect.set({ opacity: editMode === 'stations' ? 1 : 0.3 });
+        }
+      }
+    });
+
+    canvas.renderAll();
+  }, [canvas, editMode]);
 
   const handleZoomIn = () => {
     if (canvas) {
@@ -527,7 +582,7 @@ export function UnifiedGridBuilder({
   };
 
   return (
-    <div className="relative">
+    <div ref={containerRef} className="relative w-full">
       <div className="absolute top-2 right-2 flex gap-2 z-10">
         <Button variant="outline" size="sm" onClick={handleZoomIn}>
           <ZoomIn className="h-4 w-4" />
@@ -542,7 +597,9 @@ export function UnifiedGridBuilder({
       <div className="text-xs text-muted-foreground mb-2">
         💡 Hold Alt or middle-click to pan • Click and drag to move elements • Use handles to resize
       </div>
-      <canvas ref={canvasRef} className="border border-border rounded-lg shadow-lg" />
+      <div className="overflow-auto border border-border rounded-lg shadow-lg bg-background">
+        <canvas ref={canvasRef} />
+      </div>
     </div>
   );
 }
