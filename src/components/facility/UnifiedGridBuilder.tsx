@@ -26,6 +26,7 @@ interface Station {
   grid_position_y: number;
   grid_width: number;
   grid_height: number;
+  lane_id: string;
 }
 
 type EditMode = 'facility' | 'gates' | 'lanes' | 'stations';
@@ -40,6 +41,7 @@ interface UnifiedGridBuilderProps {
   onGateMove?: (gateId: string, x: number, y: number) => void;
   onLaneMove?: (laneId: string, y: number) => void;
   onStationMove?: (stationId: string, x: number, y: number) => void;
+  onFacilityResize?: (width: number, height: number) => void;
 }
 
 const CELL_SIZE = 20;
@@ -49,23 +51,24 @@ const CANVAS_HEIGHT = 700;
 // Color constants using direct RGB values (Fabric.js doesn't support CSS variables in canvas)
 const COLORS = {
   facility: {
-    grid: '#404040',
-    background: '#1a1a1a',
+    grid: 'rgb(255, 107, 107)',
+    background: 'rgb(255, 245, 245)',
+    stroke: 'rgb(255, 107, 107)',
   },
   gates: {
-    fill: 'rgba(59, 130, 246, 0.15)',
-    stroke: '#3b82f6',
-    text: '#60a5fa',
+    fill: 'rgba(16, 185, 129, 0.3)',
+    stroke: 'rgb(16, 185, 129)',
+    text: 'rgb(5, 150, 105)',
   },
   lanes: {
-    fill: 'rgba(34, 197, 94, 0.15)',
-    stroke: '#22c55e',
-    text: '#4ade80',
+    fill: 'rgba(139, 92, 246, 0.2)',
+    stroke: 'rgb(139, 92, 246)',
+    text: 'rgb(124, 58, 237)',
   },
   stations: {
-    fill: 'rgba(249, 115, 22, 0.15)',
-    stroke: '#f97316',
-    text: '#fb923c',
+    fill: 'rgba(196, 181, 253, 0.4)',
+    stroke: 'rgb(196, 181, 253)',
+    text: 'rgb(167, 139, 250)',
   },
 };
 
@@ -79,6 +82,7 @@ export function UnifiedGridBuilder({
   onGateMove,
   onLaneMove,
   onStationMove,
+  onFacilityResize,
 }: UnifiedGridBuilderProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [canvas, setCanvas] = useState<FabricCanvas | null>(null);
@@ -137,31 +141,84 @@ export function UnifiedGridBuilder({
       canvas.add(line);
     }
 
-    // Draw gates
+    // Draw lanes first (horizontal bands)
+    lanes.forEach((lane) => {
+      const isEditable = editMode === 'lanes';
+      const opacity = editMode === 'facility' || editMode === 'gates' ? 0.3 : 1;
+
+      const laneRect = new Rect({
+        left: 0,
+        top: lane.grid_position_y * CELL_SIZE,
+        width: maxX * CELL_SIZE,
+        height: lane.grid_height * CELL_SIZE,
+        fill: COLORS.lanes.fill,
+        stroke: COLORS.lanes.stroke,
+        strokeWidth: 2,
+        opacity,
+      });
+
+      const laneText = new Text(lane.name, {
+        left: 10,
+        top: lane.grid_position_y * CELL_SIZE + 5,
+        fontSize: 14,
+        fill: COLORS.lanes.text,
+        fontWeight: 'bold',
+        opacity,
+      });
+
+      const laneGroup = new Group([laneRect, laneText], {
+        selectable: isEditable,
+        hasControls: false,
+        hasBorders: isEditable,
+        lockRotation: true,
+        lockScalingX: true,
+        lockMovementX: true,
+        hoverCursor: isEditable ? 'move' : 'default',
+      });
+
+      laneGroup.set('data', { laneId: lane.id });
+
+      if (isEditable && onLaneMove) {
+        laneGroup.on('modified', () => {
+          const top = laneGroup.top || 0;
+          const snappedY = Math.round(top / CELL_SIZE);
+
+          laneGroup.set({
+            left: 0,
+            top: snappedY * CELL_SIZE,
+          });
+
+          canvas.renderAll();
+          onLaneMove(lane.id, snappedY);
+        });
+      }
+
+      canvas.add(laneGroup);
+    });
+
+    // Draw gates (thin vertical bars at edges)
     gates.forEach((gate) => {
       const isEditable = editMode === 'gates';
       const opacity = editMode === 'facility' ? 0.3 : 1;
+      const gateWidth = 3; // Thin vertical bar
 
       const gateRect = new Rect({
         left: gate.grid_position_x * CELL_SIZE,
         top: gate.grid_position_y * CELL_SIZE,
-        width: gate.grid_width * CELL_SIZE,
+        width: gateWidth * CELL_SIZE,
         height: gate.grid_height * CELL_SIZE,
         fill: COLORS.gates.fill,
         stroke: COLORS.gates.stroke,
-        strokeWidth: 2,
-        rx: 4,
-        ry: 4,
+        strokeWidth: 3,
         opacity,
       });
 
       const gateText = new Text(gate.name, {
-        left: gate.grid_position_x * CELL_SIZE + (gate.grid_width * CELL_SIZE) / 2,
-        top: gate.grid_position_y * CELL_SIZE + (gate.grid_height * CELL_SIZE) / 2,
+        left: gate.grid_position_x * CELL_SIZE + 5,
+        top: gate.grid_position_y * CELL_SIZE + 5,
         fontSize: 12,
         fill: COLORS.gates.text,
-        originX: 'center',
-        originY: 'center',
+        fontWeight: 'bold',
         opacity,
       });
 
@@ -175,10 +232,8 @@ export function UnifiedGridBuilder({
 
       gateGroup.set('data', { gateId: gate.id });
 
-      if (isEditable) {
+      if (isEditable && onGateMove) {
         gateGroup.on('modified', () => {
-          if (!onGateMove) return;
-
           const left = gateGroup.left || 0;
           const top = gateGroup.top || 0;
 
@@ -198,37 +253,6 @@ export function UnifiedGridBuilder({
       canvas.add(gateGroup);
     });
 
-    // Draw lanes (similar pattern for lanes)
-    lanes.forEach((lane) => {
-      const isEditable = editMode === 'lanes';
-      const opacity = editMode === 'facility' || editMode === 'gates' ? 0.3 : 1;
-
-      const laneRect = new Rect({
-        left: 0,
-        top: lane.grid_position_y * CELL_SIZE,
-        width: maxX * CELL_SIZE,
-        height: lane.grid_height * CELL_SIZE,
-        fill: COLORS.lanes.fill,
-        stroke: COLORS.lanes.stroke,
-        strokeWidth: 2,
-        opacity,
-        selectable: false,
-        evented: false,
-      });
-
-      const laneText = new Text(lane.name, {
-        left: 10,
-        top: lane.grid_position_y * CELL_SIZE + 5,
-        fontSize: 12,
-        fill: COLORS.lanes.text,
-        opacity,
-        selectable: false,
-        evented: false,
-      });
-
-      canvas.add(laneRect);
-      canvas.add(laneText);
-    });
 
     // Draw stations
     stations.forEach((station) => {
@@ -290,7 +314,7 @@ export function UnifiedGridBuilder({
     });
 
     canvas.renderAll();
-  }, [canvas, gridWidth, gridHeight, gates, lanes, stations, editMode, onGateMove, onLaneMove, onStationMove]);
+  }, [canvas, gridWidth, gridHeight, gates, lanes, stations, editMode, onGateMove, onLaneMove, onStationMove, onFacilityResize]);
 
   const handleZoomIn = () => {
     if (!canvas) return;

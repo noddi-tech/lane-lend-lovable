@@ -5,6 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Building2, MapPin, Layers, Square } from 'lucide-react';
 import { UnifiedGridBuilder } from '@/components/facility/UnifiedGridBuilder';
 import { useUpdateDrivingGate } from '@/hooks/admin/useDrivingGates';
+import { useLanes, useUpdateLane } from '@/hooks/admin/useLanes';
+import { useStations, useUpdateStation } from '@/hooks/admin/useStations';
+import { useUpdateFacility } from '@/hooks/admin/useFacilities';
 import type { FacilityWithGates } from '@/hooks/admin/useFacilities';
 import type { DrivingGateWithLanes } from '@/hooks/admin/useDrivingGates';
 
@@ -18,12 +21,50 @@ interface FacilityLayoutBuilderProps {
 export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayoutBuilderProps) {
   const [editMode, setEditMode] = useState<EditMode>('gates');
   const updateGate = useUpdateDrivingGate();
+  const updateLane = useUpdateLane();
+  const updateStation = useUpdateStation();
+  const updateFacility = useUpdateFacility();
+
+  // Fetch lanes for all driving gates in this facility
+  const { data: allLanes = [] } = useLanes();
+  const lanes = allLanes.filter(lane => 
+    drivingGates.some(gate => gate.id === lane.driving_gate?.id)
+  );
+
+  // Fetch stations for all lanes
+  const { data: allStations = [] } = useStations();
+  const stations = allStations.filter(station =>
+    lanes.some(lane => lane.id === station.lane?.id)
+  );
 
   const handleGateMove = async (gateId: string, x: number, y: number) => {
     await updateGate.mutateAsync({
       id: gateId,
       grid_position_x: x,
       grid_position_y: y,
+    });
+  };
+
+  const handleLaneMove = async (laneId: string, y: number) => {
+    await updateLane.mutateAsync({
+      id: laneId,
+      grid_position_y: y,
+    });
+  };
+
+  const handleStationMove = async (stationId: string, x: number, y: number) => {
+    await updateStation.mutateAsync({
+      id: stationId,
+      grid_position_x: x,
+      grid_position_y: y,
+    });
+  };
+
+  const handleFacilityResize = async (width: number, height: number) => {
+    await updateFacility.mutateAsync({
+      id: facility.id,
+      grid_width: width,
+      grid_height: height,
     });
   };
 
@@ -72,7 +113,7 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
               <Layers className="h-4 w-4 mr-2" />
               Lanes
               <Badge variant="secondary" className="ml-2 bg-green-500/20 text-green-400 border-0">
-                0
+                {lanes.length}
               </Badge>
             </Button>
             <Button
@@ -83,7 +124,7 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
               <Square className="h-4 w-4 mr-2" />
               Stations
               <Badge variant="secondary" className="ml-2 bg-orange-500/20 text-orange-400 border-0">
-                0
+                {stations.length}
               </Badge>
             </Button>
           </div>
@@ -120,10 +161,26 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
               grid_width: g.grid_width,
               grid_height: g.grid_height,
             }))}
-            lanes={[]}
-            stations={[]}
+            lanes={lanes.map(l => ({
+              id: l.id,
+              name: l.name,
+              grid_position_y: l.grid_position_y || 0,
+              grid_height: l.grid_height || 2,
+            }))}
+            stations={stations.map(s => ({
+              id: s.id,
+              name: s.name,
+              grid_position_x: s.grid_position_x || 0,
+              grid_position_y: s.grid_position_y || 0,
+              grid_width: s.grid_width || 2,
+              grid_height: s.grid_height || 2,
+              lane_id: s.lane?.id || '',
+            }))}
             editMode={editMode}
             onGateMove={handleGateMove}
+            onLaneMove={handleLaneMove}
+            onStationMove={handleStationMove}
+            onFacilityResize={handleFacilityResize}
           />
         </CardContent>
       </Card>
