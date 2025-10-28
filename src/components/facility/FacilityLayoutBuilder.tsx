@@ -13,6 +13,7 @@ import { useUpdateLane } from '@/hooks/admin/useLanes';
 import { useLanes } from '@/hooks/admin/useLanes';
 import { useStations, useUpdateStation } from '@/hooks/admin/useStations';
 import { toast } from 'sonner';
+import { useDebouncedCallback } from '@/hooks/useDebouncedMutation';
 import type { FacilityWithGates } from '@/hooks/admin/useFacilities';
 import type { DrivingGateWithLanes } from '@/hooks/admin/useDrivingGates';
 
@@ -89,61 +90,67 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
     parent_id: station.lane_id,
   }));
 
-  const handleBlockMove = async (blockId: string, gridX: number, gridY: number) => {
-    const block = [...gateBlocks, ...laneBlocks, ...stationBlocks].find(b => b.id === blockId);
-    if (!block) return;
+  const handleBlockMove = useDebouncedCallback(
+    async (blockId: string, gridX: number, gridY: number) => {
+      const block = [...gateBlocks, ...laneBlocks, ...stationBlocks].find(b => b.id === blockId);
+      if (!block) return;
 
-    try {
-      if (block.type === 'gate') {
-        await updateGate.mutateAsync({
-          id: blockId,
-          grid_position_x: gridX,
-          grid_position_y: gridY,
-        } as any);
-      } else if (block.type === 'lane') {
-        await updateLane.mutateAsync({
-          id: blockId,
-          grid_position_y: gridY,
-        } as any);
-      } else if (block.type === 'station') {
-        await updateStation.mutateAsync({
-          id: blockId,
-          grid_position_x: gridX,
-          grid_position_y: gridY,
-        } as any);
+      try {
+        if (block.type === 'gate') {
+          await updateGate.mutateAsync({
+            id: blockId,
+            grid_position_x: gridX,
+            grid_position_y: gridY,
+          } as any);
+        } else if (block.type === 'lane') {
+          await updateLane.mutateAsync({
+            id: blockId,
+            grid_position_y: gridY,
+          } as any);
+        } else if (block.type === 'station') {
+          await updateStation.mutateAsync({
+            id: blockId,
+            grid_position_x: gridX,
+            grid_position_y: gridY,
+          } as any);
+        }
+      } catch (error) {
+        toast.error('Failed to move block');
       }
-    } catch (error) {
-      toast.error('Failed to move block');
-    }
-  };
+    },
+    350
+  );
 
-  const handleBlockResize = async (blockId: string, gridWidth: number, gridHeight: number) => {
-    const block = [...gateBlocks, ...laneBlocks, ...stationBlocks].find(b => b.id === blockId);
-    if (!block) return;
+  const handleBlockResize = useDebouncedCallback(
+    async (blockId: string, gridWidth: number, gridHeight: number) => {
+      const block = [...gateBlocks, ...laneBlocks, ...stationBlocks].find(b => b.id === blockId);
+      if (!block) return;
 
-    try {
-      if (block.type === 'gate') {
-        await updateGate.mutateAsync({
-          id: blockId,
-          grid_width: gridWidth,
-          grid_height: gridHeight,
-        } as any);
-      } else if (block.type === 'lane') {
-        await updateLane.mutateAsync({
-          id: blockId,
-          grid_height: gridHeight,
-        } as any);
-      } else if (block.type === 'station') {
-        await updateStation.mutateAsync({
-          id: blockId,
-          grid_width: gridWidth,
-          grid_height: gridHeight,
-        } as any);
+      try {
+        if (block.type === 'gate') {
+          await updateGate.mutateAsync({
+            id: blockId,
+            grid_width: gridWidth,
+            grid_height: gridHeight,
+          } as any);
+        } else if (block.type === 'lane') {
+          await updateLane.mutateAsync({
+            id: blockId,
+            grid_height: gridHeight,
+          } as any);
+        } else if (block.type === 'station') {
+          await updateStation.mutateAsync({
+            id: blockId,
+            grid_width: gridWidth,
+            grid_height: gridHeight,
+          } as any);
+        }
+      } catch (error) {
+        toast.error('Failed to resize block');
       }
-    } catch (error) {
-      toast.error('Failed to resize block');
-    }
-  };
+    },
+    350
+  );
 
   return (
     <Card>

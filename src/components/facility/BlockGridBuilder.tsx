@@ -81,6 +81,7 @@ export function BlockGridBuilder({
       height: canvasDimensions.height,
       backgroundColor: 'hsl(222, 47%, 11%)',
       selection: true,
+      preserveObjectStacking: true,
     });
 
     setCanvas(fabricCanvas);
@@ -195,17 +196,15 @@ export function BlockGridBuilder({
       return group;
     };
 
-    // Draw gates
-    gates.forEach((gate) => {
-      createBlock(gate);
-    });
-
-    // Draw lanes
+    // Draw in correct Z-order: lanes first (bottom), then gates, then stations (top)
     lanes.forEach((lane) => {
       createBlock(lane);
     });
 
-    // Draw stations
+    gates.forEach((gate) => {
+      createBlock(gate);
+    });
+
     stations.forEach((station) => {
       createBlock(station);
     });
@@ -222,14 +221,15 @@ export function BlockGridBuilder({
 
       const block = obj.data as LayoutBlock;
       const isEditable = block.type === editMode;
+      const isLane = block.type === 'lane';
 
       obj.set({
         selectable: isEditable,
         evented: isEditable,
-        hasControls: false,
-        lockMovementX: !isEditable,
+        hasControls: isEditable && !isLane,
+        lockMovementX: !isEditable || isLane,
         lockMovementY: !isEditable,
-        lockScalingX: true,
+        lockScalingX: true || isLane,
         lockScalingY: true,
         lockRotation: true,
         hoverCursor: isEditable ? 'move' : 'default',
@@ -253,40 +253,116 @@ export function BlockGridBuilder({
       const top = obj.top || 0;
 
       // Snap to grid
-      const snappedX = Math.round(left / CELL_SIZE);
-      const snappedY = Math.round(top / CELL_SIZE);
+      let snappedX = Math.round(left / CELL_SIZE);
+      let snappedY = Math.round(top / CELL_SIZE);
 
-      obj.set({
-        left: snappedX * CELL_SIZE,
-        top: snappedY * CELL_SIZE,
-      });
+      // Station-to-Lane parenting constraint
+      if (block.type === 'station' && block.parent_id) {
+        const parentLane = lanes.find(l => l.id === block.parent_id);
+        if (parentLane) {
+          // Constrain to parent lane bounds
+          const laneMinX = parentLane.grid_x;
+          const laneMaxX = parentLane.grid_x + parentLane.grid_width - block.grid_width;
+          const laneMinY = parentLane.grid_y;
+          const laneMaxY = parentLane.grid_y + parentLane.grid_height - block.grid_height;
 
-      // Constrain to facility bounds
-      const maxX = facility.grid_width - block.grid_width;
-      const maxY = facility.grid_height - block.grid_height;
+          snappedX = Math.max(laneMinX, Math.min(laneMaxX, snappedX));
+          snappedY = Math.max(laneMinY, Math.min(laneMaxY, snappedY));
 
-      if (snappedX < 0) obj.set({ left: 0 });
-      if (snappedY < 0) obj.set({ top: 0 });
-      if (snappedX > maxX) obj.set({ left: maxX * CELL_SIZE });
-      if (snappedY > maxY) obj.set({ top: maxY * CELL_SIZE });
+          // Visual feedback: flash lane border when near edge
+          if (snappedX === laneMinX || snappedX === laneMaxX || 
+              snappedY === laneMinY || snappedY === laneMaxY) {
+            const laneObj = canvas.getObjects().find(o => 
+              (o as any).data?.id === block.parent_id
+            );
+            if (laneObj) {
+              const rect = (laneObj as any)._objects?.[0];
+              if (rect) {
+                rect.set({ stroke: '#ef4444', strokeWidth: 3 });
+                setTimeout(() => {
+                  rect.set({ stroke: COLORS.lane.stroke, strokeWidth: 2 });
+                  canvas.renderAll();
+                }, 200);
+              }
+            }
+          }
+        }
+      }
+
+      // Lane width lock - lanes stay at x=0
+      if (block.type === 'lane') {
+        obj.set({
+          left: 0,
+          top: snappedY * CELL_SIZE,
+        });
+      } else {
+        obj.set({
+          left: snappedX * CELL_SIZE,
+          top: snappedY * CELL_SIZE,
+        });
+      }
+
+      // Constrain to facility bounds (for non-station blocks)
+      if (block.type !== 'station') {
+        const maxX = facility.grid_width - block.grid_width;
+        const maxY = facility.grid_height - block.grid_height;
+
+        if (snappedX < 0) obj.set({ left: 0 });
+        if (snappedY < 0) obj.set({ top: 0 });
+        if (snappedX > maxX) obj.set({ left: maxX * CELL_SIZE });
+        if (snappedY > maxY) obj.set({ top: maxY * CELL_SIZE });
+      }
     };
 
     const handleObjectScaling = (e: any) => {
       const obj = e.target;
       if (!obj?.data) return;
 
+      const block = obj.data as LayoutBlock;
       const scaleX = obj.scaleX || 1;
       const scaleY = obj.scaleY || 1;
 
-      const newWidth = Math.round((obj.width || 0) * scaleX / CELL_SIZE) * CELL_SIZE;
-      const newHeight = Math.round((obj.height || 0) * scaleY / CELL_SIZE) * CELL_SIZE;
+      // Get current dimensions
+      const currentWidth = (obj.width || 0) * scaleX;
+      const currentHeight = (obj.height || 0) * scaleY;
 
-      obj.set({
-        width: Math.max(CELL_SIZE * 2, newWidth),
-        height: Math.max(CELL_SIZE * 2, newHeight),
-        scaleX: 1,
-        scaleY: 1,
-      });
+      // Snap to grid
+      const newWidth = Math.max(
+        CELL_SIZE * 2,
+        Math.round(currentWidth / CELL_SIZE) * CELL_SIZE
+      );
+      const newHeight = Math.max(
+        CELL_SIZE * 2,
+        Math.round(currentHeight / CELL_SIZE) * CELL_SIZE
+      );
+
+      // For lanes, enforce facility width
+      if (block.type === 'lane') {
+        obj.set({
+          width: facility.grid_width * CELL_SIZE,
+          height: newHeight,
+          scaleX: 1,
+          scaleY: 1,
+        });
+      } else {
+        obj.set({
+          width: newWidth,
+          height: newHeight,
+          scaleX: 1,
+          scaleY: 1,
+        });
+      }
+
+      // Update text position in the group
+      const text = obj._objects?.[1];
+      if (text) {
+        text.set({
+          left: (block.type === 'lane' ? facility.grid_width * CELL_SIZE : newWidth) / 2,
+          top: newHeight / 2,
+        });
+      }
+
+      canvas.renderAll();
     };
 
     const handleObjectModified = (e: any) => {
