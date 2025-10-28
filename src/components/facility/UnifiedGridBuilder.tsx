@@ -104,6 +104,32 @@ export function UnifiedGridBuilder({
   const [zoom, setZoom] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
   const [lastPanPoint, setLastPanPoint] = useState<{ x: number; y: number } | null>(null);
+  
+  // Store callbacks in refs to prevent useEffect re-runs
+  const callbacksRef = useRef({
+    onGateMove,
+    onLaneMove,
+    onStationMove,
+    onFacilityResize,
+    onGateResize,
+    onLaneResize,
+    onStationResize,
+    onElementSelect,
+  });
+
+  // Update refs when callbacks change
+  useEffect(() => {
+    callbacksRef.current = {
+      onGateMove,
+      onLaneMove,
+      onStationMove,
+      onFacilityResize,
+      onGateResize,
+      onLaneResize,
+      onStationResize,
+      onElementSelect,
+    };
+  });
 
   // Initialize canvas once on mount
   useEffect(() => {
@@ -197,7 +223,7 @@ export function UnifiedGridBuilder({
       evented: editMode === 'facility',
     });
 
-    if (editMode === 'facility' && onFacilityResize) {
+    if (editMode === 'facility' && callbacksRef.current.onFacilityResize) {
       facilityBoundary.on('scaling', () => {
         const scaleX = facilityBoundary.scaleX || 1;
         const scaleY = facilityBoundary.scaleY || 1;
@@ -213,7 +239,7 @@ export function UnifiedGridBuilder({
       facilityBoundary.on('modified', () => {
         const newGridWidth = Math.round((facilityBoundary.width || 0) / CELL_SIZE);
         const newGridHeight = Math.round((facilityBoundary.height || 0) / CELL_SIZE);
-        onFacilityResize(Math.max(10, newGridWidth), Math.max(10, newGridHeight));
+        callbacksRef.current.onFacilityResize?.(Math.max(10, newGridWidth), Math.max(10, newGridHeight));
       });
     }
 
@@ -299,14 +325,12 @@ export function UnifiedGridBuilder({
         laneGroup.on('modified', () => {
           const gridY = Math.round((laneGroup.top || 0) / CELL_SIZE);
           const gridHeight = Math.round((laneRect.height || 0) / CELL_SIZE);
-          if (onLaneMove) onLaneMove(lane.id, 0, gridY);
-          if (onLaneResize) onLaneResize(lane.id, gridHeight);
+          callbacksRef.current.onLaneMove?.(lane.id, 0, gridY);
+          callbacksRef.current.onLaneResize?.(lane.id, gridHeight);
         });
 
         laneGroup.on('selected', () => {
-          if (onElementSelect) {
-            onElementSelect({ type: 'lane', id: lane.id, data: lane });
-          }
+          callbacksRef.current.onElementSelect?.({ type: 'lane', id: lane.id, data: lane });
         });
       }
 
@@ -380,14 +404,12 @@ export function UnifiedGridBuilder({
           const gridY = Math.round((gateGroup.top || 0) / CELL_SIZE);
           const gridWidth = Math.round((gateRect.width || 0) / CELL_SIZE);
           const gridHeight = Math.round((gateRect.height || 0) / CELL_SIZE);
-          if (onGateMove) onGateMove(gate.id, gridX, gridY);
-          if (onGateResize) onGateResize(gate.id, gridWidth, gridHeight);
+          callbacksRef.current.onGateMove?.(gate.id, gridX, gridY);
+          callbacksRef.current.onGateResize?.(gate.id, gridWidth, gridHeight);
         });
 
         gateGroup.on('selected', () => {
-          if (onElementSelect) {
-            onElementSelect({ type: 'gate', id: gate.id, data: gate });
-          }
+          callbacksRef.current.onElementSelect?.({ type: 'gate', id: gate.id, data: gate });
         });
       }
 
@@ -462,14 +484,12 @@ export function UnifiedGridBuilder({
           const gridY = Math.round((stationGroup.top || 0) / CELL_SIZE);
           const gridWidth = Math.round((stationRect.width || 0) / CELL_SIZE);
           const gridHeight = Math.round((stationRect.height || 0) / CELL_SIZE);
-          if (onStationMove) onStationMove(station.id, gridX, gridY);
-          if (onStationResize) onStationResize(station.id, gridWidth, gridHeight);
+          callbacksRef.current.onStationMove?.(station.id, gridX, gridY);
+          callbacksRef.current.onStationResize?.(station.id, gridWidth, gridHeight);
         });
 
         stationGroup.on('selected', () => {
-          if (onElementSelect) {
-            onElementSelect({ type: 'station', id: station.id, data: station });
-          }
+          callbacksRef.current.onElementSelect?.({ type: 'station', id: station.id, data: station });
         });
       }
 
@@ -477,7 +497,7 @@ export function UnifiedGridBuilder({
     });
 
     canvas.renderAll();
-  }, [canvas, gridWidth, gridHeight, gates, lanes, stations, editMode, onGateMove, onLaneMove, onStationMove, onFacilityResize, onGateResize, onLaneResize, onStationResize, onElementSelect]);
+  }, [canvas, gridWidth, gridHeight, gates, lanes, stations, editMode]);
 
   const handleZoomIn = () => {
     if (canvas) {
