@@ -2,7 +2,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Search, DoorOpen, Layers, Box, GripVertical } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Search, DoorOpen, Layers, Box, GripVertical, Info } from 'lucide-react';
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useLibraryGates } from '@/hooks/admin/useDrivingGates';
@@ -55,32 +56,44 @@ export function LibraryPalette({ editMode, onItemDragStart }: LibraryPaletteProp
     type: 'gate' | 'lane' | 'station',
     Icon: React.ElementType
   ) => (
-    <div
-      key={item.id}
-      draggable
-      onDragStart={(e) => handleDragStart(e, item, type)}
-      className="p-3 border rounded-lg hover:bg-accent hover:border-primary cursor-move transition-colors group"
-    >
-      <div className="flex items-start gap-2">
-        <GripVertical className="h-4 w-4 text-muted-foreground group-hover:text-primary mt-0.5" />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <Icon className="h-4 w-4 flex-shrink-0" />
-            <h4 className="font-medium text-sm truncate">{item.name}</h4>
+    <TooltipProvider key={item.id}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            draggable
+            onDragStart={(e) => handleDragStart(e, item, type)}
+            className="p-3 border rounded-lg hover:bg-accent hover:border-primary cursor-move transition-all duration-200 group hover:shadow-md animate-fade-in"
+          >
+            <div className="flex items-start gap-2">
+              <GripVertical className="h-4 w-4 text-muted-foreground group-hover:text-primary mt-0.5 transition-colors" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <Icon className="h-4 w-4 flex-shrink-0 transition-transform group-hover:scale-110" />
+                  <h4 className="font-medium text-sm truncate">{item.name}</h4>
+                </div>
+                {item.description && (
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                    {item.description}
+                  </p>
+                )}
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant="outline" className="text-xs">
+                    {item.grid_width || 'auto'} × {item.grid_height}
+                  </Badge>
+                </div>
+              </div>
+            </div>
           </div>
-          {item.description && (
-            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-              {item.description}
-            </p>
-          )}
-          <div className="flex items-center gap-2 mt-2">
-            <Badge variant="outline" className="text-xs">
-              {item.grid_width || 'auto'} × {item.grid_height}
-            </Badge>
-          </div>
-        </div>
-      </div>
-    </div>
+        </TooltipTrigger>
+        <TooltipContent side="right" className="max-w-xs">
+          <p className="font-semibold">{item.name}</p>
+          {item.description && <p className="text-xs mt-1">{item.description}</p>}
+          <p className="text-xs mt-2 text-muted-foreground">
+            Drag and drop onto the canvas to place
+          </p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 
   if (editMode === 'view' || editMode === 'facility') {
@@ -97,9 +110,22 @@ export function LibraryPalette({ editMode, onItemDragStart }: LibraryPaletteProp
   }
 
   return (
-    <Card className="w-80">
+    <Card className="w-80 shadow-lg">
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg">Library Palette</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg">Library Palette</CardTitle>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p className="font-semibold mb-1">How to use</p>
+                <p className="text-xs">Drag items from the library onto the canvas to place them in your facility. Switch between tabs to view different types of elements.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
         <CardDescription>
           Drag items onto the canvas to place them
         </CardDescription>

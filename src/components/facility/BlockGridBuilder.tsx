@@ -29,6 +29,8 @@ interface BlockGridBuilderProps {
   onBlockResize: (blockId: string, gridWidth: number, gridHeight: number) => void;
   onBlockSelect: (block: LayoutBlock | null) => void;
   onDrop?: (e: React.DragEvent) => void;
+  onDelete?: (block: LayoutBlock) => void;
+  onReturnToLibrary?: (block: LayoutBlock) => void;
 }
 
 const CELL_SIZE = 15;
@@ -52,6 +54,8 @@ export function BlockGridBuilder({
   onBlockResize,
   onBlockSelect,
   onDrop,
+  onDelete,
+  onReturnToLibrary,
 }: BlockGridBuilderProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);

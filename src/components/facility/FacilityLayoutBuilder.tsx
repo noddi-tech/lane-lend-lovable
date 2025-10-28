@@ -10,11 +10,13 @@ import { CreateGateDialog } from '@/components/facility/dialogs/CreateGateDialog
 import { CreateLaneDialog } from '@/components/facility/dialogs/CreateLaneDialog';
 import { CreateStationDialog } from '@/components/facility/dialogs/CreateStationDialog';
 import { CreateRoomDialog } from '@/components/facility/dialogs/CreateRoomDialog';
-import { useUpdateDrivingGate, useAssignGateToFacility } from '@/hooks/admin/useDrivingGates';
-import { useUpdateLane, useAssignLaneToFacility } from '@/hooks/admin/useLanes';
+import { useUpdateDrivingGate, useAssignGateToFacility, useUnassignGateFromFacility } from '@/hooks/admin/useDrivingGates';
+import { useUpdateLane, useAssignLaneToFacility, useUnassignLaneFromFacility } from '@/hooks/admin/useLanes';
 import { useLanes } from '@/hooks/admin/useLanes';
-import { useStations, useUpdateStation, useAssignStationToLane } from '@/hooks/admin/useStations';
-import { useRooms, useUpdateRoom } from '@/hooks/admin/useRooms';
+import { useStations, useUpdateStation, useAssignStationToLane, useUnassignStationFromLane, useDeleteStation } from '@/hooks/admin/useStations';
+import { useRooms, useUpdateRoom, useDeleteRoom } from '@/hooks/admin/useRooms';
+import { useDeleteDrivingGate } from '@/hooks/admin/useDrivingGates';
+import { useDeleteLane } from '@/hooks/admin/useLanes';
 import { toast } from 'sonner';
 import { useDebouncedCallback } from '@/hooks/useDebouncedMutation';
 import type { FacilityWithGates } from '@/hooks/admin/useFacilities';
@@ -37,9 +39,16 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
   const updateLane = useUpdateLane();
   const updateStation = useUpdateStation();
   const updateRoom = useUpdateRoom();
+  const deleteGate = useDeleteDrivingGate();
+  const deleteLane = useDeleteLane();
+  const deleteStation = useDeleteStation();
+  const deleteRoom = useDeleteRoom();
   const assignGate = useAssignGateToFacility();
   const assignLane = useAssignLaneToFacility();
   const assignStation = useAssignStationToLane();
+  const unassignGate = useUnassignGateFromFacility();
+  const unassignLane = useUnassignLaneFromFacility();
+  const unassignStation = useUnassignStationFromLane();
 
   const { data: allLanes } = useLanes();
   const { data: allStations } = useStations();
@@ -262,53 +271,96 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
     }
   };
 
+  const handleDeleteBlock = async (block: LayoutBlock) => {
+    if (!confirm(`Are you sure you want to delete "${block.name}"?`)) return;
+
+    try {
+      if (block.type === 'gate') {
+        await deleteGate.mutateAsync(block.id);
+      } else if (block.type === 'lane') {
+        await deleteLane.mutateAsync(block.id);
+      } else if (block.type === 'station') {
+        await deleteStation.mutateAsync(block.id);
+      } else if (block.type === 'room') {
+        await deleteRoom.mutateAsync(block.id);
+      }
+      setSelectedBlock(null);
+    } catch (error) {
+      console.error('Failed to delete block:', error);
+    }
+  };
+
+  const handleReturnToLibrary = async (block: LayoutBlock) => {
+    if (!confirm(`Return "${block.name}" to library? It will be unassigned from this facility.`)) return;
+
+    try {
+      if (block.type === 'gate') {
+        await unassignGate.mutateAsync(block.id);
+      } else if (block.type === 'lane') {
+        await unassignLane.mutateAsync(block.id);
+      } else if (block.type === 'station') {
+        await unassignStation.mutateAsync(block.id);
+      }
+      setSelectedBlock(null);
+      toast.success(`"${block.name}" returned to library`);
+    } catch (error) {
+      console.error('Failed to return to library:', error);
+      toast.error('Failed to return item to library');
+    }
+  };
+
   return (
-    <Card>
+    <Card className="shadow-lg">
       <CardHeader>
         <div className="flex items-start justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
               <Layers className="h-5 w-5" />
-              Block-Based Layout Builder
+              Facility Layout Builder
             </CardTitle>
-            <CardDescription>
-              Drag and drop gates, lanes, and stations to design your facility layout
+            <CardDescription className="mt-1">
+              Design your facility by arranging gates, lanes, stations, and rooms. 
+              Drag from the library or create new elements.
             </CardDescription>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between bg-muted/50 p-3 rounded-lg">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground mr-2">Edit:</span>
+            <span className="text-sm font-medium text-muted-foreground">Edit Mode:</span>
             <Button
-              variant={editMode === 'gate' ? 'secondary' : 'outline'}
+              variant={editMode === 'gate' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setEditMode('gate')}
+              className="transition-all duration-200"
             >
               <MapPin className="h-4 w-4 mr-2" />
               Gates
             </Button>
             <Button
-              variant={editMode === 'lane' ? 'secondary' : 'outline'}
+              variant={editMode === 'lane' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setEditMode('lane')}
+              className="transition-all duration-200"
             >
               <Layers className="h-4 w-4 mr-2" />
               Lanes
             </Button>
             <Button
-              variant={editMode === 'station' ? 'secondary' : 'outline'}
+              variant={editMode === 'station' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setEditMode('station')}
+              className="transition-all duration-200"
             >
               <Box className="h-4 w-4 mr-2" />
               Stations
             </Button>
             <Button
-              variant={editMode === 'room' ? 'secondary' : 'outline'}
+              variant={editMode === 'room' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setEditMode('room')}
+              className="transition-all duration-200"
             >
               <Home className="h-4 w-4 mr-2" />
               Rooms
@@ -345,12 +397,12 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
 
         <div className="flex gap-6">
           {/* Library Palette */}
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 animate-fade-in">
             <LibraryPalette editMode={editMode} />
           </div>
 
           {/* Canvas */}
-          <div className="flex-1">
+          <div className="flex-1 animate-fade-in" style={{ animationDelay: '100ms' }}>
             <BlockGridBuilder
               facility={facilityBlock}
               gates={gateBlocks}
@@ -362,20 +414,26 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
               onBlockResize={handleBlockResize}
               onBlockSelect={setSelectedBlock}
               onDrop={handleCanvasDrop}
+              onDelete={handleDeleteBlock}
+              onReturnToLibrary={handleReturnToLibrary}
             />
           </div>
 
           {/* Properties Panel */}
-          <div className="flex-shrink-0 w-80">
+          <div className="flex-shrink-0 w-80 animate-fade-in" style={{ animationDelay: '200ms' }}>
             {selectedBlock ? (
               <BlockProperties
                 block={selectedBlock}
                 onClose={() => setSelectedBlock(null)}
               />
             ) : (
-              <Card className="p-6">
-                <p className="text-sm text-muted-foreground text-center">
+              <Card className="p-6 text-center">
+                <LayoutGrid className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
                   Select a block to view and edit its properties
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Right-click blocks for quick actions
                 </p>
               </Card>
             )}
