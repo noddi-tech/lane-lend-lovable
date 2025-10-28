@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Canvas as FabricCanvas, Rect, Text } from 'fabric';
+import { Canvas as FabricCanvas, Rect, Text, Group } from 'fabric';
 import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, Maximize2, Grid3x3, Move } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -156,40 +156,43 @@ export function BlockGridBuilder({
     // Helper to create block
     const createBlock = (block: LayoutBlock) => {
       const rect = new Rect({
-        left: block.grid_x * CELL_SIZE,
-        top: block.grid_y * CELL_SIZE,
+        left: 0,
+        top: 0,
         width: block.grid_width * CELL_SIZE,
         height: block.grid_height * CELL_SIZE,
         fill: COLORS[block.type].fill,
         stroke: COLORS[block.type].stroke,
         strokeWidth: 2,
-        selectable: false,
-        hasControls: false,
-        lockRotation: true,
-        evented: false,
-        hoverCursor: 'default',
         rx: 4,
         ry: 4,
       });
 
       const text = new Text(block.name, {
-        left: block.grid_x * CELL_SIZE + (block.grid_width * CELL_SIZE) / 2,
-        top: block.grid_y * CELL_SIZE + (block.grid_height * CELL_SIZE) / 2,
+        left: (block.grid_width * CELL_SIZE) / 2,
+        top: (block.grid_height * CELL_SIZE) / 2,
         fontSize: Math.max(10, Math.min(14, block.grid_width)),
         fill: COLORS[block.type].text,
         originX: 'center',
         originY: 'center',
         fontFamily: 'system-ui, -apple-system, sans-serif',
         fontWeight: 'bold',
-        selectable: false,
-        evented: false,
       });
 
-      rect.set({ data: block } as any);
-      canvas.add(rect);
-      canvas.add(text);
+      const group = new Group([rect, text], {
+        left: block.grid_x * CELL_SIZE,
+        top: block.grid_y * CELL_SIZE,
+        selectable: false,
+        hasControls: false,
+        lockRotation: true,
+        evented: false,
+        hoverCursor: 'default',
+        subTargetCheck: false,
+      });
 
-      return { rect, text };
+      group.set({ data: block } as any);
+      canvas.add(group);
+
+      return group;
     };
 
     // Draw gates
