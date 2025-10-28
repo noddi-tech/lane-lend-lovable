@@ -27,6 +27,8 @@ export function CreateLaneDialog({ open, onOpenChange, drivingGates }: CreateLan
       driving_gate_id: drivingGateId,
       name,
       position_order: 1,
+      grid_position_y: gridY,
+      grid_height: gridHeight,
     } as any);
     onOpenChange(false);
     setName("");

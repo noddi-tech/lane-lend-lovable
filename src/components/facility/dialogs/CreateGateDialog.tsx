@@ -24,9 +24,12 @@ export function CreateGateDialog({ open, onOpenChange, facilityId }: CreateGateD
     await createGate.mutateAsync({
       facility_id: facilityId,
       name,
-      time_zone: "UTC",
-      operational_start_time: "08:00",
-      operational_end_time: "18:00",
+      open_time: "08:00:00",
+      close_time: "17:00:00",
+      grid_position_x: gridX,
+      grid_position_y: gridY,
+      grid_width: gridWidth,
+      grid_height: gridHeight,
     } as any);
     onOpenChange(false);
     setName("");

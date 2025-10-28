@@ -1,22 +1,20 @@
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Plus } from "lucide-react";
-import { UnifiedGridBuilder } from "./UnifiedGridBuilder";
-import { useUpdateDrivingGate } from "@/hooks/admin/useDrivingGates";
-import { useLanes, useUpdateLane } from "@/hooks/admin/useLanes";
-import { useStations, useUpdateStation } from "@/hooks/admin/useStations";
-import { useUpdateFacility } from "@/hooks/admin/useFacilities";
-import { CreateGateDialog } from "./dialogs/CreateGateDialog";
-import { CreateLaneDialog } from "./dialogs/CreateLaneDialog";
-import { CreateStationDialog } from "./dialogs/CreateStationDialog";
-import { SelectedElementPanel } from "./SelectedElementPanel";
-import { toast } from "sonner";
+import { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Layers, Plus, MapPin, LayoutGrid, Box } from 'lucide-react';
+import { BlockGridBuilder, type EditMode, type LayoutBlock } from '@/components/facility/BlockGridBuilder';
+import { BlockProperties } from '@/components/facility/BlockProperties';
+import { CreateGateDialog } from '@/components/facility/dialogs/CreateGateDialog';
+import { CreateLaneDialog } from '@/components/facility/dialogs/CreateLaneDialog';
+import { CreateStationDialog } from '@/components/facility/dialogs/CreateStationDialog';
+import { useUpdateDrivingGate } from '@/hooks/admin/useDrivingGates';
+import { useUpdateLane } from '@/hooks/admin/useLanes';
+import { useLanes } from '@/hooks/admin/useLanes';
+import { useStations, useUpdateStation } from '@/hooks/admin/useStations';
+import { toast } from 'sonner';
 import type { FacilityWithGates } from '@/hooks/admin/useFacilities';
 import type { DrivingGateWithLanes } from '@/hooks/admin/useDrivingGates';
-
-type EditMode = 'facility' | 'gates' | 'lanes' | 'stations';
 
 interface FacilityLayoutBuilderProps {
   facility: FacilityWithGates;
@@ -24,150 +22,172 @@ interface FacilityLayoutBuilderProps {
 }
 
 export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayoutBuilderProps) {
-  const [editMode, setEditMode] = useState<EditMode>('facility');
+  const [editMode, setEditMode] = useState<EditMode>('gates');
   const [showCreateGateDialog, setShowCreateGateDialog] = useState(false);
   const [showCreateLaneDialog, setShowCreateLaneDialog] = useState(false);
   const [showCreateStationDialog, setShowCreateStationDialog] = useState(false);
-  const [selectedElement, setSelectedElement] = useState<{ type: string; id: string; data: any } | null>(null);
-  
+  const [selectedBlock, setSelectedBlock] = useState<LayoutBlock | null>(null);
+
   const updateGate = useUpdateDrivingGate();
-  const updateFacility = useUpdateFacility();
   const updateLane = useUpdateLane();
   const updateStation = useUpdateStation();
 
-  // Fetch lanes for all driving gates in this facility
-  const { data: allLanes = [] } = useLanes();
-  const lanes = allLanes.filter(lane => 
-    drivingGates.some(gate => gate.id === lane.driving_gate?.id)
-  );
+  const { data: allLanes } = useLanes();
+  const { data: allStations } = useStations();
 
-  // Fetch stations for all lanes
-  const { data: allStations = [] } = useStations();
-  const stations = allStations.filter(station =>
-    lanes.some(lane => lane.id === station.lane?.id)
-  );
+  const facilityGateIds = drivingGates.map(g => g.id);
+  const facilityLanes = allLanes?.filter(lane => 
+    facilityGateIds.includes(lane.driving_gate?.id || '')
+  ) || [];
+  const facilityLaneIds = facilityLanes.map(l => l.id);
+  const facilityStations = allStations?.filter(station =>
+    facilityLaneIds.includes(station.lane_id)
+  ) || [];
 
-  const handleGateMove = async (gateId: string, gridX: number, gridY: number) => {
+  const facilityBlock: LayoutBlock = {
+    id: facility.id,
+    type: 'facility',
+    name: facility.name,
+    grid_x: 0,
+    grid_y: 0,
+    grid_width: facility.grid_width,
+    grid_height: facility.grid_height,
+  };
+
+  const gateBlocks: LayoutBlock[] = drivingGates.map(gate => ({
+    id: gate.id,
+    type: 'gate',
+    name: gate.name,
+    grid_x: gate.grid_position_x || 0,
+    grid_y: gate.grid_position_y || 0,
+    grid_width: gate.grid_width,
+    grid_height: gate.grid_height,
+    parent_id: facility.id,
+  }));
+
+  const laneBlocks: LayoutBlock[] = facilityLanes.map(lane => {
+    const parentGate = drivingGates.find(g => g.id === lane.driving_gate?.id);
+    return {
+      id: lane.id,
+      type: 'lane',
+      name: lane.name,
+      grid_x: 0,
+      grid_y: lane.grid_position_y || 0,
+      grid_width: parentGate?.grid_width || 20,
+      grid_height: lane.grid_height || 5,
+      parent_id: parentGate?.id,
+    };
+  });
+
+  const stationBlocks: LayoutBlock[] = facilityStations.map(station => ({
+    id: station.id,
+    type: 'station',
+    name: station.name,
+    grid_x: station.grid_position_x,
+    grid_y: station.grid_position_y,
+    grid_width: station.grid_width,
+    grid_height: station.grid_height,
+    parent_id: station.lane_id,
+  }));
+
+  const handleBlockMove = async (blockId: string, gridX: number, gridY: number) => {
+    const block = [...gateBlocks, ...laneBlocks, ...stationBlocks].find(b => b.id === blockId);
+    if (!block) return;
+
     try {
-      await updateGate.mutateAsync({
-        id: gateId,
-        grid_x: gridX,
-        grid_y: gridY,
-      } as any);
+      if (block.type === 'gate') {
+        await updateGate.mutateAsync({
+          id: blockId,
+          grid_position_x: gridX,
+          grid_position_y: gridY,
+        } as any);
+      } else if (block.type === 'lane') {
+        await updateLane.mutateAsync({
+          id: blockId,
+          grid_position_y: gridY,
+        } as any);
+      } else if (block.type === 'station') {
+        await updateStation.mutateAsync({
+          id: blockId,
+          grid_position_x: gridX,
+          grid_position_y: gridY,
+        } as any);
+      }
     } catch (error) {
-      toast.error("Failed to move gate");
+      toast.error('Failed to move block');
     }
   };
 
-  const handleLaneMove = async (laneId: string, gridX: number, gridY: number) => {
+  const handleBlockResize = async (blockId: string, gridWidth: number, gridHeight: number) => {
+    const block = [...gateBlocks, ...laneBlocks, ...stationBlocks].find(b => b.id === blockId);
+    if (!block) return;
+
     try {
-      await updateLane.mutateAsync({
-        id: laneId,
-        grid_y: gridY,
-      } as any);
+      if (block.type === 'gate') {
+        await updateGate.mutateAsync({
+          id: blockId,
+          grid_width: gridWidth,
+          grid_height: gridHeight,
+        } as any);
+      } else if (block.type === 'lane') {
+        await updateLane.mutateAsync({
+          id: blockId,
+          grid_height: gridHeight,
+        } as any);
+      } else if (block.type === 'station') {
+        await updateStation.mutateAsync({
+          id: blockId,
+          grid_width: gridWidth,
+          grid_height: gridHeight,
+        } as any);
+      }
     } catch (error) {
-      toast.error("Failed to move lane");
+      toast.error('Failed to resize block');
     }
   };
-
-  const handleStationMove = async (stationId: string, gridX: number, gridY: number) => {
-    try {
-      await updateStation.mutateAsync({
-        id: stationId,
-        grid_x: gridX,
-        grid_y: gridY,
-      } as any);
-    } catch (error) {
-      toast.error("Failed to move station");
-    }
-  };
-
-  const handleFacilityResize = async (gridWidth: number, gridHeight: number) => {
-    try {
-      await updateFacility.mutateAsync({
-        id: facility.id,
-        grid_width: gridWidth,
-        grid_height: gridHeight,
-      });
-      toast.success("Facility grid resized");
-    } catch (error) {
-      toast.error("Failed to resize facility");
-    }
-  };
-
-  const handleGateResize = async (gateId: string, gridWidth: number, gridHeight: number) => {
-    try {
-      await updateGate.mutateAsync({
-        id: gateId,
-        grid_width: gridWidth,
-        grid_height: gridHeight,
-      } as any);
-    } catch (error) {
-      toast.error("Failed to resize gate");
-    }
-  };
-
-  const handleLaneResize = async (laneId: string, gridHeight: number) => {
-    try {
-      await updateLane.mutateAsync({
-        id: laneId,
-        grid_height: gridHeight,
-      } as any);
-    } catch (error) {
-      toast.error("Failed to resize lane");
-    }
-  };
-
-  const handleStationResize = async (stationId: string, gridWidth: number, gridHeight: number) => {
-    try {
-      await updateStation.mutateAsync({
-        id: stationId,
-        grid_width: gridWidth,
-        grid_height: gridHeight,
-      } as any);
-    } catch (error) {
-      toast.error("Failed to resize station");
-    }
-  };
-
-  if (!facility) {
-    return <div>Loading...</div>;
-  }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Facility Layout Editor</CardTitle>
-        <CardDescription>
-          Design and edit the physical layout of {facility.name}
-        </CardDescription>
+        <div className="flex items-start justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Layers className="h-5 w-5" />
+              Block-Based Layout Builder
+            </CardTitle>
+            <CardDescription>
+              Drag and drop gates, lanes, and stations to design your facility layout
+            </CardDescription>
+          </div>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex justify-between items-start mb-4">
-          <div className="flex gap-2">
+      <CardContent className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground mr-2">Edit:</span>
             <Button
-              variant={editMode === 'facility' ? 'default' : 'outline'}
-              onClick={() => setEditMode('facility')}
-            >
-              Facility Grid
-            </Button>
-            <Button
-              variant={editMode === 'gates' ? 'default' : 'outline'}
+              variant={editMode === 'gates' ? 'secondary' : 'outline'}
+              size="sm"
               onClick={() => setEditMode('gates')}
             >
-              Driving Gates <Badge variant="secondary" className="ml-2">{drivingGates.length}</Badge>
+              <MapPin className="h-4 w-4 mr-2" />
+              Gates
             </Button>
             <Button
-              variant={editMode === 'lanes' ? 'default' : 'outline'}
+              variant={editMode === 'lanes' ? 'secondary' : 'outline'}
+              size="sm"
               onClick={() => setEditMode('lanes')}
             >
-              Lanes <Badge variant="secondary" className="ml-2">{lanes?.length || 0}</Badge>
+              <Layers className="h-4 w-4 mr-2" />
+              Lanes
             </Button>
             <Button
-              variant={editMode === 'stations' ? 'default' : 'outline'}
+              variant={editMode === 'stations' ? 'secondary' : 'outline'}
+              size="sm"
               onClick={() => setEditMode('stations')}
             >
-              Stations <Badge variant="secondary" className="ml-2">{stations?.length || 0}</Badge>
+              <Box className="h-4 w-4 mr-2" />
+              Stations
             </Button>
           </div>
 
@@ -193,71 +213,54 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
           </div>
         </div>
 
-        <div className="flex gap-4 text-xs text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded" style={{ backgroundColor: 'rgba(220, 38, 38, 0.3)', border: '2px solid rgb(220, 38, 38)' }}></div>
-            <span>Facility</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded" style={{ backgroundColor: 'rgba(16, 185, 129, 0.6)', border: '2px solid rgb(5, 150, 105)' }}></div>
-            <span>Driving Gates</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded" style={{ backgroundColor: 'rgba(147, 51, 234, 0.4)', border: '2px solid rgb(126, 34, 206)' }}></div>
-            <span>Lanes</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded" style={{ backgroundColor: 'rgba(249, 115, 22, 0.7)', border: '2px solid rgb(194, 65, 12)' }}></div>
-            <span>Stations</span>
-          </div>
-        </div>
-
-        <div className="flex gap-4">
-          <div className="flex-1">
-            <UnifiedGridBuilder
-              gridWidth={facility.grid_width || 100}
-              gridHeight={facility.grid_height || 50}
-              gates={drivingGates}
-              lanes={lanes || []}
-              stations={stations || []}
+        <div className="grid grid-cols-3 gap-6">
+          <div className="col-span-2">
+            <BlockGridBuilder
+              facility={facilityBlock}
+              gates={gateBlocks}
+              lanes={laneBlocks}
+              stations={stationBlocks}
               editMode={editMode}
-              onGateMove={handleGateMove}
-              onLaneMove={handleLaneMove}
-              onStationMove={handleStationMove}
-              onFacilityResize={handleFacilityResize}
-              onGateResize={handleGateResize}
-              onLaneResize={handleLaneResize}
-              onStationResize={handleStationResize}
-              onElementSelect={setSelectedElement}
+              onBlockMove={handleBlockMove}
+              onBlockResize={handleBlockResize}
+              onBlockSelect={setSelectedBlock}
             />
           </div>
-          
-          {selectedElement && (
-            <SelectedElementPanel
-              element={selectedElement}
-              onClose={() => setSelectedElement(null)}
-            />
-          )}
-        </div>
 
-        <CreateGateDialog
-          open={showCreateGateDialog}
-          onOpenChange={setShowCreateGateDialog}
-          facilityId={facility.id}
-        />
-        
-        <CreateLaneDialog
-          open={showCreateLaneDialog}
-          onOpenChange={setShowCreateLaneDialog}
-          drivingGates={drivingGates.map(g => ({ id: g.id, name: g.name }))}
-        />
-        
-        <CreateStationDialog
-          open={showCreateStationDialog}
-          onOpenChange={setShowCreateStationDialog}
-          lanes={(lanes || []).map(l => ({ id: l.id, name: l.name || `Lane ${l.position_order}` }))}
-        />
+          <div className="col-span-1">
+            {selectedBlock ? (
+              <BlockProperties
+                block={selectedBlock}
+                onClose={() => setSelectedBlock(null)}
+              />
+            ) : (
+              <Card className="p-6">
+                <p className="text-sm text-muted-foreground text-center">
+                  Select a block to view and edit its properties
+                </p>
+              </Card>
+            )}
+          </div>
+        </div>
       </CardContent>
+
+      <CreateGateDialog
+        open={showCreateGateDialog}
+        onOpenChange={setShowCreateGateDialog}
+        facilityId={facility.id}
+      />
+
+      <CreateLaneDialog
+        open={showCreateLaneDialog}
+        onOpenChange={setShowCreateLaneDialog}
+        drivingGates={drivingGates.map(g => ({ id: g.id, name: g.name }))}
+      />
+
+      <CreateStationDialog
+        open={showCreateStationDialog}
+        onOpenChange={setShowCreateStationDialog}
+        lanes={facilityLanes.map(l => ({ id: l.id, name: l.name }))}
+      />
     </Card>
   );
 }

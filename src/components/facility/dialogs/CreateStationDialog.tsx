@@ -29,6 +29,10 @@ export function CreateStationDialog({ open, onOpenChange, lanes }: CreateStation
       lane_id: laneId,
       name,
       station_type: "service",
+      grid_position_x: gridX,
+      grid_position_y: gridY,
+      grid_width: gridWidth,
+      grid_height: gridHeight,
     } as any);
     onOpenChange(false);
     setName("");
