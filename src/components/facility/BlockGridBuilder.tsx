@@ -52,6 +52,11 @@ export function BlockGridBuilder({
   const [zoom, setZoom] = useState(1);
   const [showGrid, setShowGrid] = useState(true);
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 1000, height: 700 });
+  
+  // Object pool pattern refs
+  const objectPoolRef = useRef<Map<string, Group>>(new Map());
+  const isDraggingRef = useRef(false);
+  const lastDataHashRef = useRef<string>('');
 
   // Calculate responsive canvas size
   useEffect(() => {
@@ -94,13 +99,81 @@ export function BlockGridBuilder({
     canvas.renderAll();
   }, [canvas, canvasDimensions]);
 
-  // Draw grid and blocks (render objects ONLY when data changes)
+  // Helper: Generate stable hash of data for change detection
+  const generateDataHash = (gates: LayoutBlock[], lanes: LayoutBlock[], stations: LayoutBlock[]) => {
+    return JSON.stringify({
+      gates: gates.map(g => `${g.id}-${g.grid_x}-${g.grid_y}-${g.grid_width}-${g.grid_height}`),
+      lanes: lanes.map(l => `${l.id}-${l.grid_x}-${l.grid_y}-${l.grid_width}-${l.grid_height}`),
+      stations: stations.map(s => `${s.id}-${s.grid_x}-${s.grid_y}-${s.grid_width}-${s.grid_height}`),
+    });
+  };
+
+  // Helper: Update existing object without destroying it
+  const updateBlockObject = (group: Group, block: LayoutBlock) => {
+    group.set({
+      left: block.grid_x * CELL_SIZE,
+      top: block.grid_y * CELL_SIZE,
+    });
+    
+    // Update rect dimensions
+    const rect = group._objects?.[0] as Rect;
+    if (rect) {
+      rect.set({
+        width: block.grid_width * CELL_SIZE,
+        height: block.grid_height * CELL_SIZE,
+      });
+    }
+    
+    // Update text
+    const text = group._objects?.[1] as Text;
+    if (text) {
+      text.set({
+        text: block.name,
+        left: (block.grid_width * CELL_SIZE) / 2,
+        top: (block.grid_height * CELL_SIZE) / 2,
+      });
+    }
+    
+    group.setCoords();
+  };
+
+  // Stable object pool rendering - objects persist and update in-place
   useEffect(() => {
     if (!canvas) return;
+    
+    // Skip updates during drag to prevent interference
+    if (isDraggingRef.current) {
+      console.log('⏸️ Skipping render during drag');
+      return;
+    }
+    
+    // Check if data actually changed
+    const currentHash = generateDataHash(gates, lanes, stations);
+    const dataChanged = currentHash !== lastDataHashRef.current;
+    lastDataHashRef.current = currentHash;
+    
+    if (!dataChanged && objectPoolRef.current.size > 0) {
+      console.log('✓ Data unchanged, skipping render');
+      return;
+    }
 
-    canvas.clear();
+    console.log('🔄 Updating canvas objects');
+
+    // Clear only static elements (grid, facility boundary)
+    const interactiveObjects = canvas.getObjects().filter(obj => {
+      const block = (obj as any).data as LayoutBlock | undefined;
+      return block && (block.type === 'gate' || block.type === 'lane' || block.type === 'station');
+    });
+    
+    canvas.getObjects().forEach(obj => {
+      if (!interactiveObjects.includes(obj)) {
+        canvas.remove(obj);
+      }
+    });
+    
+    // Redraw static elements
     canvas.backgroundColor = 'hsl(222, 47%, 11%)';
-
+    
     // Draw grid lines
     if (showGrid) {
       for (let i = 0; i <= facility.grid_width; i++) {
@@ -150,9 +223,9 @@ export function BlockGridBuilder({
     facilityRect.set({ data: { ...facility, type: 'facility' } } as any);
     canvas.add(facilityRect);
 
-    // Helper to create block with interactivity set during creation
-    const createBlock = (block: LayoutBlock, currentEditMode: EditMode) => {
-      const isEditable = block.type === currentEditMode;
+    // Helper to create new block
+    const createBlock = (block: LayoutBlock) => {
+      const isEditable = block.type === editMode;
       const isLane = block.type === 'lane';
       
       const rect = new Rect({
@@ -195,32 +268,67 @@ export function BlockGridBuilder({
       });
 
       group.set({ data: block } as any);
-      canvas.add(group);
-
       return group;
     };
 
-    // Draw in correct Z-order: lanes first (bottom), then gates, then stations (top)
-    lanes.forEach((lane) => {
-      createBlock(lane, editMode);
+    // Process blocks: Update existing or create new
+    const allBlocks = [...lanes, ...gates, ...stations];
+    const currentBlockIds = new Set(allBlocks.map(b => b.id));
+    
+    // Remove deleted blocks
+    objectPoolRef.current.forEach((obj, id) => {
+      if (!currentBlockIds.has(id)) {
+        console.log(`🗑️ Removing deleted block: ${id}`);
+        canvas.remove(obj);
+        objectPoolRef.current.delete(id);
+      }
     });
-
-    gates.forEach((gate) => {
-      createBlock(gate, editMode);
+    
+    // Update or create blocks (maintain Z-order: lanes, gates, stations)
+    allBlocks.forEach(block => {
+      const existing = objectPoolRef.current.get(block.id);
+      
+      if (existing) {
+        // Update existing object
+        updateBlockObject(existing, block);
+        
+        // Update interactivity based on current editMode
+        const isEditable = block.type === editMode;
+        const isLane = block.type === 'lane';
+        
+        existing.set({
+          selectable: isEditable,
+          evented: isEditable,
+          hasControls: isEditable && !isLane,
+          hoverCursor: isEditable ? 'move' : 'default',
+          lockMovementX: !isEditable || isLane,
+          lockMovementY: !isEditable,
+          lockScalingX: !isEditable || isLane,
+          lockScalingY: !isEditable,
+          opacity: isEditable ? 1 : (block.type === 'facility' ? 1 : 0.5),
+        });
+        
+        // Update data reference
+        existing.set({ data: block } as any);
+      } else {
+        // Create new object
+        console.log(`✨ Creating new block: ${block.id}`);
+        const newObj = createBlock(block);
+        objectPoolRef.current.set(block.id, newObj);
+        canvas.add(newObj);
+      }
     });
-
-    stations.forEach((station) => {
-      createBlock(station, editMode);
-    });
-
+    
     canvas.renderAll();
-  }, [canvas, facility, gates, lanes, stations, showGrid, editMode]);
+  }, [canvas, facility, gates, lanes, stations, showGrid, editMode, generateDataHash, updateBlockObject]);
 
   // Handle object interactions
   useEffect(() => {
     if (!canvas) return;
 
     const handleObjectMoving = (e: any) => {
+      isDraggingRef.current = true; // Mark drag as active
+      
       const obj = e.target;
       if (!obj?.data) return;
 
@@ -351,6 +459,9 @@ export function BlockGridBuilder({
       const gridWidth = Math.round((obj.width || 0) / CELL_SIZE);
       const gridHeight = Math.round((obj.height || 0) / CELL_SIZE);
 
+      // Update the data reference so our object pool stays in sync
+      obj.set({ data: { ...block, grid_x: gridX, grid_y: gridY, grid_width: gridWidth, grid_height: gridHeight } } as any);
+
       if (gridX !== block.grid_x || gridY !== block.grid_y) {
         onBlockMove(block.id, gridX, gridY);
       }
@@ -358,6 +469,11 @@ export function BlockGridBuilder({
       if (gridWidth !== block.grid_width || gridHeight !== block.grid_height) {
         onBlockResize(block.id, gridWidth, gridHeight);
       }
+      
+      // Reset drag flag after a brief delay to allow mutation to complete
+      setTimeout(() => {
+        isDraggingRef.current = false;
+      }, 150);
     };
 
     const handleSelection = (e: any) => {
