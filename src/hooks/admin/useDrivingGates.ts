@@ -19,7 +19,7 @@ export interface DrivingGate {
 }
 
 export interface DrivingGateWithLanes extends DrivingGate {
-  lanes: Array<{ id: string; name: string; position_order: number }>;
+  // Gates no longer contain lanes directly - lanes belong to facilities
 }
 
 export function useDrivingGates() {
@@ -28,22 +28,12 @@ export function useDrivingGates() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('driving_gates' as any)
-        .select(`
-          *,
-          lanes_new!driving_gate_id(
-            id,
-            name,
-            position_order
-          )
-        `)
+        .select('*')
         .order('name');
 
       if (error) throw error;
       
-      return data.map((gate: any) => ({
-        ...gate,
-        lanes: gate.lanes_new || [],
-      })) as DrivingGateWithLanes[];
+      return data as any as DrivingGateWithLanes[];
     },
   });
 }

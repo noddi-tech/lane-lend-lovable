@@ -21,7 +21,7 @@ export interface Station {
 
 export interface StationWithCapabilities extends Station {
   capabilities: Array<{ id: string; name: string }>;
-  lane: { id: string; name: string; driving_gate_id: string } | null;
+  lane: { id: string; name: string; facility_id: string } | null;
 }
 
 export function useStations(laneId?: string) {
@@ -39,7 +39,7 @@ export function useStations(laneId?: string) {
           lane:lanes_new!lane_id(
             id,
             name,
-            driving_gate_id
+            facility_id
           )
         `)
         .order('lane_id')

@@ -38,7 +38,7 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
   // Fetch lanes for all driving gates in this facility
   const { data: allLanes = [] } = useLanes();
   const lanes = allLanes.filter(lane => 
-    drivingGates.some(gate => gate.id === lane.driving_gate?.id)
+    lane.facility_id === facility.id
   );
 
   // Fetch stations for all lanes

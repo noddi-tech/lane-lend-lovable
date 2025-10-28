@@ -109,7 +109,6 @@ export default function DrivingGates() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="text-sm space-y-1">
-                    <p><strong>Lanes:</strong> {gate.lanes?.length || 0}</p>
                     <p><strong>Grid:</strong> {gate.grid_width} × {gate.grid_height}</p>
                     <p><strong>Hours:</strong> {gate.open_time} - {gate.close_time}</p>
                   </div>

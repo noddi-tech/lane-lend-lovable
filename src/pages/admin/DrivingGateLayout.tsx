@@ -75,8 +75,13 @@ export default function DrivingGateLayout() {
     e.preventDefault();
     if (!id) return;
     
+    // Note: This needs to be updated to use facility_id instead
+    // For now, we need to get the facility_id from the gate
+    const facility_id = gate?.facility_id;
+    if (!facility_id) return;
+    
     await createLane.mutateAsync({
-      driving_gate_id: id,
+      facility_id,
       ...laneFormData,
       grid_position_y: (lanes?.length || 0) * 3,
       grid_height: 2,

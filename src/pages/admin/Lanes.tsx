@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useLanes, useCreateLane, useUpdateLane, useDeleteLane, type LaneWithCapabilities } from '@/hooks/admin/useLanes';
-import { useDrivingGates } from '@/hooks/admin/useDrivingGates';
+import { useFacilities } from '@/hooks/admin/useFacilities';
 import { Plus, Edit, Trash2, MapPin } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Lane } from '@/hooks/admin/useLanes';
@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 
 export default function Lanes() {
   const { data: lanes, isLoading } = useLanes();
-  const { data: drivingGates } = useDrivingGates();
+  const { data: facilities } = useFacilities();
   const createLane = useCreateLane();
   const updateLane = useUpdateLane();
   const deleteLane = useDeleteLane();
@@ -22,7 +22,7 @@ export default function Lanes() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingLane, setEditingLane] = useState<LaneWithCapabilities | null>(null);
   const [formData, setFormData] = useState({
-    driving_gate_id: '',
+    facility_id: '',
     name: '',
     position_order: 0,
     grid_position_y: 0,
@@ -49,7 +49,7 @@ export default function Lanes() {
     }
     
     setFormData({
-      driving_gate_id: '',
+      facility_id: '',
       name: '',
       position_order: 0,
       grid_position_y: 0,
@@ -62,7 +62,7 @@ export default function Lanes() {
   const handleEdit = (lane: LaneWithCapabilities) => {
     setEditingLane(lane);
     setFormData({
-      driving_gate_id: lane.driving_gate_id,
+      facility_id: lane.facility_id,
       name: lane.name,
       position_order: lane.position_order,
       grid_position_y: lane.grid_position_y,
@@ -101,7 +101,7 @@ export default function Lanes() {
               <CardHeader>
                 <CardTitle>{lane.name}</CardTitle>
                 <CardDescription>
-                  {lane.driving_gate?.name || 'No driving gate'}
+                  {lane.facility?.name || 'No facility'}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -154,18 +154,18 @@ export default function Lanes() {
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="driving_gate_id">Driving Gate</Label>
+                <Label htmlFor="facility_id">Facility</Label>
                 <Select 
-                  value={formData.driving_gate_id} 
-                  onValueChange={(value) => setFormData({ ...formData, driving_gate_id: value })}
+                  value={formData.facility_id} 
+                  onValueChange={(value) => setFormData({ ...formData, facility_id: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select driving gate" />
+                    <SelectValue placeholder="Select facility" />
                   </SelectTrigger>
                   <SelectContent>
-                    {drivingGates?.map((gate) => (
-                      <SelectItem key={gate.id} value={gate.id}>
-                        {gate.name}
+                    {facilities?.map((facility) => (
+                      <SelectItem key={facility.id} value={facility.id}>
+                        {facility.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

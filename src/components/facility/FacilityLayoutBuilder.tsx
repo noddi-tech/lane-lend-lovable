@@ -37,9 +37,8 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
 
   const facilityGateIds = drivingGates.map(g => g.id);
   const facilityLanes = allLanes?.filter(lane => {
-    // Find the gate that belongs to this facility and check if lane belongs to facility
-    const laneGate = drivingGates.find(g => g.id === lane.driving_gate?.id);
-    return laneGate !== undefined;
+    // Lanes now belong directly to facilities
+    return lane.facility_id === facility.id;
   }) || [];
   const facilityLaneIds = facilityLanes.map(l => l.id);
   const facilityStations = allStations?.filter(station =>

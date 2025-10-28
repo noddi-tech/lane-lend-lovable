@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 
 export interface Lane {
   id: string;
-  driving_gate_id: string;
+  facility_id: string;
   name: string;
   position_order: number;
   grid_position_y: number;
@@ -18,25 +18,25 @@ export interface Lane {
 }
 
 export interface LaneWithCapabilities extends Lane {
-  driving_gate: { id: string; name: string } | null;
+  facility: { id: string; name: string } | null;
   stations: Array<{ id: string; name: string; station_type: string }>;
 }
 
-export function useLanes(drivingGateId?: string) {
+export function useLanes(facilityId?: string) {
   return useQuery({
-    queryKey: ['lanes', drivingGateId],
+    queryKey: ['lanes', facilityId],
     queryFn: async () => {
       let query = supabase
         .from('lanes_new' as any)
         .select(`
           *,
-          driving_gate:driving_gates!driving_gate_id(id, name),
+          facility:facilities!facility_id(id, name),
           stations!lane_id(id, name, station_type)
         `)
         .order('position_order');
 
-      if (drivingGateId) {
-        query = query.eq('driving_gate_id', drivingGateId);
+      if (facilityId) {
+        query = query.eq('facility_id', facilityId);
       }
 
       const { data, error } = await query;
