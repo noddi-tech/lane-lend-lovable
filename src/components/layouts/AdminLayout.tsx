@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, Settings, Users, Calendar, Gauge, LogOut, User, Award, Zap, Clock, Database, BarChart3, TestTube, Building2 } from 'lucide-react';
+import { LayoutDashboard, Settings, Users, Calendar, Gauge, LogOut, User, Award, Zap, Clock, Database, BarChart3, TestTube, Building2, Library, DoorOpen, Layers, Box } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 const menuItems = [
@@ -38,6 +38,12 @@ const menuItems = [
   { title: 'Simulation', url: '/admin/simulation', icon: Zap },
   { title: 'Test Data', url: '/admin/driving-gate-test', icon: TestTube },
   { title: 'Settings', url: '/admin/settings', icon: Settings },
+];
+
+const libraryItems = [
+  { title: 'Gates Library', url: '/admin/gates-library', icon: DoorOpen },
+  { title: 'Lanes Library', url: '/admin/lanes-library', icon: Layers },
+  { title: 'Stations Library', url: '/admin/stations-library', icon: Box },
 ];
 
 export function AdminLayout() {
@@ -71,6 +77,32 @@ export function AdminLayout() {
                         <NavLink
                           to={item.url}
                           end={item.url === '/admin'}
+                          className={({ isActive }) =>
+                            isActive ? 'bg-accent text-accent-foreground' : ''
+                          }
+                        >
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarGroup>
+              <SidebarGroupLabel>
+                <Library className="h-4 w-4 inline mr-2" />
+                Libraries
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {libraryItems.map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton asChild>
+                        <NavLink
+                          to={item.url}
                           className={({ isActive }) =>
                             isActive ? 'bg-accent text-accent-foreground' : ''
                           }

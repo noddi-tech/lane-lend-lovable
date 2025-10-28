@@ -34,6 +34,9 @@ import DrivingGateTest from './pages/admin/DrivingGateTest';
 import Facilities from './pages/admin/Facilities';
 import FacilityLayout from './pages/admin/FacilityLayout';
 import FacilityManagement from './pages/admin/FacilityManagement';
+import GatesLibrary from './pages/admin/GatesLibrary';
+import LanesLibrary from './pages/admin/LanesLibrary';
+import StationsLibrary from './pages/admin/StationsLibrary';
 
 const queryClient = new QueryClient();
 
@@ -78,6 +81,9 @@ function AppContent() {
           <Route path="analytics" element={<Analytics />} />
           <Route path="skills" element={<Skills />} />
           <Route path="capabilities" element={<Capabilities />} />
+          <Route path="gates-library" element={<GatesLibrary />} />
+          <Route path="lanes-library" element={<LanesLibrary />} />
+          <Route path="stations-library" element={<StationsLibrary />} />
           <Route path="seed-data" element={<SeedData />} />
           <Route path="simulation" element={<Simulation />} />
           <Route path="settings" element={<Settings />} />
