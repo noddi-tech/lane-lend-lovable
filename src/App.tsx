@@ -37,6 +37,7 @@ import FacilityManagement from './pages/admin/FacilityManagement';
 import GatesLibrary from './pages/admin/GatesLibrary';
 import LanesLibrary from './pages/admin/LanesLibrary';
 import StationsLibrary from './pages/admin/StationsLibrary';
+import Rooms from './pages/admin/Rooms';
 
 const queryClient = new QueryClient();
 
@@ -84,6 +85,7 @@ function AppContent() {
           <Route path="gates-library" element={<GatesLibrary />} />
           <Route path="lanes-library" element={<LanesLibrary />} />
           <Route path="stations-library" element={<StationsLibrary />} />
+          <Route path="rooms" element={<Rooms />} />
           <Route path="seed-data" element={<SeedData />} />
           <Route path="simulation" element={<Simulation />} />
           <Route path="settings" element={<Settings />} />

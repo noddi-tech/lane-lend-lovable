@@ -2,17 +2,19 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Layers, Plus, MapPin, LayoutGrid, Box, DoorOpen } from 'lucide-react';
+import { Layers, Plus, MapPin, LayoutGrid, Box, DoorOpen, Home } from 'lucide-react';
 import { BlockGridBuilder, type EditMode, type LayoutBlock } from '@/components/facility/BlockGridBuilder';
 import { BlockProperties } from '@/components/facility/BlockProperties';
 import { LibraryPalette, type LibraryItem } from '@/components/facility/LibraryPalette';
 import { CreateGateDialog } from '@/components/facility/dialogs/CreateGateDialog';
 import { CreateLaneDialog } from '@/components/facility/dialogs/CreateLaneDialog';
 import { CreateStationDialog } from '@/components/facility/dialogs/CreateStationDialog';
+import { CreateRoomDialog } from '@/components/facility/dialogs/CreateRoomDialog';
 import { useUpdateDrivingGate, useAssignGateToFacility } from '@/hooks/admin/useDrivingGates';
 import { useUpdateLane, useAssignLaneToFacility } from '@/hooks/admin/useLanes';
 import { useLanes } from '@/hooks/admin/useLanes';
 import { useStations, useUpdateStation, useAssignStationToLane } from '@/hooks/admin/useStations';
+import { useRooms, useUpdateRoom } from '@/hooks/admin/useRooms';
 import { toast } from 'sonner';
 import { useDebouncedCallback } from '@/hooks/useDebouncedMutation';
 import type { FacilityWithGates } from '@/hooks/admin/useFacilities';
@@ -28,17 +30,20 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
   const [showCreateGateDialog, setShowCreateGateDialog] = useState(false);
   const [showCreateLaneDialog, setShowCreateLaneDialog] = useState(false);
   const [showCreateStationDialog, setShowCreateStationDialog] = useState(false);
+  const [showCreateRoomDialog, setShowCreateRoomDialog] = useState(false);
   const [selectedBlock, setSelectedBlock] = useState<LayoutBlock | null>(null);
 
   const updateGate = useUpdateDrivingGate();
   const updateLane = useUpdateLane();
   const updateStation = useUpdateStation();
+  const updateRoom = useUpdateRoom();
   const assignGate = useAssignGateToFacility();
   const assignLane = useAssignLaneToFacility();
   const assignStation = useAssignStationToLane();
 
   const { data: allLanes } = useLanes();
   const { data: allStations } = useStations();
+  const { data: allRooms } = useRooms(facility.id);
 
   // Debug: Track editMode changes
   useEffect(() => {
@@ -99,9 +104,21 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
     parent_id: station.lane_id,
   }));
 
+  const roomBlocks: LayoutBlock[] = (allRooms || []).map(room => ({
+    id: room.id,
+    type: 'room',
+    name: room.name,
+    grid_x: room.grid_position_x,
+    grid_y: room.grid_position_y,
+    grid_width: room.grid_width,
+    grid_height: room.grid_height,
+    parent_id: facility.id,
+    color: room.color,
+  }));
+
   const handleBlockMove = useDebouncedCallback(
     async (blockId: string, gridX: number, gridY: number) => {
-      const block = [...gateBlocks, ...laneBlocks, ...stationBlocks].find(b => b.id === blockId);
+      const block = [...gateBlocks, ...laneBlocks, ...stationBlocks, ...roomBlocks].find(b => b.id === blockId);
       if (!block) return;
 
       try {
@@ -122,6 +139,12 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
             grid_position_x: gridX,
             grid_position_y: gridY,
           } as any);
+        } else if (block.type === 'room') {
+          await updateRoom.mutateAsync({
+            id: blockId,
+            grid_position_x: gridX,
+            grid_position_y: gridY,
+          } as any);
         }
       } catch (error) {
         toast.error('Failed to move block');
@@ -132,7 +155,7 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
 
   const handleBlockResize = useDebouncedCallback(
     async (blockId: string, gridWidth: number, gridHeight: number) => {
-      const block = [...gateBlocks, ...laneBlocks, ...stationBlocks].find(b => b.id === blockId);
+      const block = [...gateBlocks, ...laneBlocks, ...stationBlocks, ...roomBlocks].find(b => b.id === blockId);
       if (!block) return;
 
       try {
@@ -149,6 +172,12 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
           } as any);
         } else if (block.type === 'station') {
           await updateStation.mutateAsync({
+            id: blockId,
+            grid_width: gridWidth,
+            grid_height: gridHeight,
+          } as any);
+        } else if (block.type === 'room') {
+          await updateRoom.mutateAsync({
             id: blockId,
             grid_width: gridWidth,
             grid_height: gridHeight,
@@ -276,6 +305,14 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
               <Box className="h-4 w-4 mr-2" />
               Stations
             </Button>
+            <Button
+              variant={editMode === 'room' ? 'secondary' : 'outline'}
+              size="sm"
+              onClick={() => setEditMode('room')}
+            >
+              <Home className="h-4 w-4 mr-2" />
+              Rooms
+            </Button>
           </div>
 
           <div className="flex gap-2">
@@ -297,6 +334,12 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
                 Add Station
               </Button>
             )}
+            {editMode === 'room' && (
+              <Button onClick={() => setShowCreateRoomDialog(true)} size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Room
+              </Button>
+            )}
           </div>
         </div>
 
@@ -313,6 +356,7 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
               gates={gateBlocks}
               lanes={laneBlocks}
               stations={stationBlocks}
+              rooms={roomBlocks}
               editMode={editMode}
               onBlockMove={handleBlockMove}
               onBlockResize={handleBlockResize}
@@ -355,6 +399,12 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
         open={showCreateStationDialog}
         onOpenChange={setShowCreateStationDialog}
         lanes={facilityLanes.map(l => ({ id: l.id, name: l.name }))}
+      />
+
+      <CreateRoomDialog
+        open={showCreateRoomDialog}
+        onOpenChange={setShowCreateRoomDialog}
+        facilityId={facility.id}
       />
     </Card>
   );

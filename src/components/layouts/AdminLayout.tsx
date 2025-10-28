@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, Settings, Users, Calendar, Gauge, LogOut, User, Award, Zap, Clock, Database, BarChart3, TestTube, Building2, Library, DoorOpen, Layers, Box } from 'lucide-react';
+import { LayoutDashboard, Settings, Users, Calendar, Gauge, LogOut, User, Award, Zap, Clock, Database, BarChart3, TestTube, Building2, Library, DoorOpen, Layers, Box, Home } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 const menuItems = [
@@ -29,6 +29,7 @@ const menuItems = [
   { title: 'Bookings', url: '/admin/bookings', icon: Calendar },
   { title: 'Analytics', url: '/admin/analytics', icon: BarChart3 },
   { title: 'Facility Management', url: '/admin/facility-management', icon: Building2 },
+  { title: 'Rooms', url: '/admin/rooms', icon: Home },
   { title: 'Capacity', url: '/admin/capacity', icon: Gauge },
   { title: 'Workers', url: '/admin/workers', icon: Users },
   { title: 'Shifts', url: '/admin/contributions', icon: Clock },
