@@ -100,8 +100,9 @@ export function BlockGridBuilder({
   }, [canvas, canvasDimensions]);
 
   // Helper: Generate stable hash of data for change detection
-  const generateDataHash = (gates: LayoutBlock[], lanes: LayoutBlock[], stations: LayoutBlock[]) => {
+  const generateDataHash = (gates: LayoutBlock[], lanes: LayoutBlock[], stations: LayoutBlock[], mode: EditMode) => {
     return JSON.stringify({
+      editMode: mode,
       gates: gates.map(g => `${g.id}-${g.grid_x}-${g.grid_y}-${g.grid_width}-${g.grid_height}`),
       lanes: lanes.map(l => `${l.id}-${l.grid_x}-${l.grid_y}-${l.grid_width}-${l.grid_height}`),
       stations: stations.map(s => `${s.id}-${s.grid_x}-${s.grid_y}-${s.grid_width}-${s.grid_height}`),
@@ -148,7 +149,7 @@ export function BlockGridBuilder({
     }
     
     // Check if data actually changed
-    const currentHash = generateDataHash(gates, lanes, stations);
+    const currentHash = generateDataHash(gates, lanes, stations, editMode);
     const dataChanged = currentHash !== lastDataHashRef.current;
     lastDataHashRef.current = currentHash;
     
