@@ -238,7 +238,7 @@ export function BlockGridBuilder({
     });
 
     canvas.renderAll();
-  }, [canvas, editMode]);
+  }, [canvas, editMode, gates, lanes, stations]);
 
   // Handle object interactions
   useEffect(() => {
