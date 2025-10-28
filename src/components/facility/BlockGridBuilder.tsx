@@ -397,7 +397,8 @@ export function BlockGridBuilder({
     if (!canvas) return;
 
     const handleMouseDown = (e: any) => {
-      if (e.e.altKey) {
+      // Only pan if Alt is pressed AND we're clicking on the canvas background (not an object)
+      if (e.e.altKey && !e.target) {
         setIsPanning(true);
         setLastPosX(e.e.clientX);
         setLastPosY(e.e.clientY);
