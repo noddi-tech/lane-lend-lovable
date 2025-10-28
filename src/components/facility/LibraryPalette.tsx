@@ -12,8 +12,8 @@ import { useLibraryStations } from '@/hooks/admin/useStations';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface LibraryPaletteProps {
-  editMode: 'gate' | 'lane' | 'station' | 'room' | 'view' | 'facility';
-  onItemDragStart?: (item: LibraryItem, type: 'gate' | 'lane' | 'station') => void;
+  editMode: 'gate' | 'lane' | 'station' | 'room' | 'view' | 'facility' | 'outside' | 'storage';
+  onItemDragStart?: (item: LibraryItem, type: 'gate' | 'lane' | 'station' | 'outside' | 'storage') => void;
 }
 
 export interface LibraryItem {

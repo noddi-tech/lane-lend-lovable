@@ -550,6 +550,7 @@ export type Database = {
           grid_height: number
           grid_position_y: number
           id: string
+          lane_type: string | null
           name: string
           open_time: string | null
           position_order: number
@@ -563,6 +564,7 @@ export type Database = {
           grid_height?: number
           grid_position_y?: number
           id?: string
+          lane_type?: string | null
           name: string
           open_time?: string | null
           position_order?: number
@@ -576,6 +578,7 @@ export type Database = {
           grid_height?: number
           grid_position_y?: number
           id?: string
+          lane_type?: string | null
           name?: string
           open_time?: string | null
           position_order?: number
@@ -595,6 +598,59 @@ export type Database = {
             columns: ["room_id"]
             isOneToOne: false
             referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      outside_areas: {
+        Row: {
+          area_type: string
+          color: string | null
+          created_at: string | null
+          description: string | null
+          facility_id: string
+          grid_height: number
+          grid_position_x: number
+          grid_position_y: number
+          grid_width: number
+          id: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          area_type?: string
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          facility_id: string
+          grid_height?: number
+          grid_position_x?: number
+          grid_position_y?: number
+          grid_width?: number
+          id?: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          area_type?: string
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          facility_id?: string
+          grid_height?: number
+          grid_position_x?: number
+          grid_position_y?: number
+          grid_width?: number
+          id?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outside_areas_facility_id_fkey"
+            columns: ["facility_id"]
+            isOneToOne: false
+            referencedRelation: "facilities"
             referencedColumns: ["id"]
           },
         ]
@@ -914,6 +970,69 @@ export type Database = {
           },
           {
             foreignKeyName: "stations_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      storage_locations: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          grid_height: number
+          grid_position_x: number
+          grid_position_y: number
+          grid_width: number
+          id: string
+          lane_id: string | null
+          name: string
+          room_id: string | null
+          status: string | null
+          storage_type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          grid_height?: number
+          grid_position_x?: number
+          grid_position_y?: number
+          grid_width?: number
+          id?: string
+          lane_id?: string | null
+          name: string
+          room_id?: string | null
+          status?: string | null
+          storage_type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          grid_height?: number
+          grid_position_x?: number
+          grid_position_y?: number
+          grid_width?: number
+          id?: string
+          lane_id?: string | null
+          name?: string
+          room_id?: string | null
+          status?: string | null
+          storage_type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "storage_locations_lane_id_fkey"
+            columns: ["lane_id"]
+            isOneToOne: false
+            referencedRelation: "lanes_new"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "storage_locations_room_id_fkey"
             columns: ["room_id"]
             isOneToOne: false
             referencedRelation: "rooms"

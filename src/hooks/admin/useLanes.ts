@@ -4,13 +4,15 @@ import { toast } from 'sonner';
 
 export interface Lane {
   id: string;
-  facility_id: string;
+  facility_id: string | null;
+  room_id: string | null;
   name: string;
   position_order: number;
   grid_position_y: number;
   grid_height: number;
   open_time: string | null;
   close_time: string | null;
+  lane_type: 'service' | 'storage' | 'staging';
   closed_for_new_bookings_at: string | null;
   closed_for_cancellations_at: string | null;
   created_at: string;

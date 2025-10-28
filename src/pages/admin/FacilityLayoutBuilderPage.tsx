@@ -29,7 +29,6 @@ export default function FacilityLayoutBuilderPage() {
   const [selectedBlock, setSelectedBlock] = useState<LayoutBlock | null>(null);
   const [showLibrary, setShowLibrary] = useState(true);
   const [showProperties, setShowProperties] = useState(true);
-
   const { data: facilities, isLoading: loadingFacilities } = useFacilities();
   const { data: allDrivingGates } = useDrivingGates();
   const { data: allLanes } = useLanes();
@@ -52,10 +51,30 @@ export default function FacilityLayoutBuilderPage() {
 
   const facility = facilities?.find(f => f.id === facilityId);
   const { data: allRooms } = useRooms(facilityId);
+  
+  const [viewContext, setViewContext] = useState<{ type: 'facility' | 'room'; id: string; name: string; gridWidth: number; gridHeight: number }>({
+    type: 'facility',
+    id: facility?.id || '',
+    name: facility?.name || '',
+    gridWidth: facility?.grid_width || 100,
+    gridHeight: facility?.grid_height || 100,
+  });
 
   useEffect(() => {
     console.log('🎯 FacilityLayoutBuilderPage editMode changed to:', editMode);
   }, [editMode]);
+  
+  useEffect(() => {
+    if (facility && viewContext.type === 'facility') {
+      setViewContext({
+        type: 'facility',
+        id: facility.id,
+        name: facility.name,
+        gridWidth: facility.grid_width,
+        gridHeight: facility.grid_height,
+      });
+    }
+  }, [facility]);
 
   if (loadingFacilities) {
     return (
@@ -460,12 +479,25 @@ export default function FacilityLayoutBuilderPage() {
             stations={stationBlocks}
             rooms={roomBlocks}
             editMode={editMode}
+            viewContext={viewContext}
             onBlockMove={handleBlockMove}
             onBlockResize={handleBlockResize}
             onBlockSelect={setSelectedBlock}
             onDrop={handleCanvasDrop}
             onDelete={handleDeleteBlock}
             onReturnToLibrary={handleReturnToLibrary}
+            onEnterRoom={(roomId) => {
+              const room = allRooms?.find(r => r.id === roomId);
+              if (room) {
+                setViewContext({
+                  type: 'room',
+                  id: room.id,
+                  name: room.name,
+                  gridWidth: room.grid_width,
+                  gridHeight: room.grid_height,
+                });
+              }
+            }}
           />
         </div>
 

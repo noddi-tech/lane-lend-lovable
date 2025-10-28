@@ -3,19 +3,31 @@ import { Canvas as FabricCanvas, Rect, Text, Group } from 'fabric';
 import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, Maximize2, Grid3x3 } from 'lucide-react';
 
-export type EditMode = 'view' | 'facility' | 'gate' | 'lane' | 'station' | 'room';
+export type EditMode = 'view' | 'facility' | 'gate' | 'lane' | 'station' | 'room' | 'outside' | 'storage';
+
+export interface ViewContext {
+  type: 'facility' | 'room';
+  id: string;
+  name: string;
+  gridWidth: number;
+  gridHeight: number;
+}
 
 export interface LayoutBlock {
   id: string;
-  type: 'facility' | 'gate' | 'lane' | 'station' | 'room';
+  type: 'facility' | 'gate' | 'lane' | 'station' | 'room' | 'outside' | 'storage';
   name: string;
   grid_x: number;
   grid_y: number;
   grid_width: number;
   grid_height: number;
   parent_id?: string;
-  color?: string; // For rooms
-  is_library?: boolean; // True if not yet assigned to facility
+  color?: string;
+  is_library?: boolean;
+  lane_type?: 'service' | 'storage' | 'staging';
+  area_type?: string;
+  storage_type?: string;
+  status?: string;
 }
 
 interface BlockGridBuilderProps {
@@ -24,13 +36,17 @@ interface BlockGridBuilderProps {
   lanes: LayoutBlock[];
   stations: LayoutBlock[];
   rooms?: LayoutBlock[];
+  outsideAreas?: LayoutBlock[];
+  storageLocations?: LayoutBlock[];
   editMode: EditMode;
+  viewContext: ViewContext;
   onBlockMove: (blockId: string, gridX: number, gridY: number) => void;
   onBlockResize: (blockId: string, gridWidth: number, gridHeight: number) => void;
   onBlockSelect: (block: LayoutBlock | null) => void;
   onDrop?: (e: React.DragEvent) => void;
   onDelete?: (block: LayoutBlock) => void;
   onReturnToLibrary?: (block: LayoutBlock) => void;
+  onEnterRoom?: (roomId: string) => void;
 }
 
 // Dynamic cell size calculation - allow much smaller cells for large grids
@@ -48,6 +64,8 @@ const DEFAULT_CELL_SIZE = 30; // Fallback if calculation fails
 const COLORS = {
   facility: { fill: 'rgba(59, 130, 246, 0.1)', stroke: '#3b82f6', text: '#3b82f6' },
   gate: { fill: 'rgba(34, 197, 94, 0.2)', stroke: '#22c55e', text: '#22c55e' },
+  outside: { fill: 'rgba(107, 114, 128, 0.1)', stroke: '#6b7280', text: '#6b7280' },
+  storage: { fill: 'rgba(251, 146, 60, 0.2)', stroke: '#fb923c', text: '#fb923c' },
   lane: { fill: 'rgba(168, 85, 247, 0.2)', stroke: '#a855f7', text: '#a855f7' },
   station: { fill: 'rgba(251, 146, 60, 0.25)', stroke: '#fb923c', text: '#fb923c' },
   room: { fill: 'rgba(99, 102, 241, 0.15)', stroke: '#6366f1', text: '#6366f1' },

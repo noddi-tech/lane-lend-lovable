@@ -410,6 +410,13 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
               stations={stationBlocks}
               rooms={roomBlocks}
               editMode={editMode}
+              viewContext={{
+                type: 'facility',
+                id: facility.id,
+                name: facility.name,
+                gridWidth: facility.grid_width,
+                gridHeight: facility.grid_height,
+              }}
               onBlockMove={handleBlockMove}
               onBlockResize={handleBlockResize}
               onBlockSelect={setSelectedBlock}
