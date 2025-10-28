@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, Maximize2, Grid3x3, Move } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
-export type EditMode = 'view' | 'facility' | 'gates' | 'lanes' | 'stations';
+export type EditMode = 'view' | 'facility' | 'gate' | 'lane' | 'station';
 
 export interface LayoutBlock {
   id: string;

@@ -22,7 +22,7 @@ interface FacilityLayoutBuilderProps {
 }
 
 export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayoutBuilderProps) {
-  const [editMode, setEditMode] = useState<EditMode>('gates');
+  const [editMode, setEditMode] = useState<EditMode>('gate');
   const [showCreateGateDialog, setShowCreateGateDialog] = useState(false);
   const [showCreateLaneDialog, setShowCreateLaneDialog] = useState(false);
   const [showCreateStationDialog, setShowCreateStationDialog] = useState(false);
@@ -165,25 +165,25 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground mr-2">Edit:</span>
             <Button
-              variant={editMode === 'gates' ? 'secondary' : 'outline'}
+              variant={editMode === 'gate' ? 'secondary' : 'outline'}
               size="sm"
-              onClick={() => setEditMode('gates')}
+              onClick={() => setEditMode('gate')}
             >
               <MapPin className="h-4 w-4 mr-2" />
               Gates
             </Button>
             <Button
-              variant={editMode === 'lanes' ? 'secondary' : 'outline'}
+              variant={editMode === 'lane' ? 'secondary' : 'outline'}
               size="sm"
-              onClick={() => setEditMode('lanes')}
+              onClick={() => setEditMode('lane')}
             >
               <Layers className="h-4 w-4 mr-2" />
               Lanes
             </Button>
             <Button
-              variant={editMode === 'stations' ? 'secondary' : 'outline'}
+              variant={editMode === 'station' ? 'secondary' : 'outline'}
               size="sm"
-              onClick={() => setEditMode('stations')}
+              onClick={() => setEditMode('station')}
             >
               <Box className="h-4 w-4 mr-2" />
               Stations
@@ -191,19 +191,19 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
           </div>
 
           <div className="flex gap-2">
-            {editMode === 'gates' && (
+            {editMode === 'gate' && (
               <Button onClick={() => setShowCreateGateDialog(true)} size="sm">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Gate
               </Button>
             )}
-            {editMode === 'lanes' && (
+            {editMode === 'lane' && (
               <Button onClick={() => setShowCreateLaneDialog(true)} size="sm">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Lane
               </Button>
             )}
-            {editMode === 'stations' && (
+            {editMode === 'station' && (
               <Button onClick={() => setShowCreateStationDialog(true)} size="sm">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Station
