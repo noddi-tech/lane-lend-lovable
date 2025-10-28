@@ -154,8 +154,11 @@ export function BlockGridBuilder({
     facilityRect.set({ data: { ...facility, type: 'facility' } } as any);
     canvas.add(facilityRect);
 
-    // Helper to create block
-    const createBlock = (block: LayoutBlock) => {
+    // Helper to create block with interactivity set during creation
+    const createBlock = (block: LayoutBlock, currentEditMode: EditMode) => {
+      const isEditable = block.type === currentEditMode;
+      const isLane = block.type === 'lane';
+      
       const rect = new Rect({
         left: 0,
         top: 0,
@@ -182,11 +185,16 @@ export function BlockGridBuilder({
       const group = new Group([rect, text], {
         left: block.grid_x * CELL_SIZE,
         top: block.grid_y * CELL_SIZE,
-        selectable: false,
-        hasControls: false,
+        selectable: isEditable,
+        hasControls: isEditable && !isLane,
         lockRotation: true,
-        evented: false,
-        hoverCursor: 'default',
+        evented: isEditable,
+        hoverCursor: isEditable ? 'move' : 'default',
+        lockMovementX: !isEditable || isLane,
+        lockMovementY: !isEditable,
+        lockScalingX: !isEditable || isLane,
+        lockScalingY: !isEditable,
+        opacity: isEditable ? 1 : (block.type === 'facility' ? 1 : 0.5),
         subTargetCheck: false,
       });
 
@@ -198,47 +206,19 @@ export function BlockGridBuilder({
 
     // Draw in correct Z-order: lanes first (bottom), then gates, then stations (top)
     lanes.forEach((lane) => {
-      createBlock(lane);
+      createBlock(lane, editMode);
     });
 
     gates.forEach((gate) => {
-      createBlock(gate);
+      createBlock(gate, editMode);
     });
 
     stations.forEach((station) => {
-      createBlock(station);
+      createBlock(station, editMode);
     });
 
     canvas.renderAll();
-  }, [canvas, facility, gates, lanes, stations, showGrid]); // NO editMode!
-
-  // Update interactivity when editMode changes (don't redraw, just update properties)
-  useEffect(() => {
-    if (!canvas) return;
-
-    canvas.getObjects().forEach((obj: any) => {
-      if (!obj.data || !obj.data.type) return;
-
-      const block = obj.data as LayoutBlock;
-      const isEditable = block.type === editMode;
-      const isLane = block.type === 'lane';
-
-      obj.set({
-        selectable: isEditable,
-        evented: isEditable,
-        hasControls: isEditable && !isLane,
-        lockMovementX: !isEditable || isLane,
-        lockMovementY: !isEditable,
-        lockScalingX: !isEditable || isLane,
-        lockScalingY: !isEditable,
-        lockRotation: true,
-        hoverCursor: isEditable ? 'move' : 'default',
-        opacity: isEditable ? 1 : (block.type === 'facility' ? 1 : 0.5),
-      });
-    });
-
-    canvas.renderAll();
-  }, [canvas, editMode, gates, lanes, stations]);
+  }, [canvas, facility, gates, lanes, stations, showGrid, editMode]);
 
   // Handle object interactions
   useEffect(() => {
