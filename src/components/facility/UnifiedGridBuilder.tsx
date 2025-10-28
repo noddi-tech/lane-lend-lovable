@@ -105,6 +105,7 @@ export function UnifiedGridBuilder({
   const [isPanning, setIsPanning] = useState(false);
   const [lastPanPoint, setLastPanPoint] = useState<{ x: number; y: number } | null>(null);
 
+  // Initialize canvas once on mount
   useEffect(() => {
     if (!canvasRef.current) return;
 
@@ -112,7 +113,7 @@ export function UnifiedGridBuilder({
       width: CANVAS_WIDTH,
       height: CANVAS_HEIGHT,
       backgroundColor: COLORS.facility.background,
-      selection: editMode === 'facility',
+      selection: false,
     });
 
     fabricCanvas.viewportTransform = [1, 0, 0, 1, 100, 100];
@@ -121,13 +122,22 @@ export function UnifiedGridBuilder({
     return () => {
       fabricCanvas.dispose();
     };
-  }, [editMode]);
+  }, []); // Only create once
+
+  // Update selection mode when editMode changes
+  useEffect(() => {
+    if (!canvas) return;
+    canvas.selection = editMode === 'facility';
+  }, [canvas, editMode]);
 
   // Panning handlers
   useEffect(() => {
     if (!canvas) return;
 
     const handleMouseDown = (e: any) => {
+      // Don't start panning if clicking on an object
+      if (e.target && e.target !== canvas) return;
+      
       if (e.e.altKey || e.e.button === 1) {
         setIsPanning(true);
         setLastPanPoint({ x: e.e.clientX, y: e.e.clientY });
