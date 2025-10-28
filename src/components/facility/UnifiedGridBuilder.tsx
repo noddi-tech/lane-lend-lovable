@@ -167,7 +167,7 @@ export function UnifiedGridBuilder({
   }, [canvas, isPanning, lastPanPoint, editMode]);
 
   useEffect(() => {
-    if (!canvas || !canvas.getContext()) return;
+    if (!canvas || !canvas.upperCanvasEl) return;
 
     canvas.clear();
     canvas.backgroundColor = COLORS.facility.background;
