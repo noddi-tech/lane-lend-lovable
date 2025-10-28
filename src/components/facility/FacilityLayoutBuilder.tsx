@@ -65,19 +65,17 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
     parent_id: facility.id,
   }));
 
-  const laneBlocks: LayoutBlock[] = facilityLanes.map(lane => {
-    const parentGate = drivingGates.find(g => g.id === lane.driving_gate?.id);
-    return {
-      id: lane.id,
-      type: 'lane',
-      name: lane.name,
-      grid_x: 0,
-      grid_y: lane.grid_position_y || 0,
-      grid_width: parentGate?.grid_width || 20,
-      grid_height: lane.grid_height || 5,
-      parent_id: parentGate?.id,
-    };
-  });
+  // Lanes belong to facility (not gates!), spanning full facility width
+  const laneBlocks: LayoutBlock[] = facilityLanes.map(lane => ({
+    id: lane.id,
+    type: 'lane',
+    name: lane.name,
+    grid_x: 0, // Lanes span full width, starting at x=0
+    grid_y: lane.grid_position_y || 0,
+    grid_width: facility.grid_width, // Full facility width
+    grid_height: lane.grid_height || 2,
+    parent_id: facility.id, // Lanes belong to facility
+  }));
 
   const stationBlocks: LayoutBlock[] = facilityStations.map(station => ({
     id: station.id,

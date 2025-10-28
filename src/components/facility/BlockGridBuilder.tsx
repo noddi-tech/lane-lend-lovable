@@ -97,7 +97,7 @@ export function BlockGridBuilder({
     canvas.renderAll();
   }, [canvas, canvasDimensions]);
 
-  // Draw grid and blocks
+  // Draw grid and blocks (render objects ONLY when data changes)
   useEffect(() => {
     if (!canvas) return;
 
@@ -142,10 +142,10 @@ export function BlockGridBuilder({
       fill: COLORS.facility.fill,
       stroke: COLORS.facility.stroke,
       strokeWidth: 3,
-      selectable: editMode === 'facility',
-      hasControls: editMode === 'facility',
+      selectable: false,
+      hasControls: false,
       lockRotation: true,
-      evented: editMode === 'facility',
+      evented: false,
       rx: 4,
       ry: 4,
     });
@@ -154,7 +154,7 @@ export function BlockGridBuilder({
     canvas.add(facilityRect);
 
     // Helper to create block
-    const createBlock = (block: LayoutBlock, isSelectable: boolean) => {
+    const createBlock = (block: LayoutBlock) => {
       const rect = new Rect({
         left: block.grid_x * CELL_SIZE,
         top: block.grid_y * CELL_SIZE,
@@ -163,11 +163,11 @@ export function BlockGridBuilder({
         fill: COLORS[block.type].fill,
         stroke: COLORS[block.type].stroke,
         strokeWidth: 2,
-        selectable: isSelectable,
-        hasControls: isSelectable,
+        selectable: false,
+        hasControls: false,
         lockRotation: true,
-        evented: isSelectable,
-        hoverCursor: isSelectable ? 'move' : 'default',
+        evented: false,
+        hoverCursor: 'default',
         rx: 4,
         ry: 4,
       });
@@ -194,21 +194,43 @@ export function BlockGridBuilder({
 
     // Draw gates
     gates.forEach((gate) => {
-      createBlock(gate, editMode === 'gates');
+      createBlock(gate);
     });
 
     // Draw lanes
     lanes.forEach((lane) => {
-      createBlock(lane, editMode === 'lanes');
+      createBlock(lane);
     });
 
     // Draw stations
     stations.forEach((station) => {
-      createBlock(station, editMode === 'stations');
+      createBlock(station);
     });
 
     canvas.renderAll();
-  }, [canvas, facility, gates, lanes, stations, editMode, showGrid]);
+  }, [canvas, facility, gates, lanes, stations, showGrid]); // NO editMode!
+
+  // Update interactivity when editMode changes (don't redraw, just update properties)
+  useEffect(() => {
+    if (!canvas) return;
+
+    canvas.getObjects().forEach((obj: any) => {
+      if (!obj.data || !obj.data.type) return;
+
+      const block = obj.data as LayoutBlock;
+      const isEditable = block.type === editMode;
+
+      obj.set({
+        selectable: isEditable,
+        evented: isEditable,
+        hasControls: isEditable,
+        hoverCursor: isEditable ? 'move' : 'default',
+        opacity: isEditable ? 1 : (block.type === 'facility' ? 1 : 0.5),
+      });
+    });
+
+    canvas.renderAll();
+  }, [canvas, editMode]);
 
   // Handle object interactions
   useEffect(() => {
