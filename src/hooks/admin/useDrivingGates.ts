@@ -108,3 +108,95 @@ export function useDeleteDrivingGate() {
     },
   });
 }
+
+// Library management hooks
+export function useLibraryGates() {
+  return useQuery({
+    queryKey: ['library-gates'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('driving_gates' as any)
+        .select('*')
+        .is('facility_id', null)
+        .order('name');
+
+      if (error) throw error;
+      
+      return data as any as DrivingGate[];
+    },
+  });
+}
+
+export function useAssignGateToFacility() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ 
+      gateId, 
+      facilityId, 
+      roomId, 
+      gridX, 
+      gridY 
+    }: { 
+      gateId: string; 
+      facilityId: string; 
+      roomId?: string | null;
+      gridX: number; 
+      gridY: number;
+    }) => {
+      const { data, error } = await supabase
+        .from('driving_gates' as any)
+        .update({ 
+          facility_id: facilityId,
+          room_id: roomId || null,
+          grid_position_x: gridX,
+          grid_position_y: gridY
+        })
+        .eq('id', gateId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['driving-gates'] });
+      queryClient.invalidateQueries({ queryKey: ['library-gates'] });
+      toast.success('Gate assigned to facility');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to assign gate: ${error.message}`);
+    },
+  });
+}
+
+export function useUnassignGateFromFacility() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (gateId: string) => {
+      const { data, error } = await supabase
+        .from('driving_gates' as any)
+        .update({ 
+          facility_id: null,
+          room_id: null,
+          grid_position_x: 0,
+          grid_position_y: 0
+        })
+        .eq('id', gateId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['driving-gates'] });
+      queryClient.invalidateQueries({ queryKey: ['library-gates'] });
+      toast.success('Gate returned to library');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to unassign gate: ${error.message}`);
+    },
+  });
+}

@@ -176,3 +176,104 @@ export function useRemoveCapabilityFromStation() {
     },
   });
 }
+
+// Library management hooks
+export function useLibraryStations() {
+  return useQuery({
+    queryKey: ['library-stations'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('stations' as any)
+        .select(`
+          *,
+          station_capabilities(
+            capability_id,
+            capabilities(id, name)
+          )
+        `)
+        .is('lane_id', null)
+        .order('name');
+
+      if (error) throw error;
+      
+      return data.map((station: any) => ({
+        ...station,
+        capabilities: station.station_capabilities?.map((sc: any) => sc.capabilities).filter(Boolean) || [],
+      })) as any as StationWithCapabilities[];
+    },
+  });
+}
+
+export function useAssignStationToLane() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ 
+      stationId, 
+      laneId, 
+      roomId, 
+      gridX, 
+      gridY 
+    }: { 
+      stationId: string; 
+      laneId: string; 
+      roomId?: string | null;
+      gridX: number; 
+      gridY: number;
+    }) => {
+      const { data, error } = await supabase
+        .from('stations' as any)
+        .update({ 
+          lane_id: laneId,
+          room_id: roomId || null,
+          grid_position_x: gridX,
+          grid_position_y: gridY
+        })
+        .eq('id', stationId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['stations'] });
+      queryClient.invalidateQueries({ queryKey: ['library-stations'] });
+      toast.success('Station assigned to lane');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to assign station: ${error.message}`);
+    },
+  });
+}
+
+export function useUnassignStationFromLane() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (stationId: string) => {
+      const { data, error } = await supabase
+        .from('stations' as any)
+        .update({ 
+          lane_id: null,
+          room_id: null,
+          grid_position_x: 0,
+          grid_position_y: 0
+        })
+        .eq('id', stationId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['stations'] });
+      queryClient.invalidateQueries({ queryKey: ['library-stations'] });
+      toast.success('Station returned to library');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to unassign station: ${error.message}`);
+    },
+  });
+}

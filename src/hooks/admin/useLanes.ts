@@ -119,5 +119,94 @@ export function useDeleteLane() {
   });
 }
 
-// Lane capabilities are now managed at station level
-// These functions are deprecated but kept for backward compatibility
+// Library management hooks
+export function useLibraryLanes() {
+  return useQuery({
+    queryKey: ['library-lanes'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('lanes_new' as any)
+        .select('*')
+        .is('facility_id', null)
+        .order('name');
+
+      if (error) throw error;
+      
+      return data as any as Lane[];
+    },
+  });
+}
+
+export function useAssignLaneToFacility() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ 
+      laneId, 
+      facilityId, 
+      roomId, 
+      gridY,
+      positionOrder
+    }: { 
+      laneId: string; 
+      facilityId: string; 
+      roomId?: string | null;
+      gridY: number;
+      positionOrder: number;
+    }) => {
+      const { data, error } = await supabase
+        .from('lanes_new' as any)
+        .update({ 
+          facility_id: facilityId,
+          room_id: roomId || null,
+          grid_position_y: gridY,
+          position_order: positionOrder
+        })
+        .eq('id', laneId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['lanes'] });
+      queryClient.invalidateQueries({ queryKey: ['library-lanes'] });
+      toast.success('Lane assigned to facility');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to assign lane: ${error.message}`);
+    },
+  });
+}
+
+export function useUnassignLaneFromFacility() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (laneId: string) => {
+      const { data, error } = await supabase
+        .from('lanes_new' as any)
+        .update({ 
+          facility_id: null,
+          room_id: null,
+          grid_position_y: 0,
+          position_order: 0
+        })
+        .eq('id', laneId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['lanes'] });
+      queryClient.invalidateQueries({ queryKey: ['library-lanes'] });
+      toast.success('Lane returned to library');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to unassign lane: ${error.message}`);
+    },
+  });
+}
