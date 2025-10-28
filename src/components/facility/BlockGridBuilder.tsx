@@ -33,14 +33,14 @@ interface BlockGridBuilderProps {
   onReturnToLibrary?: (block: LayoutBlock) => void;
 }
 
-// Dynamic cell size calculation
+// Dynamic cell size calculation - allow much smaller cells for large grids
 const calculateCellSize = (containerWidth: number, gridWidth: number): number => {
   // Calculate cell size to make grid fill most of the available width
   const targetFillRatio = 0.85; // Use 85% of available width
   const calculatedSize = (containerWidth * targetFillRatio) / gridWidth;
   
-  // Clamp between 25 and 60 pixels for optimal visibility
-  return Math.max(25, Math.min(60, Math.floor(calculatedSize)));
+  // Allow smaller cells (5px min) for very large grids, up to 60px max
+  return Math.max(5, Math.min(60, Math.floor(calculatedSize)));
 };
 
 const DEFAULT_CELL_SIZE = 30; // Fallback if calculation fails
@@ -74,6 +74,8 @@ export function BlockGridBuilder({
   const [showGrid, setShowGrid] = useState(true);
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 1000, height: 700 });
   const [cellSize, setCellSize] = useState(DEFAULT_CELL_SIZE);
+  const [isPanning, setIsPanning] = useState(false);
+  const lastPosRef = useRef({ x: 0, y: 0 });
   
   // Object pool pattern refs
   const objectPoolRef = useRef<Map<string, Group>>(new Map());
@@ -564,97 +566,237 @@ export function BlockGridBuilder({
       canvas.off('selection:updated', handleSelection);
       canvas.off('selection:cleared', handleSelectionCleared);
     };
-  }, [canvas, facility, onBlockMove, onBlockResize, onBlockSelect]);
-
+  }, [canvas, facility, lanes, onBlockMove, onBlockResize, onBlockSelect, cellSize]);
 
   const handleZoomIn = () => {
-    if (!canvas) return;
-    const newZoom = Math.min(zoom + 0.2, 3);
-    setZoom(newZoom);
-    canvas.setZoom(newZoom);
-    canvas.renderAll();
+    setZoom((prev) => Math.min(prev + 0.1, 5.0));
   };
 
   const handleZoomOut = () => {
-    if (!canvas) return;
-    const newZoom = Math.max(zoom - 0.2, 0.5);
-    setZoom(newZoom);
-    canvas.setZoom(newZoom);
-    canvas.renderAll();
+    setZoom((prev) => Math.max(prev - 0.1, 0.1));
   };
 
   const handleResetZoom = () => {
-    if (!canvas) return;
     setZoom(1);
-    canvas.setZoom(1);
-    canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
-    canvas.renderAll();
   };
 
-  const debugCanvas = () => {
-    canvas?.getObjects().forEach(obj => {
-      const data = (obj as any).data;
-      if (data) {
-        console.log(`🔍 Object ${data.id} (${data.type}):`, {
-          selectable: obj.selectable,
-          evented: obj.evented,
-          lockMovementX: obj.lockMovementX,
-          lockMovementY: obj.lockMovementY,
-          hasControls: obj.hasControls,
-        });
-      }
-    });
+  const handleFitToView = () => {
+    if (!containerRef.current) return;
+    
+    const containerWidth = containerRef.current.clientWidth - 40;
+    const containerHeight = containerRef.current.clientHeight - 100;
+    
+    const gridPixelWidth = facility.grid_width * cellSize;
+    const gridPixelHeight = facility.grid_height * cellSize;
+    
+    const zoomX = containerWidth / gridPixelWidth;
+    const zoomY = containerHeight / gridPixelHeight;
+    
+    const fitZoom = Math.min(zoomX, zoomY, 1); // Don't zoom in beyond 100%
+    setZoom(Math.max(0.1, fitZoom)); // Minimum 10%
   };
+
+  // Update zoom
+  useEffect(() => {
+    if (!canvas) return;
+    canvas.setZoom(zoom);
+    canvas.renderAll();
+  }, [canvas, zoom]);
+
+  // Auto fit-to-view on initial load
+  useEffect(() => {
+    if (!canvas || !containerRef.current) return;
+    
+    // Wait for layout to stabilize, then fit to view
+    const timer = setTimeout(() => {
+      handleFitToView();
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [canvas, facility.grid_width, facility.grid_height]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle if not typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      
+      switch (e.key.toLowerCase()) {
+        case 'f':
+          handleFitToView();
+          break;
+        case '+':
+        case '=':
+          handleZoomIn();
+          break;
+        case '-':
+        case '_':
+          handleZoomOut();
+          break;
+        case '0':
+          handleResetZoom();
+          break;
+        case ' ':
+          setIsPanning(true);
+          e.preventDefault();
+          break;
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === ' ') {
+        setIsPanning(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  // Pan functionality
+  useEffect(() => {
+    if (!canvas) return;
+
+    const handleMouseDown = (e: any) => {
+      if (isPanning || e.e.button === 1) { // Space key or middle mouse
+        canvas.selection = false;
+        setIsPanning(true);
+        lastPosRef.current = { x: e.e.clientX, y: e.e.clientY };
+      }
+    };
+
+    const handleMouseMove = (e: any) => {
+      if (isPanning) {
+        const vpt = canvas.viewportTransform;
+        if (vpt) {
+          vpt[4] += e.e.clientX - lastPosRef.current.x;
+          vpt[5] += e.e.clientY - lastPosRef.current.y;
+          canvas.requestRenderAll();
+          lastPosRef.current = { x: e.e.clientX, y: e.e.clientY };
+        }
+      }
+    };
+
+    const handleMouseUp = () => {
+      if (isPanning) {
+        setIsPanning(false);
+        canvas.selection = true;
+      }
+    };
+
+    canvas.on('mouse:down', handleMouseDown);
+    canvas.on('mouse:move', handleMouseMove);
+    canvas.on('mouse:up', handleMouseUp);
+
+    return () => {
+      canvas.off('mouse:down', handleMouseDown);
+      canvas.off('mouse:move', handleMouseMove);
+      canvas.off('mouse:up', handleMouseUp);
+    };
+  }, [canvas, isPanning]);
 
   return (
-    <div className="space-y-4" ref={containerRef}>
-      <div className="flex items-center justify-between">
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleZoomIn}>
-            <ZoomIn className="h-4 w-4" />
+    <div ref={containerRef} className="relative w-full h-full">
+      {/* Controls */}
+      <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
+        <div className="bg-background/95 backdrop-blur-sm rounded-lg border shadow-lg p-2 space-y-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleFitToView}
+            title="Fit to View (F)"
+            className="w-full"
+          >
+            <Maximize2 className="h-4 w-4 mr-2" />
+            Fit View
           </Button>
-          <Button variant="outline" size="sm" onClick={handleZoomOut}>
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleResetZoom}>
-            <Maximize2 className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="sm" onClick={debugCanvas}>
-            🐛 Debug
+          <div className="flex gap-1">
+            <Button
+              variant="secondary"
+              size="icon"
+              onClick={handleZoomIn}
+              title="Zoom In (+)"
+            >
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="secondary"
+              size="icon"
+              onClick={handleZoomOut}
+              title="Zoom Out (-)"
+            >
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleResetZoom}
+            title="100% Zoom (0)"
+            className="w-full"
+          >
+            {Math.round(zoom * 100)}%
           </Button>
           <Button
-            variant={showGrid ? 'secondary' : 'outline'}
-            size="sm"
+            variant="outline"
+            size="icon"
             onClick={() => setShowGrid(!showGrid)}
+            title="Toggle Grid"
           >
             <Grid3x3 className="h-4 w-4" />
           </Button>
         </div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-muted-foreground">Zoom: {Math.round(zoom * 100)}%</span>
-        </div>
       </div>
 
+      {/* Canvas */}
       <div 
-        className="border rounded-lg overflow-auto bg-card"
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={onDrop}
+        className="w-full h-full overflow-auto bg-slate-900 rounded-lg"
+        style={{ cursor: isPanning ? 'grabbing' : 'default' }}
       >
         <canvas ref={canvasRef} />
       </div>
 
-      <div className="flex gap-4 text-xs">
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded border-2" style={{ borderColor: COLORS.gate.stroke, backgroundColor: COLORS.gate.fill }} />
-          <span className="text-muted-foreground">Gates</span>
+      {/* Legend & Shortcuts */}
+      <div className="absolute bottom-4 left-4 space-y-2">
+        <div className="bg-background/95 backdrop-blur-sm rounded-lg border shadow-lg p-3">
+          <div className="text-xs font-semibold mb-2">Legend</div>
+          <div className="space-y-1.5 text-xs">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded border-2" style={{ borderColor: COLORS.facility.stroke, backgroundColor: COLORS.facility.fill }} />
+              <span>Facility</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded border-2" style={{ borderColor: COLORS.gate.stroke, backgroundColor: COLORS.gate.fill }} />
+              <span>Gate</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded border-2" style={{ borderColor: COLORS.lane.stroke, backgroundColor: COLORS.lane.fill }} />
+              <span>Lane</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded border-2" style={{ borderColor: COLORS.station.stroke, backgroundColor: COLORS.station.fill }} />
+              <span>Station</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded border-2" style={{ borderColor: COLORS.room.stroke, backgroundColor: COLORS.room.fill }} />
+              <span>Room</span>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded border-2" style={{ borderColor: COLORS.lane.stroke, backgroundColor: COLORS.lane.fill }} />
-          <span className="text-muted-foreground">Lanes</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded border-2" style={{ borderColor: COLORS.station.stroke, backgroundColor: COLORS.station.fill }} />
-          <span className="text-muted-foreground">Stations</span>
+        
+        <div className="bg-background/95 backdrop-blur-sm rounded-lg border shadow-lg p-3">
+          <div className="text-xs font-semibold mb-2">Shortcuts</div>
+          <div className="space-y-1 text-xs text-muted-foreground">
+            <div><kbd className="px-1 py-0.5 bg-muted rounded">F</kbd> Fit to view</div>
+            <div><kbd className="px-1 py-0.5 bg-muted rounded">+/-</kbd> Zoom in/out</div>
+            <div><kbd className="px-1 py-0.5 bg-muted rounded">0</kbd> Reset zoom</div>
+            <div><kbd className="px-1 py-0.5 bg-muted rounded">Space</kbd> Pan canvas</div>
+          </div>
         </div>
       </div>
     </div>
