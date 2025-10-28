@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -35,6 +35,11 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
 
   const { data: allLanes } = useLanes();
   const { data: allStations } = useStations();
+
+  // Debug: Track editMode changes
+  useEffect(() => {
+    console.log('🎯 FacilityLayoutBuilder editMode changed to:', editMode);
+  }, [editMode]);
 
   const facilityGateIds = drivingGates.map(g => g.id);
   const facilityLanes = allLanes?.filter(lane => {
