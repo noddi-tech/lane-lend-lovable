@@ -9,22 +9,21 @@ import { useCreateLane } from "@/hooks/admin/useLanes";
 interface CreateLaneDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  drivingGates: Array<{ id: string; name: string }>;
+  facilityId: string;
 }
 
-export function CreateLaneDialog({ open, onOpenChange, drivingGates }: CreateLaneDialogProps) {
+export function CreateLaneDialog({ open, onOpenChange, facilityId }: CreateLaneDialogProps) {
   const [name, setName] = useState("");
-  const [drivingGateId, setDrivingGateId] = useState("");
   const [gridY, setGridY] = useState(5);
-  const [gridHeight, setGridHeight] = useState(5);
+  const [gridHeight, setGridHeight] = useState(2);
 
   const createLane = useCreateLane();
 
   const handleSubmit = async () => {
-    if (!drivingGateId) return;
+    if (!name) return;
     
     await createLane.mutateAsync({
-      driving_gate_id: drivingGateId,
+      facility_id: facilityId,
       name,
       position_order: 1,
       grid_position_y: gridY,
@@ -32,7 +31,8 @@ export function CreateLaneDialog({ open, onOpenChange, drivingGates }: CreateLan
     } as any);
     onOpenChange(false);
     setName("");
-    setDrivingGateId("");
+    setGridY(5);
+    setGridHeight(2);
   };
 
   return (
@@ -41,7 +41,7 @@ export function CreateLaneDialog({ open, onOpenChange, drivingGates }: CreateLan
         <DialogHeader>
           <DialogTitle>Create New Lane</DialogTitle>
           <DialogDescription>
-            Add a new lane to a driving gate
+            Add a new lane to this facility. Lanes span the full width of the facility.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -53,21 +53,6 @@ export function CreateLaneDialog({ open, onOpenChange, drivingGates }: CreateLan
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Express Lane"
             />
-          </div>
-          <div>
-            <Label htmlFor="driving-gate">Driving Gate</Label>
-            <Select value={drivingGateId} onValueChange={setDrivingGateId}>
-              <SelectTrigger id="driving-gate">
-                <SelectValue placeholder="Select a gate" />
-              </SelectTrigger>
-              <SelectContent>
-                {drivingGates.map((gate) => (
-                  <SelectItem key={gate.id} value={gate.id}>
-                    {gate.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -97,7 +82,7 @@ export function CreateLaneDialog({ open, onOpenChange, drivingGates }: CreateLan
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={!name || !drivingGateId}>
+          <Button onClick={handleSubmit} disabled={!name}>
             Create Lane
           </Button>
         </DialogFooter>

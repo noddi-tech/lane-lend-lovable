@@ -536,7 +536,7 @@ export type Database = {
         Row: {
           close_time: string | null
           created_at: string | null
-          driving_gate_id: string
+          facility_id: string
           grid_height: number
           grid_position_y: number
           id: string
@@ -548,7 +548,7 @@ export type Database = {
         Insert: {
           close_time?: string | null
           created_at?: string | null
-          driving_gate_id: string
+          facility_id: string
           grid_height?: number
           grid_position_y?: number
           id?: string
@@ -560,7 +560,7 @@ export type Database = {
         Update: {
           close_time?: string | null
           created_at?: string | null
-          driving_gate_id?: string
+          facility_id?: string
           grid_height?: number
           grid_position_y?: number
           id?: string
@@ -571,10 +571,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "lanes_new_driving_gate_id_fkey"
-            columns: ["driving_gate_id"]
+            foreignKeyName: "lanes_new_facility_id_fkey"
+            columns: ["facility_id"]
             isOneToOne: false
-            referencedRelation: "driving_gates"
+            referencedRelation: "facilities"
             referencedColumns: ["id"]
           },
         ]

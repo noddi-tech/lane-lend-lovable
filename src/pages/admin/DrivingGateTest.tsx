@@ -78,7 +78,7 @@ export default function DrivingGateTest() {
         .insert(
           lanesData.map(l => ({
             ...l,
-            driving_gate_id: gate.id,
+            facility_id: gate.facility_id,
             open_time: '08:00:00',
             close_time: '17:00:00',
           }))

@@ -36,9 +36,11 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
   const { data: allStations } = useStations();
 
   const facilityGateIds = drivingGates.map(g => g.id);
-  const facilityLanes = allLanes?.filter(lane => 
-    facilityGateIds.includes(lane.driving_gate?.id || '')
-  ) || [];
+  const facilityLanes = allLanes?.filter(lane => {
+    // Find the gate that belongs to this facility and check if lane belongs to facility
+    const laneGate = drivingGates.find(g => g.id === lane.driving_gate?.id);
+    return laneGate !== undefined;
+  }) || [];
   const facilityLaneIds = facilityLanes.map(l => l.id);
   const facilityStations = allStations?.filter(station =>
     facilityLaneIds.includes(station.lane_id)
@@ -251,7 +253,7 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
       <CreateLaneDialog
         open={showCreateLaneDialog}
         onOpenChange={setShowCreateLaneDialog}
-        drivingGates={drivingGates.map(g => ({ id: g.id, name: g.name }))}
+        facilityId={facility.id}
       />
 
       <CreateStationDialog
