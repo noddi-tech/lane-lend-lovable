@@ -341,7 +341,7 @@ export type Database = {
           close_time: string
           created_at: string | null
           description: string | null
-          facility_id: string
+          facility_id: string | null
           grid_height: number
           grid_position_x: number | null
           grid_position_y: number | null
@@ -349,13 +349,14 @@ export type Database = {
           id: string
           name: string
           open_time: string
+          room_id: string | null
           updated_at: string | null
         }
         Insert: {
           close_time?: string
           created_at?: string | null
           description?: string | null
-          facility_id: string
+          facility_id?: string | null
           grid_height?: number
           grid_position_x?: number | null
           grid_position_y?: number | null
@@ -363,13 +364,14 @@ export type Database = {
           id?: string
           name: string
           open_time?: string
+          room_id?: string | null
           updated_at?: string | null
         }
         Update: {
           close_time?: string
           created_at?: string | null
           description?: string | null
-          facility_id?: string
+          facility_id?: string | null
           grid_height?: number
           grid_position_x?: number | null
           grid_position_y?: number | null
@@ -377,6 +379,7 @@ export type Database = {
           id?: string
           name?: string
           open_time?: string
+          room_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -385,6 +388,13 @@ export type Database = {
             columns: ["facility_id"]
             isOneToOne: false
             referencedRelation: "facilities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driving_gates_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
             referencedColumns: ["id"]
           },
         ]
@@ -536,37 +546,40 @@ export type Database = {
         Row: {
           close_time: string | null
           created_at: string | null
-          facility_id: string
+          facility_id: string | null
           grid_height: number
           grid_position_y: number
           id: string
           name: string
           open_time: string | null
           position_order: number
+          room_id: string | null
           updated_at: string | null
         }
         Insert: {
           close_time?: string | null
           created_at?: string | null
-          facility_id: string
+          facility_id?: string | null
           grid_height?: number
           grid_position_y?: number
           id?: string
           name: string
           open_time?: string | null
           position_order?: number
+          room_id?: string | null
           updated_at?: string | null
         }
         Update: {
           close_time?: string | null
           created_at?: string | null
-          facility_id?: string
+          facility_id?: string | null
           grid_height?: number
           grid_position_y?: number
           id?: string
           name?: string
           open_time?: string | null
           position_order?: number
+          room_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -575,6 +588,13 @@ export type Database = {
             columns: ["facility_id"]
             isOneToOne: false
             referencedRelation: "facilities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lanes_new_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
             referencedColumns: ["id"]
           },
         ]
@@ -605,6 +625,56 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      rooms: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          description: string | null
+          facility_id: string
+          grid_height: number
+          grid_position_x: number
+          grid_position_y: number
+          grid_width: number
+          id: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          facility_id: string
+          grid_height?: number
+          grid_position_x?: number
+          grid_position_y?: number
+          grid_width?: number
+          id?: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          facility_id?: string
+          grid_height?: number
+          grid_position_x?: number
+          grid_position_y?: number
+          grid_width?: number
+          id?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rooms_facility_id_fkey"
+            columns: ["facility_id"]
+            isOneToOne: false
+            referencedRelation: "facilities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales_item_capabilities: {
         Row: {
@@ -793,9 +863,10 @@ export type Database = {
           grid_position_y: number
           grid_width: number
           id: string
-          lane_id: string
+          lane_id: string | null
           name: string
           open_time: string | null
+          room_id: string | null
           station_type: string
           updated_at: string | null
         }
@@ -809,9 +880,10 @@ export type Database = {
           grid_position_y?: number
           grid_width?: number
           id?: string
-          lane_id: string
+          lane_id?: string | null
           name: string
           open_time?: string | null
+          room_id?: string | null
           station_type?: string
           updated_at?: string | null
         }
@@ -825,9 +897,10 @@ export type Database = {
           grid_position_y?: number
           grid_width?: number
           id?: string
-          lane_id?: string
+          lane_id?: string | null
           name?: string
           open_time?: string | null
+          room_id?: string | null
           station_type?: string
           updated_at?: string | null
         }
@@ -837,6 +910,13 @@ export type Database = {
             columns: ["lane_id"]
             isOneToOne: false
             referencedRelation: "lanes_new"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stations_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
             referencedColumns: ["id"]
           },
         ]
