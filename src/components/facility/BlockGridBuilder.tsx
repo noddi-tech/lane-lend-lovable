@@ -223,7 +223,12 @@ export function BlockGridBuilder({
       obj.set({
         selectable: isEditable,
         evented: isEditable,
-        hasControls: isEditable,
+        hasControls: false,
+        lockMovementX: !isEditable,
+        lockMovementY: !isEditable,
+        lockScalingX: true,
+        lockScalingY: true,
+        lockRotation: true,
         hoverCursor: isEditable ? 'move' : 'default',
         opacity: isEditable ? 1 : (block.type === 'facility' ? 1 : 0.5),
       });
