@@ -296,17 +296,27 @@ export function BlockGridBuilder({
         const isEditable = block.type === editMode;
         const isLane = block.type === 'lane';
         
-        existing.set({
-          selectable: isEditable,
-          evented: isEditable,
-          hasControls: isEditable && !isLane,
-          hoverCursor: isEditable ? 'move' : 'default',
-          lockMovementX: !isEditable || isLane,
-          lockMovementY: !isEditable,
-          lockScalingX: !isEditable || isLane,
-          lockScalingY: !isEditable,
-          opacity: isEditable ? 1 : (block.type === 'facility' ? 1 : 0.5),
-        });
+      console.log(`🔄 Updating ${block.type} ${block.id}:`, { 
+        isEditable, 
+        selectable: isEditable,
+        evented: isEditable,
+        lockMovementX: !isEditable || isLane,
+        lockMovementY: !isEditable
+      });
+      
+      existing.set({
+        selectable: isEditable,
+        evented: isEditable,
+        hasControls: isEditable && !isLane,
+        hoverCursor: isEditable ? 'move' : 'default',
+        lockMovementX: !isEditable || isLane,
+        lockMovementY: !isEditable,
+        lockScalingX: !isEditable || isLane,
+        lockScalingY: !isEditable,
+        opacity: isEditable ? 1 : (block.type === 'facility' ? 1 : 0.5),
+      });
+      
+      existing.setCoords(); // Update interaction boundaries
         
         // Update data reference
         existing.set({ data: block } as any);
@@ -316,23 +326,30 @@ export function BlockGridBuilder({
         const newObj = createBlock(block);
         objectPoolRef.current.set(block.id, newObj);
         canvas.add(newObj);
-      }
-    });
-    
-    canvas.renderAll();
+    }
+  });
+  
+  // Force thorough canvas refresh
+  canvas.getObjects().forEach(obj => {
+    if ((obj as any).data) {
+      obj.setCoords();
+    }
+  });
+  canvas.requestRenderAll();
   }, [canvas, facility, gates, lanes, stations, showGrid, editMode, generateDataHash, updateBlockObject]);
 
   // Handle object interactions
   useEffect(() => {
     if (!canvas) return;
 
-    const handleObjectMoving = (e: any) => {
-      isDraggingRef.current = true; // Mark drag as active
-      
-      const obj = e.target;
+  const handleObjectMoving = (e: any) => {
+    isDraggingRef.current = true; // Mark drag as active
+    
+    const obj = e.target;
       if (!obj?.data) return;
 
       const block = obj.data as LayoutBlock;
+      console.log(`👆 Object moving:`, { type: block?.type, id: block?.id });
       const left = obj.left || 0;
       const top = obj.top || 0;
 
@@ -529,6 +546,21 @@ export function BlockGridBuilder({
     canvas.renderAll();
   };
 
+  const debugCanvas = () => {
+    canvas?.getObjects().forEach(obj => {
+      const data = (obj as any).data;
+      if (data) {
+        console.log(`🔍 Object ${data.id} (${data.type}):`, {
+          selectable: obj.selectable,
+          evented: obj.evented,
+          lockMovementX: obj.lockMovementX,
+          lockMovementY: obj.lockMovementY,
+          hasControls: obj.hasControls,
+        });
+      }
+    });
+  };
+
   return (
     <div className="space-y-4" ref={containerRef}>
       <div className="flex items-center justify-between">
@@ -541,6 +573,9 @@ export function BlockGridBuilder({
           </Button>
           <Button variant="outline" size="sm" onClick={handleResetZoom}>
             <Maximize2 className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="sm" onClick={debugCanvas}>
+            🐛 Debug
           </Button>
           <Button
             variant={showGrid ? 'secondary' : 'outline'}
