@@ -34,6 +34,7 @@ import DrivingGateTest from './pages/admin/DrivingGateTest';
 import Facilities from './pages/admin/Facilities';
 import FacilityLayout from './pages/admin/FacilityLayout';
 import FacilityManagement from './pages/admin/FacilityManagement';
+import FacilityLayoutBuilderPage from './pages/admin/FacilityLayoutBuilderPage';
 import GatesLibrary from './pages/admin/GatesLibrary';
 import LanesLibrary from './pages/admin/LanesLibrary';
 import StationsLibrary from './pages/admin/StationsLibrary';
@@ -68,6 +69,7 @@ function AppContent() {
           <Route index element={<Dashboard />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="facility-management" element={<FacilityManagement />} />
+          <Route path="facility-layout/:facilityId" element={<FacilityLayoutBuilderPage />} />
           <Route path="facilities" element={<Facilities />} />
           <Route path="facilities/:facilityId" element={<FacilityLayout />} />
           <Route path="driving-gates" element={<DrivingGates />} />

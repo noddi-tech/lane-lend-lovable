@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useFacilities } from '@/hooks/admin/useFacilities';
 import { useDrivingGates } from '@/hooks/admin/useDrivingGates';
 import { Button } from '@/components/ui/button';
@@ -6,10 +7,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
 import { Building2, Plus, Layers } from 'lucide-react';
 import { FacilityOverview } from '@/components/facility/FacilityOverview';
-import { FacilityLayoutBuilder } from '@/components/facility/FacilityLayoutBuilder';
 import { FacilityConfiguration } from '@/components/facility/FacilityConfiguration';
 
 export default function FacilityManagement() {
+  const navigate = useNavigate();
   const { data: facilities, isLoading: loadingFacilities } = useFacilities();
   const { data: drivingGates, isLoading: loadingGates } = useDrivingGates();
   const [selectedFacilityId, setSelectedFacilityId] = useState<string | null>(null);
@@ -88,10 +89,14 @@ export default function FacilityManagement() {
               </TabsContent>
 
               <TabsContent value="layout" className="space-y-4">
-                <FacilityLayoutBuilder 
-                  facility={selectedFacility}
-                  drivingGates={drivingGates?.filter(g => g.facility_id === selectedFacility.id) || []}
-                />
+                <div className="text-center py-8 space-y-4">
+                  <p className="text-muted-foreground">
+                    For the best layout building experience, use the full-page builder.
+                  </p>
+                  <Button onClick={() => navigate(`/admin/facility-layout/${selectedFacility.id}`)}>
+                    Open Full Layout Builder
+                  </Button>
+                </div>
               </TabsContent>
 
               <TabsContent value="config" className="space-y-4">

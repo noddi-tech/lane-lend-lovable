@@ -33,7 +33,17 @@ interface BlockGridBuilderProps {
   onReturnToLibrary?: (block: LayoutBlock) => void;
 }
 
-const CELL_SIZE = 15;
+// Dynamic cell size calculation
+const calculateCellSize = (containerWidth: number, gridWidth: number): number => {
+  // Calculate cell size to make grid fill most of the available width
+  const targetFillRatio = 0.85; // Use 85% of available width
+  const calculatedSize = (containerWidth * targetFillRatio) / gridWidth;
+  
+  // Clamp between 25 and 60 pixels for optimal visibility
+  return Math.max(25, Math.min(60, Math.floor(calculatedSize)));
+};
+
+const DEFAULT_CELL_SIZE = 30; // Fallback if calculation fails
 
 const COLORS = {
   facility: { fill: 'rgba(59, 130, 246, 0.1)', stroke: '#3b82f6', text: '#3b82f6' },
@@ -63,21 +73,33 @@ export function BlockGridBuilder({
   const [zoom, setZoom] = useState(1);
   const [showGrid, setShowGrid] = useState(true);
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 1000, height: 700 });
+  const [cellSize, setCellSize] = useState(DEFAULT_CELL_SIZE);
   
   // Object pool pattern refs
   const objectPoolRef = useRef<Map<string, Group>>(new Map());
   const isDraggingRef = useRef(false);
   const lastDataHashRef = useRef<string>('');
 
-  // Calculate responsive canvas size
+  // Calculate responsive canvas size and cell size
   useEffect(() => {
     if (!containerRef.current) return;
 
     const resizeObserver = new ResizeObserver((entries) => {
-      const { width } = entries[0].contentRect;
-      const aspectRatio = facility.grid_height / facility.grid_width;
-      const height = Math.min(width * aspectRatio, 700);
-      setCanvasDimensions({ width: Math.min(width - 40, 1200), height });
+      const { width, height } = entries[0].contentRect;
+      
+      // Calculate optimal cell size based on available width
+      const optimalCellSize = calculateCellSize(width - 40, facility.grid_width);
+      setCellSize(optimalCellSize);
+      
+      // Calculate canvas dimensions based on cell size and grid dimensions
+      const canvasWidth = facility.grid_width * optimalCellSize;
+      const canvasHeight = facility.grid_height * optimalCellSize;
+      
+      // Limit canvas to container size
+      const finalWidth = Math.min(canvasWidth, width - 40);
+      const finalHeight = Math.min(canvasHeight, height - 40);
+      
+      setCanvasDimensions({ width: finalWidth, height: finalHeight });
     });
 
     resizeObserver.observe(containerRef.current);
@@ -124,16 +146,16 @@ export function BlockGridBuilder({
   // Helper: Update existing object without destroying it
   const updateBlockObject = (group: Group, block: LayoutBlock) => {
     group.set({
-      left: block.grid_x * CELL_SIZE,
-      top: block.grid_y * CELL_SIZE,
+      left: block.grid_x * cellSize,
+      top: block.grid_y * cellSize,
     });
     
     // Update rect dimensions
     const rect = group._objects?.[0] as Rect;
     if (rect) {
       rect.set({
-        width: block.grid_width * CELL_SIZE,
-        height: block.grid_height * CELL_SIZE,
+        width: block.grid_width * cellSize,
+        height: block.grid_height * cellSize,
       });
     }
     
@@ -142,8 +164,8 @@ export function BlockGridBuilder({
     if (text) {
       text.set({
         text: block.name,
-        left: (block.grid_width * CELL_SIZE) / 2,
-        top: (block.grid_height * CELL_SIZE) / 2,
+        left: (block.grid_width * cellSize) / 2,
+        top: (block.grid_height * cellSize) / 2,
       });
     }
     
@@ -191,10 +213,10 @@ export function BlockGridBuilder({
     if (showGrid) {
       for (let i = 0; i <= facility.grid_width; i++) {
         const line = new Rect({
-          left: i * CELL_SIZE,
+          left: i * cellSize,
           top: 0,
           width: 1,
-          height: facility.grid_height * CELL_SIZE,
+          height: facility.grid_height * cellSize,
           fill: 'rgba(255, 255, 255, 0.05)',
           selectable: false,
           evented: false,
@@ -205,8 +227,8 @@ export function BlockGridBuilder({
       for (let j = 0; j <= facility.grid_height; j++) {
         const line = new Rect({
           left: 0,
-          top: j * CELL_SIZE,
-          width: facility.grid_width * CELL_SIZE,
+          top: j * cellSize,
+          width: facility.grid_width * cellSize,
           height: 1,
           fill: 'rgba(255, 255, 255, 0.05)',
           selectable: false,
@@ -220,8 +242,8 @@ export function BlockGridBuilder({
     const facilityRect = new Rect({
       left: 0,
       top: 0,
-      width: facility.grid_width * CELL_SIZE,
-      height: facility.grid_height * CELL_SIZE,
+      width: facility.grid_width * cellSize,
+      height: facility.grid_height * cellSize,
       fill: COLORS.facility.fill,
       stroke: COLORS.facility.stroke,
       strokeWidth: 3,
@@ -254,8 +276,8 @@ export function BlockGridBuilder({
       const rect = new Rect({
         left: 0,
         top: 0,
-        width: block.grid_width * CELL_SIZE,
-        height: block.grid_height * CELL_SIZE,
+        width: block.grid_width * cellSize,
+        height: block.grid_height * cellSize,
         fill: colors.fill,
         stroke: colors.stroke,
         strokeWidth: isRoom ? 3 : 2,
@@ -264,9 +286,9 @@ export function BlockGridBuilder({
       });
 
       const text = new Text(block.name, {
-        left: (block.grid_width * CELL_SIZE) / 2,
-        top: (block.grid_height * CELL_SIZE) / 2,
-        fontSize: Math.max(10, Math.min(14, block.grid_width)),
+        left: (block.grid_width * cellSize) / 2,
+        top: (block.grid_height * cellSize) / 2,
+        fontSize: Math.max(12, Math.min(18, block.grid_width * 1.5)),
         fill: COLORS[block.type].text,
         originX: 'center',
         originY: 'center',
@@ -275,8 +297,8 @@ export function BlockGridBuilder({
       });
 
       const group = new Group([rect, text], {
-        left: block.grid_x * CELL_SIZE,
-        top: block.grid_y * CELL_SIZE,
+        left: block.grid_x * cellSize,
+        top: block.grid_y * cellSize,
         selectable: isEditable,
         hasControls: isEditable && !isLane,
         lockRotation: true,
@@ -359,7 +381,7 @@ export function BlockGridBuilder({
     }
   });
   canvas.requestRenderAll();
-  }, [canvas, facility, gates, lanes, stations, showGrid, editMode, generateDataHash, updateBlockObject]);
+  }, [canvas, facility, gates, lanes, stations, rooms, showGrid, editMode, cellSize]);
 
   // Handle object interactions
   useEffect(() => {
@@ -377,8 +399,8 @@ export function BlockGridBuilder({
       const top = obj.top || 0;
 
       // Snap to grid
-      let snappedX = Math.round(left / CELL_SIZE);
-      let snappedY = Math.round(top / CELL_SIZE);
+      let snappedX = Math.round(left / cellSize);
+      let snappedY = Math.round(top / cellSize);
 
       // Station-to-Lane parenting constraint
       if (block.type === 'station' && block.parent_id) {
@@ -417,12 +439,12 @@ export function BlockGridBuilder({
       if (block.type === 'lane') {
         obj.set({
           left: 0,
-          top: snappedY * CELL_SIZE,
+          top: snappedY * cellSize,
         });
       } else {
         obj.set({
-          left: snappedX * CELL_SIZE,
-          top: snappedY * CELL_SIZE,
+          left: snappedX * cellSize,
+          top: snappedY * cellSize,
         });
       }
 
@@ -433,8 +455,8 @@ export function BlockGridBuilder({
 
         if (snappedX < 0) obj.set({ left: 0 });
         if (snappedY < 0) obj.set({ top: 0 });
-        if (snappedX > maxX) obj.set({ left: maxX * CELL_SIZE });
-        if (snappedY > maxY) obj.set({ top: maxY * CELL_SIZE });
+        if (snappedX > maxX) obj.set({ left: maxX * cellSize });
+        if (snappedY > maxY) obj.set({ top: maxY * cellSize });
       }
     };
 
@@ -452,18 +474,18 @@ export function BlockGridBuilder({
 
       // Snap to grid
       const newWidth = Math.max(
-        CELL_SIZE * 2,
-        Math.round(currentWidth / CELL_SIZE) * CELL_SIZE
+        cellSize * 2,
+        Math.round(currentWidth / cellSize) * cellSize
       );
       const newHeight = Math.max(
-        CELL_SIZE * 2,
-        Math.round(currentHeight / CELL_SIZE) * CELL_SIZE
+        cellSize * 2,
+        Math.round(currentHeight / cellSize) * cellSize
       );
 
       // For lanes, enforce facility width
       if (block.type === 'lane') {
         obj.set({
-          width: facility.grid_width * CELL_SIZE,
+          width: facility.grid_width * cellSize,
           height: newHeight,
           scaleX: 1,
           scaleY: 1,
@@ -481,7 +503,7 @@ export function BlockGridBuilder({
       const text = obj._objects?.[1];
       if (text) {
         text.set({
-          left: (block.type === 'lane' ? facility.grid_width * CELL_SIZE : newWidth) / 2,
+          left: (block.type === 'lane' ? facility.grid_width * cellSize : newWidth) / 2,
           top: newHeight / 2,
         });
       }
@@ -494,10 +516,10 @@ export function BlockGridBuilder({
       if (!obj?.data) return;
 
       const block = obj.data as LayoutBlock;
-      const gridX = Math.round((obj.left || 0) / CELL_SIZE);
-      const gridY = Math.round((obj.top || 0) / CELL_SIZE);
-      const gridWidth = Math.round((obj.width || 0) / CELL_SIZE);
-      const gridHeight = Math.round((obj.height || 0) / CELL_SIZE);
+      const gridX = Math.round((obj.left || 0) / cellSize);
+      const gridY = Math.round((obj.top || 0) / cellSize);
+      const gridWidth = Math.round((obj.width || 0) / cellSize);
+      const gridHeight = Math.round((obj.height || 0) / cellSize);
 
       // Update the data reference so our object pool stays in sync
       obj.set({ data: { ...block, grid_x: gridX, grid_y: gridY, grid_width: gridWidth, grid_height: gridHeight } } as any);
