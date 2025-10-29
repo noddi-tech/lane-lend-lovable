@@ -201,7 +201,7 @@ export default function FacilityLayoutBuilderPageUnified() {
         <div className="border-t bg-card p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium">{selectedElement.data.originalData?.name || selectedElement.type}</p>
+              <p className="font-medium">{selectedElement.data?.originalData?.name || selectedElement.type}</p>
               <p className="text-sm text-muted-foreground">
                 {selectedElement.type} • ID: {selectedElement.id.slice(0, 8)}...
               </p>
