@@ -62,13 +62,62 @@ const calculateCellSize = (containerWidth: number, gridWidth: number): number =>
 const DEFAULT_CELL_SIZE = 30; // Fallback if calculation fails
 
 const COLORS = {
-  facility: { fill: 'rgba(59, 130, 246, 0.1)', stroke: '#3b82f6', text: '#3b82f6' },
-  gate: { fill: 'rgba(34, 197, 94, 0.2)', stroke: '#22c55e', text: '#22c55e' },
-  outside: { fill: 'rgba(107, 114, 128, 0.1)', stroke: '#6b7280', text: '#6b7280' },
-  storage: { fill: 'rgba(251, 146, 60, 0.2)', stroke: '#fb923c', text: '#fb923c' },
-  lane: { fill: 'rgba(168, 85, 247, 0.2)', stroke: '#a855f7', text: '#a855f7' },
-  station: { fill: 'rgba(251, 146, 60, 0.25)', stroke: '#fb923c', text: '#fb923c' },
-  room: { fill: 'rgba(99, 102, 241, 0.15)', stroke: '#6366f1', text: '#6366f1' },
+  facility: { 
+    fill: 'rgba(59, 130, 246, 0.05)', 
+    stroke: '#3b82f6', 
+    strokeWidth: 3,
+    strokeDashArray: [10, 5],
+    text: '#1e40af',
+    opacity: 1
+  },
+  gate: { 
+    fill: 'rgba(34, 197, 94, 0.15)', 
+    stroke: '#22c55e', 
+    strokeWidth: 2,
+    strokeDashArray: [],
+    text: '#166534',
+    opacity: 1
+  },
+  outside: { 
+    fill: 'rgba(156, 163, 175, 0.05)', 
+    stroke: '#9ca3af', 
+    strokeWidth: 1,
+    strokeDashArray: [5, 5],
+    text: '#6b7280',
+    opacity: 0.6
+  },
+  storage: { 
+    fill: 'rgba(245, 158, 11, 0.2)', 
+    stroke: '#f59e0b', 
+    strokeWidth: 1,
+    strokeDashArray: [2, 2],
+    text: '#92400e',
+    opacity: 1
+  },
+  lane: { 
+    fill: 'rgba(168, 85, 247, 0.15)', 
+    stroke: '#a855f7', 
+    strokeWidth: 2,
+    strokeDashArray: [],
+    text: '#6b21a8',
+    opacity: 1
+  },
+  station: { 
+    fill: 'rgba(239, 68, 68, 0.15)', 
+    stroke: '#ef4444', 
+    strokeWidth: 2,
+    strokeDashArray: [],
+    text: '#991b1b',
+    opacity: 1
+  },
+  room: { 
+    fill: 'rgba(99, 102, 241, 0.1)', 
+    stroke: '#6366f1', 
+    strokeWidth: 3,
+    strokeDashArray: [15, 5],
+    text: '#3730a3',
+    opacity: 1
+  },
 };
 
 export function BlockGridBuilder({
@@ -77,7 +126,10 @@ export function BlockGridBuilder({
   lanes,
   stations,
   rooms = [],
+  outsideAreas = [],
+  storageLocations = [],
   editMode,
+  viewContext,
   onBlockMove,
   onBlockResize,
   onBlockSelect,
@@ -153,13 +205,23 @@ export function BlockGridBuilder({
   }, [canvas, canvasDimensions]);
 
   // Helper: Generate stable hash of data for change detection
-  const generateDataHash = (gates: LayoutBlock[], lanes: LayoutBlock[], stations: LayoutBlock[], rooms: LayoutBlock[], mode: EditMode) => {
+  const generateDataHash = (
+    gates: LayoutBlock[], 
+    lanes: LayoutBlock[], 
+    stations: LayoutBlock[], 
+    rooms: LayoutBlock[], 
+    outsideAreas: LayoutBlock[], 
+    storageLocations: LayoutBlock[], 
+    mode: EditMode
+  ) => {
     return JSON.stringify({
       editMode: mode,
       gates: gates.map(g => `${g.id}-${g.grid_x}-${g.grid_y}-${g.grid_width}-${g.grid_height}`),
       lanes: lanes.map(l => `${l.id}-${l.grid_x}-${l.grid_y}-${l.grid_width}-${l.grid_height}`),
       stations: stations.map(s => `${s.id}-${s.grid_x}-${s.grid_y}-${s.grid_width}-${s.grid_height}`),
       rooms: rooms.map(r => `${r.id}-${r.grid_x}-${r.grid_y}-${r.grid_width}-${r.grid_height}-${r.color}`),
+      outsideAreas: outsideAreas.map(o => `${o.id}-${o.grid_x}-${o.grid_y}-${o.grid_width}-${o.grid_height}`),
+      storageLocations: storageLocations.map(s => `${s.id}-${s.grid_x}-${s.grid_y}-${s.grid_width}-${s.grid_height}`),
     });
   };
 
@@ -203,7 +265,7 @@ export function BlockGridBuilder({
     }
     
     // Check if data actually changed
-    const currentHash = generateDataHash(gates, lanes, stations, rooms, editMode);
+    const currentHash = generateDataHash(gates, lanes, stations, rooms, outsideAreas, storageLocations, editMode);
     const dataChanged = currentHash !== lastDataHashRef.current;
     lastDataHashRef.current = currentHash;
     
@@ -217,7 +279,7 @@ export function BlockGridBuilder({
     // Clear only static elements (grid, facility boundary)
     const interactiveObjects = canvas.getObjects().filter(obj => {
       const block = (obj as any).data as LayoutBlock | undefined;
-      return block && (block.type === 'gate' || block.type === 'lane' || block.type === 'station' || block.type === 'room');
+      return block && (block.type === 'gate' || block.type === 'lane' || block.type === 'station' || block.type === 'room' || block.type === 'outside' || block.type === 'storage');
     });
     
     canvas.getObjects().forEach(obj => {
@@ -300,9 +362,11 @@ export function BlockGridBuilder({
         height: block.grid_height * cellSize,
         fill: colors.fill,
         stroke: colors.stroke,
-        strokeWidth: isRoom ? 3 : 2,
+        strokeWidth: (colors as any).strokeWidth || 2,
+        strokeDashArray: (colors as any).strokeDashArray || [],
         rx: 4,
         ry: 4,
+        opacity: (colors as any).opacity || 1,
       });
 
       const text = new Text(block.name, {
@@ -336,8 +400,8 @@ export function BlockGridBuilder({
       return group;
     };
 
-    // Process blocks: Update existing or create new (maintain Z-order: rooms, lanes, gates, stations)
-    const allBlocks = [...rooms, ...lanes, ...gates, ...stations];
+    // Process blocks: Update existing or create new (maintain Z-order: outside (background), rooms, lanes, gates, stations, storage)
+    const allBlocks = [...outsideAreas, ...rooms, ...lanes, ...gates, ...stations, ...storageLocations];
     const currentBlockIds = new Set(allBlocks.map(b => b.id));
     
     // Remove deleted blocks
@@ -401,7 +465,7 @@ export function BlockGridBuilder({
     }
   });
   canvas.requestRenderAll();
-  }, [canvas, facility, gates, lanes, stations, rooms, showGrid, editMode, cellSize]);
+  }, [canvas, facility, gates, lanes, stations, rooms, outsideAreas, storageLocations, showGrid, editMode, cellSize]);
 
   // Handle object interactions
   useEffect(() => {
@@ -803,6 +867,30 @@ export function BlockGridBuilder({
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded border-2" style={{ borderColor: COLORS.room.stroke, backgroundColor: COLORS.room.fill }} />
               <span>Room</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div 
+                className="w-4 h-4 rounded border" 
+                style={{ 
+                  borderColor: COLORS.outside.stroke, 
+                  backgroundColor: COLORS.outside.fill,
+                  borderStyle: 'dashed',
+                  opacity: COLORS.outside.opacity
+                }} 
+              />
+              <span>Outside</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div 
+                className="w-4 h-4 rounded border" 
+                style={{ 
+                  borderColor: COLORS.storage.stroke, 
+                  backgroundColor: COLORS.storage.fill,
+                  borderStyle: 'dotted',
+                  borderWidth: 2
+                }} 
+              />
+              <span>Storage</span>
             </div>
           </div>
         </div>

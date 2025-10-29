@@ -109,6 +109,22 @@ export function LibraryPalette({ editMode, onItemDragStart }: LibraryPaletteProp
     );
   }
 
+  if (editMode === 'outside' || editMode === 'storage') {
+    return (
+      <Card className="w-80">
+        <CardHeader>
+          <CardTitle className="text-lg">Library</CardTitle>
+          <CardDescription>
+            Click "Add {editMode === 'outside' ? 'Outside Area' : 'Storage'}" button to create new {editMode === 'outside' ? 'outside areas' : 'storage locations'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-4 text-sm text-muted-foreground text-center">
+          No library items for {editMode} mode. Use the toolbar button to create new elements.
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="w-80 shadow-lg">
       <CardHeader className="pb-3">
