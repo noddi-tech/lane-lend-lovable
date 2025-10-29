@@ -198,6 +198,9 @@ export function UnifiedGridBuilder({
   const isPanningRef = useRef(false);
   const lastPanPointRef = useRef<{ x: number; y: number } | null>(null);
   
+  // Ref to prevent infinite loop when programmatically setting selection
+  const selectionChangeInProgress = useRef(false);
+  
   // Store data in ref to prevent event handler re-registration
   const dataRef = useRef({
     lanes,
@@ -362,7 +365,6 @@ export function UnifiedGridBuilder({
     if (!canvas) return;
 
     const handleObjectMoving = (e: any) => {
-      console.log('🔄 object:moving', e.target?.data);
       const obj = e.target;
       if (!obj?.data) return;
 
@@ -430,7 +432,6 @@ export function UnifiedGridBuilder({
     };
 
     const handleObjectModified = (e: any) => {
-      console.log('✅ object:modified', e.target?.data);
       const obj = e.target;
       if (!obj?.data) return;
 
@@ -497,7 +498,12 @@ export function UnifiedGridBuilder({
     };
 
     const handleSelectionCreated = (e: any) => {
-      console.log('🎯 selection:created', e.selected?.[0]?.data);
+      // Skip callback if this is a programmatic selection change
+      if (selectionChangeInProgress.current) {
+        selectionChangeInProgress.current = false;
+        return;
+      }
+      
       const obj = e.selected?.[0];
       if (obj?.data) {
         callbacksRef.current.onElementSelect?.(obj.data);
@@ -524,13 +530,6 @@ export function UnifiedGridBuilder({
     if (!canvas) return;
 
     const handleMouseDown = (e: any) => {
-      console.log('🖱️ mouse:down', { 
-        hasTarget: !!e.target, 
-        targetType: e.target?.data?.type,
-        altKey: e.e.altKey, 
-        button: e.e.button 
-      });
-      
       // Only pan with Alt/middle-click AND when clicking empty space (not an object)
       if ((e.e.altKey || e.e.button === 1) && !e.target) {
         e.e.preventDefault();
@@ -574,11 +573,6 @@ export function UnifiedGridBuilder({
 
   useEffect(() => {
     if (!canvas || !canvas.upperCanvasEl) return;
-
-    // Preserve active selection before clearing
-    const activeObject = canvas.getActiveObject() as any;
-    const activeId = activeObject?.data?.id;
-    const activeType = activeObject?.data?.type;
 
     canvas.clear();
     canvas.backgroundColor = COLORS.facility.background;
@@ -957,18 +951,19 @@ export function UnifiedGridBuilder({
       canvas.add(storageGroup);
     });
 
-    // Restore selection after re-render if element still exists
-    if (activeId && activeType) {
-      const objectToSelect = canvas.getObjects().find((obj: any) => 
-        obj.data?.id === activeId && obj.data?.type === activeType
-      );
-      if (objectToSelect) {
-        canvas.setActiveObject(objectToSelect);
-      }
-    }
-
     canvas.renderAll();
   }, [canvas, gridWidth, gridHeight, gates, lanes, stations, rooms, outsideAreas, storageLocations, zones, editMode]);
+
+  // Clear selection when switching to incompatible edit mode
+  useEffect(() => {
+    if (!canvas) return;
+    
+    const activeObject = canvas.getActiveObject() as any;
+    if (activeObject?.data?.type && activeObject.data?.type !== editMode && editMode !== 'view') {
+      canvas.discardActiveObject();
+      canvas.renderAll();
+    }
+  }, [canvas, editMode]);
 
   // Update element properties when editMode changes
   useEffect(() => {
