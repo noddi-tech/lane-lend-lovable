@@ -33,7 +33,20 @@ export function useLanes(facilityId?: string) {
       let query = supabase
         .from('lanes_new' as any)
         .select(`
-          *,
+          id,
+          name,
+          facility_id,
+          room_id,
+          grid_position_x,
+          grid_position_y,
+          grid_width,
+          grid_height,
+          position_order,
+          lane_type,
+          open_time,
+          close_time,
+          created_at,
+          updated_at,
           facility:facilities!facility_id(id, name),
           stations!lane_id(id, name, station_type)
         `)

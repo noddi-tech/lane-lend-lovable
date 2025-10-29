@@ -23,10 +23,12 @@ import { CreateStorageLocationDialog } from '@/components/facility/dialogs/Creat
 import { CreateZoneDialog } from '@/components/facility/dialogs/CreateZoneDialog';
 import { toast } from 'sonner';
 import { useDebouncedCallback } from '@/hooks/useDebouncedMutation';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function FacilityLayoutBuilderPage() {
   const { facilityId } = useParams<{ facilityId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [editMode, setEditMode] = useState<EditMode>('gate');
   const [showCreateGateDialog, setShowCreateGateDialog] = useState(false);
   const [showCreateLaneDialog, setShowCreateLaneDialog] = useState(false);
@@ -218,64 +220,76 @@ export default function FacilityLayoutBuilderPage() {
     zone_type: zone.zone_type,
   }));
 
-  const handleBlockMove = useDebouncedCallback(
-    async (blockId: string, gridX: number, gridY: number) => {
-      const block = [...gateBlocks, ...laneBlocks, ...stationBlocks, ...roomBlocks, ...outsideBlocks, ...storageBlocks, ...zoneBlocks].find(b => b.id === blockId);
-      if (!block) return;
+  const handleBlockMove = async (blockId: string, gridX: number, gridY: number) => {
+    const block = [...gateBlocks, ...laneBlocks, ...stationBlocks, ...roomBlocks, ...outsideBlocks, ...storageBlocks, ...zoneBlocks].find(b => b.id === blockId);
+    if (!block) return;
 
-      try {
-        if (block.type === 'gate') {
-          await updateGate.mutateAsync({
-            id: blockId,
-            grid_position_x: gridX,
-            grid_position_y: gridY,
-          } as any);
-        } else if (block.type === 'lane') {
-          await updateLane.mutateAsync({
-            id: blockId,
-            grid_position_x: gridX,
-            grid_position_y: gridY,
-          } as any);
-        } else if (block.type === 'station') {
-          await updateStation.mutateAsync({
-            id: blockId,
-            grid_position_x: gridX,
-            grid_position_y: gridY,
-          } as any);
-        } else if (block.type === 'room') {
-          await updateRoom.mutateAsync({
-            id: blockId,
-            grid_position_x: gridX,
-            grid_position_y: gridY,
-          } as any);
-        } else if (block.type === 'outside') {
-          await updateOutsideArea.mutateAsync({
-            id: blockId,
-            grid_position_x: gridX,
-            grid_position_y: gridY,
-          } as any);
-        } else if (block.type === 'storage') {
-          await updateStorageLocation.mutateAsync({
-            id: blockId,
-            grid_position_x: gridX,
-            grid_position_y: gridY,
-          } as any);
-        } else if (block.type === 'zone') {
-          await updateZone.mutateAsync({
-            id: blockId,
-            grid_position_x: gridX,
-            grid_position_y: gridY,
-          } as any);
-        }
-      } catch (error) {
-        toast.error('Failed to move block');
+    // Optimistic update for immediate visual feedback
+    if (block.type === 'lane') {
+      queryClient.setQueryData(['lanes', facilityId], (old: any) => {
+        if (!old) return old;
+        return old.map((lane: any) =>
+          lane.id === blockId
+            ? { ...lane, grid_position_x: gridX, grid_position_y: gridY }
+            : lane
+        );
+      });
+    }
+
+    try {
+      if (block.type === 'gate') {
+        await updateGate.mutateAsync({
+          id: blockId,
+          grid_position_x: gridX,
+          grid_position_y: gridY,
+        } as any);
+      } else if (block.type === 'lane') {
+        await updateLane.mutateAsync({
+          id: blockId,
+          grid_position_x: gridX,
+          grid_position_y: gridY,
+        } as any);
+      } else if (block.type === 'station') {
+        await updateStation.mutateAsync({
+          id: blockId,
+          grid_position_x: gridX,
+          grid_position_y: gridY,
+        } as any);
+      } else if (block.type === 'room') {
+        await updateRoom.mutateAsync({
+          id: blockId,
+          grid_position_x: gridX,
+          grid_position_y: gridY,
+        } as any);
+      } else if (block.type === 'outside') {
+        await updateOutsideArea.mutateAsync({
+          id: blockId,
+          grid_position_x: gridX,
+          grid_position_y: gridY,
+        } as any);
+      } else if (block.type === 'storage') {
+        await updateStorageLocation.mutateAsync({
+          id: blockId,
+          grid_position_x: gridX,
+          grid_position_y: gridY,
+        } as any);
+      } else if (block.type === 'zone') {
+        await updateZone.mutateAsync({
+          id: blockId,
+          grid_position_x: gridX,
+          grid_position_y: gridY,
+        } as any);
       }
-    },
-    350
-  );
+    } catch (error) {
+      console.error('Failed to move block:', error);
+      // Rollback optimistic update on error
+      queryClient.invalidateQueries({ queryKey: ['lanes', facilityId] });
+      toast.error('Failed to move block');
+    }
+  };
 
   const handleBlockResize = useDebouncedCallback(
-    async (blockId: string, gridWidth: number, gridHeight: number) => {
+    async (blockId: string, gridX: number, gridY: number, gridWidth: number, gridHeight: number) => {
       const block = [...gateBlocks, ...laneBlocks, ...stationBlocks, ...roomBlocks, ...outsideBlocks, ...storageBlocks, ...zoneBlocks].find(b => b.id === blockId);
       if (!block) return;
 
@@ -283,47 +297,62 @@ export default function FacilityLayoutBuilderPage() {
         if (block.type === 'gate') {
           await updateGate.mutateAsync({
             id: blockId,
+            grid_position_x: gridX,
+            grid_position_y: gridY,
             grid_width: gridWidth,
             grid_height: gridHeight,
           } as any);
         } else if (block.type === 'lane') {
           await updateLane.mutateAsync({
             id: blockId,
+            grid_position_x: gridX,
+            grid_position_y: gridY,
             grid_width: gridWidth,
             grid_height: gridHeight,
           } as any);
         } else if (block.type === 'station') {
           await updateStation.mutateAsync({
             id: blockId,
+            grid_position_x: gridX,
+            grid_position_y: gridY,
             grid_width: gridWidth,
             grid_height: gridHeight,
           } as any);
         } else if (block.type === 'room') {
           await updateRoom.mutateAsync({
             id: blockId,
+            grid_position_x: gridX,
+            grid_position_y: gridY,
             grid_width: gridWidth,
             grid_height: gridHeight,
           } as any);
         } else if (block.type === 'outside') {
           await updateOutsideArea.mutateAsync({
             id: blockId,
+            grid_position_x: gridX,
+            grid_position_y: gridY,
             grid_width: gridWidth,
             grid_height: gridHeight,
           } as any);
         } else if (block.type === 'storage') {
           await updateStorageLocation.mutateAsync({
             id: blockId,
+            grid_position_x: gridX,
+            grid_position_y: gridY,
             grid_width: gridWidth,
             grid_height: gridHeight,
           } as any);
         } else if (block.type === 'zone') {
           await updateZone.mutateAsync({
             id: blockId,
+            grid_position_x: gridX,
+            grid_position_y: gridY,
             grid_width: gridWidth,
             grid_height: gridHeight,
           } as any);
         }
       } catch (error) {
+        console.error('Failed to resize block:', error);
         toast.error('Failed to resize block');
       }
     },

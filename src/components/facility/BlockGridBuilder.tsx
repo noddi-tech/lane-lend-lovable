@@ -42,7 +42,7 @@ interface BlockGridBuilderProps {
   editMode: EditMode;
   viewContext: ViewContext;
   onBlockMove: (blockId: string, gridX: number, gridY: number) => void;
-  onBlockResize: (blockId: string, gridWidth: number, gridHeight: number) => void;
+  onBlockResize: (blockId: string, gridX: number, gridY: number, gridWidth: number, gridHeight: number) => void;
   onBlockSelect: (block: LayoutBlock | null) => void;
   onDrop?: (e: React.DragEvent) => void;
   onDelete?: (block: LayoutBlock) => void;
@@ -613,7 +613,7 @@ export function BlockGridBuilder({
       }
 
       if (gridWidth !== block.grid_width || gridHeight !== block.grid_height) {
-        onBlockResize(block.id, gridWidth, gridHeight);
+        onBlockResize(block.id, gridX, gridY, gridWidth, gridHeight);
       }
       
       // Reset drag flag after a brief delay to allow mutation to complete
