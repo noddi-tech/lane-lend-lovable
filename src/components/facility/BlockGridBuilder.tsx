@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Canvas as FabricCanvas, Rect, Text, Group } from 'fabric';
 import { Button } from '@/components/ui/button';
-import { ZoomIn, ZoomOut, Maximize2, Grid3x3, Eye, EyeOff } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize2, Grid3x3, Eye, EyeOff, Home } from 'lucide-react';
 import { calculateOptimalBoundary } from '@/utils/facilityBoundaryCalculator';
 
 // Individual element types
@@ -87,6 +87,44 @@ const calculateCellSize = (containerWidth: number, gridWidth: number): number =>
 };
 
 const DEFAULT_CELL_SIZE = 30; // Fallback if calculation fails
+const DEFAULT_WORKING_AREA = { width: 1000, height: 1000 }; // Match facility grid default
+const WORKING_AREA_PADDING = 20; // Extra cells around content
+
+// Calculate the actual working area based on placed elements
+const calculateWorkingArea = (
+  gates: LayoutBlock[],
+  lanes: LayoutBlock[],
+  stations: LayoutBlock[],
+  rooms: LayoutBlock[],
+  outsideAreas: LayoutBlock[],
+  storageLocations: LayoutBlock[],
+  zones: LayoutBlock[]
+) => {
+  const allBlocks = [...gates, ...lanes, ...stations, ...rooms, ...outsideAreas, ...storageLocations, ...zones];
+  
+  if (allBlocks.length === 0) {
+    // Empty canvas: use 1000×1000 default
+    return { minX: 0, minY: 0, ...DEFAULT_WORKING_AREA };
+  }
+  
+  // Find the bounding box of all elements
+  const minX = Math.min(...allBlocks.map(b => b.grid_x));
+  const minY = Math.min(...allBlocks.map(b => b.grid_y));
+  const maxX = Math.max(...allBlocks.map(b => b.grid_x + b.grid_width));
+  const maxY = Math.max(...allBlocks.map(b => b.grid_y + b.grid_height));
+  
+  // Calculate dimensions with padding
+  const width = maxX - minX + (WORKING_AREA_PADDING * 2);
+  const height = maxY - minY + (WORKING_AREA_PADDING * 2);
+  
+  // Add padding and ensure minimum size matches default
+  return {
+    minX: Math.max(0, minX - WORKING_AREA_PADDING),
+    minY: Math.max(0, minY - WORKING_AREA_PADDING),
+    width: Math.max(DEFAULT_WORKING_AREA.width, width),
+    height: Math.max(DEFAULT_WORKING_AREA.height, height),
+  };
+};
 
 const COLORS = {
   facility: { 
@@ -186,11 +224,18 @@ export function BlockGridBuilder({
   const lastPosRef = useRef({ x: 0, y: 0 });
   const [showBoundaryPreview, setShowBoundaryPreview] = useState(false);
   const [boundaryMargin, setBoundaryMargin] = useState(5);
+  const [workingArea, setWorkingArea] = useState({ minX: 0, minY: 0, width: 1000, height: 1000 });
   
   // Object pool pattern refs
   const objectPoolRef = useRef<Map<string, Group>>(new Map());
   const isDraggingRef = useRef(false);
   const lastDataHashRef = useRef<string>('');
+
+  // Recalculate working area when elements change
+  useEffect(() => {
+    const area = calculateWorkingArea(gates, lanes, stations, rooms, outsideAreas, storageLocations, zones);
+    setWorkingArea(area);
+  }, [gates, lanes, stations, rooms, outsideAreas, storageLocations, zones]);
 
   // Calculate responsive canvas size and cell size
   useEffect(() => {
@@ -335,38 +380,79 @@ export function BlockGridBuilder({
     // Redraw static elements
     canvas.backgroundColor = 'hsl(222, 47%, 11%)';
     
-    // Draw grid lines - fill entire canvas
+    // Draw grid lines - constrained to working area
     if (showGrid) {
-      const gridCellsX = Math.floor(canvasDimensions.width / cellSize);
-      const gridCellsY = Math.floor(canvasDimensions.height / cellSize);
+      const { minX, minY, width: gridWidth, height: gridHeight } = workingArea;
       
-      // Vertical lines
-      for (let i = 0; i <= gridCellsX; i++) {
+      // Vertical lines (regular)
+      for (let i = 0; i <= gridWidth; i++) {
         const line = new Rect({
-          left: i * cellSize,
-          top: 0,
+          left: (minX + i) * cellSize,
+          top: minY * cellSize,
           width: 1,
-          height: canvasDimensions.height,
-          fill: 'rgba(255, 255, 255, 0.05)',
+          height: gridHeight * cellSize,
+          fill: 'rgba(255, 255, 255, 0.15)', // Better contrast (was 0.05)
           selectable: false,
           evented: false,
         });
         canvas.add(line);
       }
 
-      // Horizontal lines
-      for (let j = 0; j <= gridCellsY; j++) {
+      // Horizontal lines (regular)
+      for (let j = 0; j <= gridHeight; j++) {
         const line = new Rect({
-          left: 0,
-          top: j * cellSize,
-          width: canvasDimensions.width,
+          left: minX * cellSize,
+          top: (minY + j) * cellSize,
+          width: gridWidth * cellSize,
           height: 1,
-          fill: 'rgba(255, 255, 255, 0.05)',
+          fill: 'rgba(255, 255, 255, 0.15)', // Better contrast
           selectable: false,
           evented: false,
         });
         canvas.add(line);
       }
+      
+      // Major grid lines every 100 cells (since grid is 1000×1000)
+      for (let i = 0; i <= gridWidth; i += 100) {
+        const line = new Rect({
+          left: (minX + i) * cellSize,
+          top: minY * cellSize,
+          width: 2, // Thicker
+          height: gridHeight * cellSize,
+          fill: 'rgba(255, 255, 255, 0.25)', // More visible
+          selectable: false,
+          evented: false,
+        });
+        canvas.add(line);
+      }
+
+      for (let j = 0; j <= gridHeight; j += 100) {
+        const line = new Rect({
+          left: minX * cellSize,
+          top: (minY + j) * cellSize,
+          width: gridWidth * cellSize,
+          height: 2, // Thicker
+          fill: 'rgba(255, 255, 255, 0.25)', // More visible
+          selectable: false,
+          evented: false,
+        });
+        canvas.add(line);
+      }
+      
+      // Add subtle working area border
+      const workingAreaBorder = new Rect({
+        left: minX * cellSize,
+        top: minY * cellSize,
+        width: gridWidth * cellSize,
+        height: gridHeight * cellSize,
+        fill: 'transparent',
+        stroke: 'rgba(59, 130, 246, 0.3)',
+        strokeWidth: 2,
+        strokeDashArray: [5, 5],
+        selectable: false,
+        evented: false,
+      });
+      canvas.add(workingAreaBorder);
     }
 
     // Facility boundary removed - infinite grid
@@ -731,19 +817,41 @@ export function BlockGridBuilder({
   };
 
   const handleFitToView = () => {
-    if (!containerRef.current) return;
+    if (!canvas || !containerRef.current) return;
     
-    const containerWidth = containerRef.current.clientWidth - 40;
-    const containerHeight = containerRef.current.clientHeight - 100;
+    const containerWidth = containerRef.current.clientWidth - 80; // Account for controls
+    const containerHeight = containerRef.current.clientHeight - 120; // Account for legend
     
-    const gridPixelWidth = facility.grid_width * cellSize;
-    const gridPixelHeight = facility.grid_height * cellSize;
+    const { minX, minY, width: gridWidth, height: gridHeight } = workingArea;
     
-    const zoomX = containerWidth / gridPixelWidth;
-    const zoomY = containerHeight / gridPixelHeight;
+    // Calculate working area pixel dimensions
+    const workingPixelWidth = gridWidth * cellSize;
+    const workingPixelHeight = gridHeight * cellSize;
     
-    const fitZoom = Math.min(zoomX, zoomY, 1); // Don't zoom in beyond 100%
-    setZoom(Math.max(0.1, fitZoom)); // Minimum 10%
+    // Calculate zoom to fit working area
+    const zoomX = containerWidth / workingPixelWidth;
+    const zoomY = containerHeight / workingPixelHeight;
+    
+    // Use the smaller zoom to ensure entire working area is visible
+    const fitZoom = Math.min(zoomX, zoomY, 2); // Allow up to 200% zoom
+    const finalZoom = Math.max(0.3, fitZoom); // Minimum 30% zoom for readability
+    
+    setZoom(finalZoom);
+    
+    // Center the working area in viewport
+    if (canvas.viewportTransform) {
+      const vpt = canvas.viewportTransform;
+      
+      // Calculate center offset
+      const centerX = (containerWidth - workingPixelWidth * finalZoom) / 2;
+      const centerY = (containerHeight - workingPixelHeight * finalZoom) / 2;
+      
+      vpt[4] = centerX - (minX * cellSize * finalZoom);
+      vpt[5] = centerY - (minY * cellSize * finalZoom);
+      
+      canvas.setViewportTransform(vpt);
+      canvas.renderAll();
+    }
   };
 
   // Update zoom
@@ -774,6 +882,13 @@ export function BlockGridBuilder({
       switch (e.key.toLowerCase()) {
         case 'f':
           handleFitToView();
+          break;
+        case 'h':
+          if (canvas?.viewportTransform) {
+            canvas.viewportTransform[4] = 0;
+            canvas.viewportTransform[5] = 0;
+            canvas.renderAll();
+          }
           break;
         case '+':
         case '=':
@@ -824,8 +939,38 @@ export function BlockGridBuilder({
       if (isPanning) {
         const vpt = canvas.viewportTransform;
         if (vpt) {
-          vpt[4] += e.e.clientX - lastPosRef.current.x;
-          vpt[5] += e.e.clientY - lastPosRef.current.y;
+          const deltaX = e.e.clientX - lastPosRef.current.x;
+          const deltaY = e.e.clientY - lastPosRef.current.y;
+          
+          vpt[4] += deltaX;
+          vpt[5] += deltaY;
+          
+          // Constrain panning to keep working area in view
+          const { minX, minY, width: gridWidth, height: gridHeight } = workingArea;
+          const startX = minX * cellSize * zoom;
+          const startY = minY * cellSize * zoom;
+          const endX = startX + gridWidth * cellSize * zoom;
+          const endY = startY + gridHeight * cellSize * zoom;
+          
+          const containerWidth = containerRef.current?.clientWidth || 1000;
+          const containerHeight = containerRef.current?.clientHeight || 700;
+          
+          // Allow panning slightly beyond edges (25% overflow)
+          const maxOffsetX = gridWidth * cellSize * zoom * 0.25;
+          const maxOffsetY = gridHeight * cellSize * zoom * 0.25;
+          
+          // Constrain X
+          if (vpt[4] > maxOffsetX) vpt[4] = maxOffsetX;
+          if (vpt[4] < containerWidth - endX - maxOffsetX) {
+            vpt[4] = containerWidth - endX - maxOffsetX;
+          }
+          
+          // Constrain Y
+          if (vpt[5] > maxOffsetY) vpt[5] = maxOffsetY;
+          if (vpt[5] < containerHeight - endY - maxOffsetY) {
+            vpt[5] = containerHeight - endY - maxOffsetY;
+          }
+          
           canvas.requestRenderAll();
           lastPosRef.current = { x: e.e.clientX, y: e.e.clientY };
         }
@@ -852,6 +997,16 @@ export function BlockGridBuilder({
 
   return (
     <div ref={containerRef} className="relative w-full h-full">
+      {/* Working Area Info */}
+      <div className="absolute top-4 left-4 z-10">
+        <div className="bg-background/95 backdrop-blur-sm rounded-lg border shadow-lg px-3 py-1.5">
+          <div className="text-xs font-mono text-muted-foreground">
+            Grid: {workingArea.width} × {workingArea.height} cells
+            {workingArea.minX > 0 && ` (offset: ${workingArea.minX}, ${workingArea.minY})`}
+          </div>
+        </div>
+      </div>
+
       {/* Controls */}
       <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
         <div className="bg-background/95 backdrop-blur-sm rounded-lg border shadow-lg p-2 space-y-2">
@@ -864,6 +1019,22 @@ export function BlockGridBuilder({
           >
             <Maximize2 className="h-4 w-4 mr-2" />
             Fit View
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (canvas?.viewportTransform) {
+                canvas.viewportTransform[4] = 0;
+                canvas.viewportTransform[5] = 0;
+                canvas.renderAll();
+              }
+            }}
+            title="Reset Pan Position (H)"
+            className="w-full text-xs"
+          >
+            <Home className="h-3 w-3 mr-1" />
+            Home
           </Button>
           <div className="flex gap-1">
             <Button
@@ -987,6 +1158,7 @@ export function BlockGridBuilder({
           <div className="text-xs font-semibold mb-2">Shortcuts</div>
           <div className="space-y-1 text-xs text-muted-foreground">
             <div><kbd className="px-1 py-0.5 bg-muted rounded">F</kbd> Fit to view</div>
+            <div><kbd className="px-1 py-0.5 bg-muted rounded">H</kbd> Home position</div>
             <div><kbd className="px-1 py-0.5 bg-muted rounded">+/-</kbd> Zoom in/out</div>
             <div><kbd className="px-1 py-0.5 bg-muted rounded">0</kbd> Reset zoom</div>
             <div><kbd className="px-1 py-0.5 bg-muted rounded">Space</kbd> Pan canvas</div>
