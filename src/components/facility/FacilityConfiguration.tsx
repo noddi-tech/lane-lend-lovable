@@ -6,8 +6,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useUpdateFacility, useDeleteFacility } from '@/hooks/admin/useFacilities';
 import type { FacilityWithGates } from '@/hooks/admin/useFacilities';
-import { Settings, Trash2, Save } from 'lucide-react';
+import { Settings, Trash2, Save, LayoutGrid, Info } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface FacilityConfigurationProps {
   facility: FacilityWithGates;
@@ -75,31 +77,50 @@ export function FacilityConfiguration({ facility }: FacilityConfigurationProps) 
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="grid_width">Grid Width</Label>
-                <Input
-                  id="grid_width"
-                  type="number"
-                  min="10"
-                  max="200"
-                  value={formData.grid_width}
-                  onChange={(e) => setFormData({ ...formData, grid_width: parseInt(e.target.value) })}
-                  required
-                />
+            <div className="space-y-4">
+              <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-sm">Facility Boundary</h4>
+                  <Badge variant={facility.is_bounded ? "default" : "secondary"}>
+                    {facility.is_bounded ? "Defined" : "Unbounded"}
+                  </Badge>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Grid Width:</span>
+                    <span className="ml-2 font-mono">
+                      {facility.grid_width || '—'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Grid Height:</span>
+                    <span className="ml-2 font-mono">
+                      {facility.grid_height || '—'}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => navigate(`/admin/facility-layout/${facility.id}`)}
+                  >
+                    <LayoutGrid className="h-4 w-4 mr-2" />
+                    Define Boundary in Layout Builder
+                  </Button>
+                </div>
               </div>
-              <div>
-                <Label htmlFor="grid_height">Grid Height</Label>
-                <Input
-                  id="grid_height"
-                  type="number"
-                  min="10"
-                  max="200"
-                  value={formData.grid_height}
-                  onChange={(e) => setFormData({ ...formData, grid_height: parseInt(e.target.value) })}
-                  required
-                />
-              </div>
+              
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  Use the Layout Builder to design your facility layout and define its boundary automatically.
+                </AlertDescription>
+              </Alert>
             </div>
 
             <div>
