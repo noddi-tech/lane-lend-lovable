@@ -519,18 +519,11 @@ export function BlockGridBuilder({
         }
       }
 
-      // Lane width lock - lanes stay at x=0
-      if (block.type === 'lane') {
-        obj.set({
-          left: 0,
-          top: snappedY * cellSize,
-        });
-      } else {
-        obj.set({
-          left: snappedX * cellSize,
-          top: snappedY * cellSize,
-        });
-      }
+      // Allow free movement for all blocks
+      obj.set({
+        left: snappedX * cellSize,
+        top: snappedY * cellSize,
+      });
 
       // Constrain to facility bounds (for non-station blocks)
       if (block.type !== 'station') {
@@ -566,28 +559,19 @@ export function BlockGridBuilder({
         Math.round(currentHeight / cellSize) * cellSize
       );
 
-      // For lanes, enforce facility width
-      if (block.type === 'lane') {
-        obj.set({
-          width: facility.grid_width * cellSize,
-          height: newHeight,
-          scaleX: 1,
-          scaleY: 1,
-        });
-      } else {
-        obj.set({
-          width: newWidth,
-          height: newHeight,
-          scaleX: 1,
-          scaleY: 1,
-        });
-      }
+      // Allow free resizing for all blocks
+      obj.set({
+        width: newWidth,
+        height: newHeight,
+        scaleX: 1,
+        scaleY: 1,
+      });
 
       // Update text position in the group
       const text = obj._objects?.[1];
       if (text) {
         text.set({
-          left: (block.type === 'lane' ? facility.grid_width * cellSize : newWidth) / 2,
+          left: newWidth / 2,
           top: newHeight / 2,
         });
       }
