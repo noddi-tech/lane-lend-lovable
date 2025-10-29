@@ -79,8 +79,8 @@ export default function FacilityLayoutBuilderPage() {
     type: 'facility',
     id: facility?.id || '',
     name: facility?.name || '',
-    gridWidth: facility?.grid_width || 100,
-    gridHeight: facility?.grid_height || 100,
+    gridWidth: facility?.grid_width || 1000,
+    gridHeight: facility?.grid_height || 1000,
   });
 
   useEffect(() => {
@@ -93,8 +93,8 @@ export default function FacilityLayoutBuilderPage() {
         type: 'facility',
         id: facility.id,
         name: facility.name,
-        gridWidth: facility.grid_width,
-        gridHeight: facility.grid_height,
+        gridWidth: facility.grid_width || 1000,
+        gridHeight: facility.grid_height || 1000,
       });
     }
   }, [facility]);
