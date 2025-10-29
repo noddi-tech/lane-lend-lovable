@@ -181,8 +181,8 @@ export function BlockGridBuilder({
         height: height - padding 
       });
       
-      // Use a default grid size for infinite canvas (200x200 cells)
-      const defaultGridCells = 200;
+      // Use a default grid size for infinite canvas (1000x1000 cells)
+      const defaultGridCells = 1000;
       const optimalCellSize = Math.min(
         (width - padding) / defaultGridCells,
         (height - padding) / defaultGridCells

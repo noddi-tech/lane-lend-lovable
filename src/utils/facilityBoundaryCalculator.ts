@@ -16,8 +16,8 @@ export const calculateOptimalBoundary = (
     return {
       grid_x: 0,
       grid_y: 0,
-      grid_width: 100,
-      grid_height: 100,
+      grid_width: 1000,
+      grid_height: 1000,
       elements_count: 0,
     };
   }
