@@ -928,7 +928,12 @@ export function BlockGridBuilder({
     if (!canvas) return;
 
     const handleMouseDown = (e: any) => {
-      if (isPanning || e.e.button === 1) { // Space key or middle mouse
+      if (isPanning) {
+        // Space key is already pressed
+        canvas.selection = false;
+        lastPosRef.current = { x: e.e.clientX, y: e.e.clientY };
+      } else if (e.e.button === 1) {
+        // Middle mouse button
         canvas.selection = false;
         setIsPanning(true);
         lastPosRef.current = { x: e.e.clientX, y: e.e.clientY };
@@ -936,45 +941,43 @@ export function BlockGridBuilder({
     };
 
     const handleMouseMove = (e: any) => {
-      if (isPanning) {
-        const vpt = canvas.viewportTransform;
-        if (vpt) {
-          const deltaX = e.e.clientX - lastPosRef.current.x;
-          const deltaY = e.e.clientY - lastPosRef.current.y;
-          
-          vpt[4] += deltaX;
-          vpt[5] += deltaY;
-          
-          // Constrain panning to keep working area in view
-          const { minX, minY, width: gridWidth, height: gridHeight } = workingArea;
-          const startX = minX * cellSize * zoom;
-          const startY = minY * cellSize * zoom;
-          const endX = startX + gridWidth * cellSize * zoom;
-          const endY = startY + gridHeight * cellSize * zoom;
-          
-          const containerWidth = containerRef.current?.clientWidth || 1000;
-          const containerHeight = containerRef.current?.clientHeight || 700;
-          
-          // Allow panning slightly beyond edges (25% overflow)
-          const maxOffsetX = gridWidth * cellSize * zoom * 0.25;
-          const maxOffsetY = gridHeight * cellSize * zoom * 0.25;
-          
-          // Constrain X
-          if (vpt[4] > maxOffsetX) vpt[4] = maxOffsetX;
-          if (vpt[4] < containerWidth - endX - maxOffsetX) {
-            vpt[4] = containerWidth - endX - maxOffsetX;
-          }
-          
-          // Constrain Y
-          if (vpt[5] > maxOffsetY) vpt[5] = maxOffsetY;
-          if (vpt[5] < containerHeight - endY - maxOffsetY) {
-            vpt[5] = containerHeight - endY - maxOffsetY;
-          }
-          
-          canvas.requestRenderAll();
-          lastPosRef.current = { x: e.e.clientX, y: e.e.clientY };
-        }
+      if (!isPanning || !canvas.viewportTransform) return;
+      
+      const vpt = canvas.viewportTransform;
+      const deltaX = e.e.clientX - lastPosRef.current.x;
+      const deltaY = e.e.clientY - lastPosRef.current.y;
+      
+      vpt[4] += deltaX;
+      vpt[5] += deltaY;
+      
+      // Constrain panning to keep working area in view
+      const { minX, minY, width: gridWidth, height: gridHeight } = workingArea;
+      const startX = minX * cellSize * zoom;
+      const startY = minY * cellSize * zoom;
+      const endX = startX + gridWidth * cellSize * zoom;
+      const endY = startY + gridHeight * cellSize * zoom;
+      
+      const containerWidth = containerRef.current?.clientWidth || 1000;
+      const containerHeight = containerRef.current?.clientHeight || 700;
+      
+      // Allow panning slightly beyond edges (25% overflow)
+      const maxOffsetX = gridWidth * cellSize * zoom * 0.25;
+      const maxOffsetY = gridHeight * cellSize * zoom * 0.25;
+      
+      // Constrain X
+      if (vpt[4] > maxOffsetX) vpt[4] = maxOffsetX;
+      if (vpt[4] < containerWidth - endX - maxOffsetX) {
+        vpt[4] = containerWidth - endX - maxOffsetX;
       }
+      
+      // Constrain Y
+      if (vpt[5] > maxOffsetY) vpt[5] = maxOffsetY;
+      if (vpt[5] < containerHeight - endY - maxOffsetY) {
+        vpt[5] = containerHeight - endY - maxOffsetY;
+      }
+      
+      canvas.requestRenderAll();
+      lastPosRef.current = { x: e.e.clientX, y: e.e.clientY };
     };
 
     const handleMouseUp = () => {
@@ -993,7 +996,7 @@ export function BlockGridBuilder({
       canvas.off('mouse:move', handleMouseMove);
       canvas.off('mouse:up', handleMouseUp);
     };
-  }, [canvas, isPanning]);
+  }, [canvas, isPanning, workingArea, zoom]);
 
   return (
     <div ref={containerRef} className="relative w-full h-full">
