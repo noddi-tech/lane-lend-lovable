@@ -7,9 +7,10 @@ import { useStations, useUpdateStation, useAssignStationToLane, useUnassignStati
 import { useRooms, useUpdateRoom, useDeleteRoom } from '@/hooks/admin/useRooms';
 import { useOutsideAreas, useUpdateOutsideArea, useDeleteOutsideArea } from '@/hooks/admin/useOutsideAreas';
 import { useStorageLocations, useUpdateStorageLocation, useDeleteStorageLocation } from '@/hooks/admin/useStorageLocations';
+import { useZones, useUpdateZone, useDeleteZone } from '@/hooks/admin/useZones';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, MapPin, Layers, Box, Home, Plus, ChevronLeft, ChevronRight, LayoutGrid, Map, Archive } from 'lucide-react';
+import { ArrowLeft, MapPin, Layers, Box, Home, Plus, ChevronLeft, ChevronRight, LayoutGrid, Map, Archive, Square } from 'lucide-react';
 import { BlockGridBuilder, type EditMode, type LayoutBlock } from '@/components/facility/BlockGridBuilder';
 import { BlockProperties } from '@/components/facility/BlockProperties';
 import { LibraryPalette, type LibraryItem } from '@/components/facility/LibraryPalette';
@@ -19,6 +20,7 @@ import { CreateStationDialog } from '@/components/facility/dialogs/CreateStation
 import { CreateRoomDialog } from '@/components/facility/dialogs/CreateRoomDialog';
 import { CreateOutsideAreaDialog } from '@/components/facility/dialogs/CreateOutsideAreaDialog';
 import { CreateStorageLocationDialog } from '@/components/facility/dialogs/CreateStorageLocationDialog';
+import { CreateZoneDialog } from '@/components/facility/dialogs/CreateZoneDialog';
 import { toast } from 'sonner';
 import { useDebouncedCallback } from '@/hooks/useDebouncedMutation';
 
@@ -32,6 +34,7 @@ export default function FacilityLayoutBuilderPage() {
   const [showCreateRoomDialog, setShowCreateRoomDialog] = useState(false);
   const [showCreateOutsideDialog, setShowCreateOutsideDialog] = useState(false);
   const [showCreateStorageDialog, setShowCreateStorageDialog] = useState(false);
+  const [showCreateZoneDialog, setShowCreateZoneDialog] = useState(false);
   const [selectedBlock, setSelectedBlock] = useState<LayoutBlock | null>(null);
   const [showLibrary, setShowLibrary] = useState(true);
   const [showProperties, setShowProperties] = useState(true);
@@ -41,6 +44,7 @@ export default function FacilityLayoutBuilderPage() {
   const { data: allStations } = useStations();
   const { data: allOutsideAreas } = useOutsideAreas(facilityId);
   const { data: allStorageLocations } = useStorageLocations();
+  const { data: allZones } = useZones(facilityId);
 
   const updateGate = useUpdateDrivingGate();
   const updateLane = useUpdateLane();
@@ -48,12 +52,14 @@ export default function FacilityLayoutBuilderPage() {
   const updateRoom = useUpdateRoom();
   const updateOutsideArea = useUpdateOutsideArea();
   const updateStorageLocation = useUpdateStorageLocation();
+  const updateZone = useUpdateZone();
   const deleteGate = useDeleteDrivingGate();
   const deleteLane = useDeleteLane();
   const deleteStation = useDeleteStation();
   const deleteRoom = useDeleteRoom();
   const deleteOutsideArea = useDeleteOutsideArea();
   const deleteStorageLocation = useDeleteStorageLocation();
+  const deleteZone = useDeleteZone();
   const assignGate = useAssignGateToFacility();
   const assignLane = useAssignLaneToFacility();
   const assignStation = useAssignStationToLane();
@@ -141,9 +147,9 @@ export default function FacilityLayoutBuilderPage() {
     id: lane.id,
     type: 'lane',
     name: lane.name,
-    grid_x: 0,
+    grid_x: lane.grid_position_x || 0,
     grid_y: lane.grid_position_y || 0,
-    grid_width: facility.grid_width,
+    grid_width: lane.grid_width || 100,
     grid_height: lane.grid_height || 2,
     parent_id: facility.id,
   }));
@@ -199,9 +205,22 @@ export default function FacilityLayoutBuilderPage() {
       status: storage.status,
     }));
 
+  const zoneBlocks: LayoutBlock[] = (allZones || []).map(zone => ({
+    id: zone.id,
+    type: 'zone',
+    name: zone.name,
+    grid_x: zone.grid_position_x,
+    grid_y: zone.grid_position_y,
+    grid_width: zone.grid_width,
+    grid_height: zone.grid_height,
+    parent_id: facility.id,
+    color: zone.color,
+    zone_type: zone.zone_type,
+  }));
+
   const handleBlockMove = useDebouncedCallback(
     async (blockId: string, gridX: number, gridY: number) => {
-      const block = [...gateBlocks, ...laneBlocks, ...stationBlocks, ...roomBlocks, ...outsideBlocks, ...storageBlocks].find(b => b.id === blockId);
+      const block = [...gateBlocks, ...laneBlocks, ...stationBlocks, ...roomBlocks, ...outsideBlocks, ...storageBlocks, ...zoneBlocks].find(b => b.id === blockId);
       if (!block) return;
 
       try {
@@ -214,6 +233,7 @@ export default function FacilityLayoutBuilderPage() {
         } else if (block.type === 'lane') {
           await updateLane.mutateAsync({
             id: blockId,
+            grid_position_x: gridX,
             grid_position_y: gridY,
           } as any);
         } else if (block.type === 'station') {
@@ -236,6 +256,12 @@ export default function FacilityLayoutBuilderPage() {
           } as any);
         } else if (block.type === 'storage') {
           await updateStorageLocation.mutateAsync({
+            id: blockId,
+            grid_position_x: gridX,
+            grid_position_y: gridY,
+          } as any);
+        } else if (block.type === 'zone') {
+          await updateZone.mutateAsync({
             id: blockId,
             grid_position_x: gridX,
             grid_position_y: gridY,
@@ -250,7 +276,7 @@ export default function FacilityLayoutBuilderPage() {
 
   const handleBlockResize = useDebouncedCallback(
     async (blockId: string, gridWidth: number, gridHeight: number) => {
-      const block = [...gateBlocks, ...laneBlocks, ...stationBlocks, ...roomBlocks, ...outsideBlocks, ...storageBlocks].find(b => b.id === blockId);
+      const block = [...gateBlocks, ...laneBlocks, ...stationBlocks, ...roomBlocks, ...outsideBlocks, ...storageBlocks, ...zoneBlocks].find(b => b.id === blockId);
       if (!block) return;
 
       try {
@@ -263,6 +289,7 @@ export default function FacilityLayoutBuilderPage() {
         } else if (block.type === 'lane') {
           await updateLane.mutateAsync({
             id: blockId,
+            grid_width: gridWidth,
             grid_height: gridHeight,
           } as any);
         } else if (block.type === 'station') {
@@ -285,6 +312,12 @@ export default function FacilityLayoutBuilderPage() {
           } as any);
         } else if (block.type === 'storage') {
           await updateStorageLocation.mutateAsync({
+            id: blockId,
+            grid_width: gridWidth,
+            grid_height: gridHeight,
+          } as any);
+        } else if (block.type === 'zone') {
+          await updateZone.mutateAsync({
             id: blockId,
             grid_width: gridWidth,
             grid_height: gridHeight,
@@ -380,6 +413,8 @@ export default function FacilityLayoutBuilderPage() {
         await deleteOutsideArea.mutateAsync(block.id);
       } else if (block.type === 'storage') {
         await deleteStorageLocation.mutateAsync(block.id);
+      } else if (block.type === 'zone') {
+        await deleteZone.mutateAsync(block.id);
       }
       setSelectedBlock(null);
     } catch (error) {
@@ -490,6 +525,14 @@ export default function FacilityLayoutBuilderPage() {
               <Archive className="h-4 w-4 mr-2" />
               Storage
             </Button>
+            <Button
+              variant={editMode === 'zone' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setEditMode('zone')}
+            >
+              <Square className="h-4 w-4 mr-2" />
+              Zones
+            </Button>
           </div>
 
           <div className="flex gap-2">
@@ -527,6 +570,12 @@ export default function FacilityLayoutBuilderPage() {
               <Button onClick={() => setShowCreateStorageDialog(true)} size="sm">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Storage
+              </Button>
+            )}
+            {editMode === 'zone' && (
+              <Button onClick={() => setShowCreateZoneDialog(true)} size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Zone
               </Button>
             )}
           </div>
@@ -576,6 +625,7 @@ export default function FacilityLayoutBuilderPage() {
             rooms={roomBlocks}
             outsideAreas={outsideBlocks}
             storageLocations={storageBlocks}
+            zones={zoneBlocks}
             editMode={editMode}
             viewContext={viewContext}
             onBlockMove={handleBlockMove}
@@ -680,6 +730,12 @@ export default function FacilityLayoutBuilderPage() {
       <CreateStorageLocationDialog
         open={showCreateStorageDialog}
         onOpenChange={setShowCreateStorageDialog}
+      />
+
+      <CreateZoneDialog
+        open={showCreateZoneDialog}
+        onOpenChange={setShowCreateZoneDialog}
+        facilityId={facility.id}
       />
     </div>
   );

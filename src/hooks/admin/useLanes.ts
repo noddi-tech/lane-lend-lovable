@@ -8,7 +8,9 @@ export interface Lane {
   room_id: string | null;
   name: string;
   position_order: number;
+  grid_position_x: number;
   grid_position_y: number;
+  grid_width: number;
   grid_height: number;
   open_time: string | null;
   close_time: string | null;

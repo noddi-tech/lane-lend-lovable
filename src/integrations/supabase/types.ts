@@ -548,7 +548,9 @@ export type Database = {
           created_at: string | null
           facility_id: string | null
           grid_height: number
+          grid_position_x: number
           grid_position_y: number
+          grid_width: number
           id: string
           lane_type: string | null
           name: string
@@ -562,7 +564,9 @@ export type Database = {
           created_at?: string | null
           facility_id?: string | null
           grid_height?: number
+          grid_position_x?: number
           grid_position_y?: number
+          grid_width?: number
           id?: string
           lane_type?: string | null
           name: string
@@ -576,7 +580,9 @@ export type Database = {
           created_at?: string | null
           facility_id?: string | null
           grid_height?: number
+          grid_position_x?: number
           grid_position_y?: number
+          grid_width?: number
           id?: string
           lane_type?: string | null
           name?: string
