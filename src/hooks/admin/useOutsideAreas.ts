@@ -109,3 +109,19 @@ export function useDeleteOutsideArea() {
     },
   });
 }
+
+export function useLibraryOutsideAreas() {
+  return useQuery({
+    queryKey: ['library-outside-areas'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('outside_areas' as any)
+        .select('*')
+        .is('facility_id', null)
+        .order('name');
+      
+      if (error) throw error;
+      return data as any as OutsideArea[];
+    },
+  });
+}

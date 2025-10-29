@@ -113,3 +113,20 @@ export function useDeleteStorageLocation() {
     },
   });
 }
+
+export function useLibraryStorageLocations() {
+  return useQuery({
+    queryKey: ['library-storage-locations'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('storage_locations' as any)
+        .select('*')
+        .is('lane_id', null)
+        .is('room_id', null)
+        .order('name');
+      
+      if (error) throw error;
+      return data as any as StorageLocation[];
+    },
+  });
+}

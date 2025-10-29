@@ -99,6 +99,29 @@ export function useDeleteRoom() {
 
   return useMutation({
     mutationFn: async (id: string) => {
+      // Check for child elements before deleting
+      const { data: lanes } = await supabase
+        .from('lanes_new' as any)
+        .select('id')
+        .eq('room_id', id)
+        .limit(1);
+      
+      const { data: gates } = await supabase
+        .from('driving_gates' as any)
+        .select('id')
+        .eq('room_id', id)
+        .limit(1);
+      
+      const { data: stations } = await supabase
+        .from('stations' as any)
+        .select('id')
+        .eq('room_id', id)
+        .limit(1);
+      
+      if ((lanes && lanes.length > 0) || (gates && gates.length > 0) || (stations && stations.length > 0)) {
+        throw new Error('Cannot delete room with child elements. Remove all lanes, gates, and stations first.');
+      }
+
       const { error } = await supabase
         .from('rooms' as any)
         .delete()
@@ -112,6 +135,22 @@ export function useDeleteRoom() {
     },
     onError: (error: Error) => {
       toast.error(`Failed to delete room: ${error.message}`);
+    },
+  });
+}
+
+export function useLibraryRooms() {
+  return useQuery({
+    queryKey: ['library-rooms'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('rooms' as any)
+        .select('*')
+        .is('facility_id', null)
+        .order('name');
+      
+      if (error) throw error;
+      return data as any as Room[];
     },
   });
 }

@@ -3,17 +3,20 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Search, DoorOpen, Layers, Box, GripVertical, Info } from 'lucide-react';
+import { Search, DoorOpen, Layers, Box, GripVertical, Info, Home, Map, Archive } from 'lucide-react';
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useLibraryGates } from '@/hooks/admin/useDrivingGates';
 import { useLibraryLanes } from '@/hooks/admin/useLanes';
 import { useLibraryStations } from '@/hooks/admin/useStations';
+import { useLibraryRooms } from '@/hooks/admin/useRooms';
+import { useLibraryOutsideAreas } from '@/hooks/admin/useOutsideAreas';
+import { useLibraryStorageLocations } from '@/hooks/admin/useStorageLocations';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface LibraryPaletteProps {
   editMode: 'gate' | 'lane' | 'station' | 'room' | 'view' | 'facility' | 'outside' | 'storage';
-  onItemDragStart?: (item: LibraryItem, type: 'gate' | 'lane' | 'station' | 'outside' | 'storage') => void;
+  onItemDragStart?: (item: LibraryItem, type: 'gate' | 'lane' | 'station' | 'room' | 'outside' | 'storage') => void;
 }
 
 export interface LibraryItem {
@@ -30,6 +33,9 @@ export function LibraryPalette({ editMode, onItemDragStart }: LibraryPaletteProp
   const { data: gates, isLoading: loadingGates } = useLibraryGates();
   const { data: lanes, isLoading: loadingLanes } = useLibraryLanes();
   const { data: stations, isLoading: loadingStations } = useLibraryStations();
+  const { data: rooms, isLoading: loadingRooms } = useLibraryRooms();
+  const { data: outsideAreas, isLoading: loadingOutside } = useLibraryOutsideAreas();
+  const { data: storageLocations, isLoading: loadingStorage } = useLibraryStorageLocations();
 
   const filterItems = <T extends LibraryItem>(items: T[] | undefined): T[] => {
     if (!items) return [];
@@ -44,8 +50,11 @@ export function LibraryPalette({ editMode, onItemDragStart }: LibraryPaletteProp
   const filteredGates = filterItems(gates);
   const filteredLanes = filterItems(lanes);
   const filteredStations = filterItems(stations);
+  const filteredRooms = filterItems(rooms);
+  const filteredOutsideAreas = filterItems(outsideAreas);
+  const filteredStorageLocations = filterItems(storageLocations);
 
-  const handleDragStart = (e: React.DragEvent, item: LibraryItem, type: 'gate' | 'lane' | 'station') => {
+  const handleDragStart = (e: React.DragEvent, item: LibraryItem, type: 'gate' | 'lane' | 'station' | 'room' | 'outside' | 'storage') => {
     e.dataTransfer.effectAllowed = 'copy';
     e.dataTransfer.setData('application/json', JSON.stringify({ item, type }));
     onItemDragStart?.(item, type);
@@ -53,7 +62,7 @@ export function LibraryPalette({ editMode, onItemDragStart }: LibraryPaletteProp
 
   const renderLibraryItem = (
     item: LibraryItem,
-    type: 'gate' | 'lane' | 'station',
+    type: 'gate' | 'lane' | 'station' | 'room' | 'outside' | 'storage',
     Icon: React.ElementType
   ) => (
     <TooltipProvider key={item.id}>
@@ -109,22 +118,6 @@ export function LibraryPalette({ editMode, onItemDragStart }: LibraryPaletteProp
     );
   }
 
-  if (editMode === 'outside' || editMode === 'storage') {
-    return (
-      <Card className="w-80">
-        <CardHeader>
-          <CardTitle className="text-lg">Library</CardTitle>
-          <CardDescription>
-            Click "Add {editMode === 'outside' ? 'Outside Area' : 'Storage'}" button to create new {editMode === 'outside' ? 'outside areas' : 'storage locations'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-4 text-sm text-muted-foreground text-center">
-          No library items for {editMode} mode. Use the toolbar button to create new elements.
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <Card className="w-80 shadow-lg">
       <CardHeader className="pb-3">
@@ -156,8 +149,16 @@ export function LibraryPalette({ editMode, onItemDragStart }: LibraryPaletteProp
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <Tabs defaultValue={editMode === 'gate' ? 'gates' : editMode === 'lane' ? 'lanes' : 'stations'}>
-          <TabsList className="w-full grid grid-cols-3 mx-4 mb-2" style={{ width: 'calc(100% - 2rem)' }}>
+        <Tabs defaultValue={
+          editMode === 'gate' ? 'gates' : 
+          editMode === 'lane' ? 'lanes' : 
+          editMode === 'station' ? 'stations' :
+          editMode === 'room' ? 'rooms' :
+          editMode === 'outside' ? 'outside' :
+          editMode === 'storage' ? 'storage' :
+          'gates'
+        }>
+          <TabsList className="w-full grid grid-cols-6 mx-4 mb-2" style={{ width: 'calc(100% - 2rem)' }}>
             <TabsTrigger value="gates" className="text-xs">
               <DoorOpen className="h-3 w-3 mr-1" />
               Gates
@@ -169,6 +170,18 @@ export function LibraryPalette({ editMode, onItemDragStart }: LibraryPaletteProp
             <TabsTrigger value="stations" className="text-xs">
               <Box className="h-3 w-3 mr-1" />
               Stations
+            </TabsTrigger>
+            <TabsTrigger value="rooms" className="text-xs">
+              <Home className="h-3 w-3 mr-1" />
+              Rooms
+            </TabsTrigger>
+            <TabsTrigger value="outside" className="text-xs">
+              <Map className="h-3 w-3 mr-1" />
+              Outside
+            </TabsTrigger>
+            <TabsTrigger value="storage" className="text-xs">
+              <Archive className="h-3 w-3 mr-1" />
+              Storage
             </TabsTrigger>
           </TabsList>
 
@@ -218,6 +231,54 @@ export function LibraryPalette({ editMode, onItemDragStart }: LibraryPaletteProp
                 </div>
               ) : (
                 filteredStations.map(station => renderLibraryItem(station, 'station', Box))
+              )}
+            </TabsContent>
+
+            <TabsContent value="rooms" className="mt-0 px-4 pb-4 space-y-2">
+              {loadingRooms ? (
+                <>
+                  <Skeleton className="h-20" />
+                  <Skeleton className="h-20" />
+                  <Skeleton className="h-20" />
+                </>
+              ) : filteredRooms.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  {searchQuery ? 'No rooms found' : 'No rooms in library'}
+                </div>
+              ) : (
+                filteredRooms.map(room => renderLibraryItem(room, 'room', Home))
+              )}
+            </TabsContent>
+
+            <TabsContent value="outside" className="mt-0 px-4 pb-4 space-y-2">
+              {loadingOutside ? (
+                <>
+                  <Skeleton className="h-20" />
+                  <Skeleton className="h-20" />
+                  <Skeleton className="h-20" />
+                </>
+              ) : filteredOutsideAreas.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  {searchQuery ? 'No outside areas found' : 'No outside areas in library'}
+                </div>
+              ) : (
+                filteredOutsideAreas.map(area => renderLibraryItem(area, 'outside', Map))
+              )}
+            </TabsContent>
+
+            <TabsContent value="storage" className="mt-0 px-4 pb-4 space-y-2">
+              {loadingStorage ? (
+                <>
+                  <Skeleton className="h-20" />
+                  <Skeleton className="h-20" />
+                  <Skeleton className="h-20" />
+                </>
+              ) : filteredStorageLocations.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  {searchQuery ? 'No storage locations found' : 'No storage locations in library'}
+                </div>
+              ) : (
+                filteredStorageLocations.map(storage => renderLibraryItem(storage, 'storage', Archive))
               )}
             </TabsContent>
           </ScrollArea>

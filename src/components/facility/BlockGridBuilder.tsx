@@ -320,25 +320,7 @@ export function BlockGridBuilder({
       }
     }
 
-    // Draw facility boundary
-    const facilityRect = new Rect({
-      left: 0,
-      top: 0,
-      width: facility.grid_width * cellSize,
-      height: facility.grid_height * cellSize,
-      fill: COLORS.facility.fill,
-      stroke: COLORS.facility.stroke,
-      strokeWidth: 3,
-      selectable: false,
-      hasControls: false,
-      lockRotation: true,
-      evented: false,
-      rx: 4,
-      ry: 4,
-    });
-
-    facilityRect.set({ data: { ...facility, type: 'facility' } } as any);
-    canvas.add(facilityRect);
+    // Facility boundary removed - grid provides sufficient visual reference
 
     // Helper to create new block
     const createBlock = (block: LayoutBlock) => {
@@ -384,13 +366,13 @@ export function BlockGridBuilder({
         left: block.grid_x * cellSize,
         top: block.grid_y * cellSize,
         selectable: isEditable,
-        hasControls: isEditable && !isLane,
+        hasControls: isEditable,
         lockRotation: true,
         evented: isEditable,
         hoverCursor: isEditable ? 'move' : 'default',
-        lockMovementX: !isEditable || isLane,
+        lockMovementX: !isEditable,
         lockMovementY: !isEditable,
-        lockScalingX: !isEditable || isLane,
+        lockScalingX: !isEditable,
         lockScalingY: !isEditable,
         opacity: isEditable ? 1 : (block.type === 'facility' ? 1 : 0.5),
         subTargetCheck: false,
@@ -429,18 +411,18 @@ export function BlockGridBuilder({
         isEditable, 
         selectable: isEditable,
         evented: isEditable,
-        lockMovementX: !isEditable || isLane,
+        lockMovementX: !isEditable,
         lockMovementY: !isEditable
       });
       
       existing.set({
         selectable: isEditable,
         evented: isEditable,
-        hasControls: isEditable && !isLane,
+        hasControls: isEditable,
         hoverCursor: isEditable ? 'move' : 'default',
-        lockMovementX: !isEditable || isLane,
+        lockMovementX: !isEditable,
         lockMovementY: !isEditable,
-        lockScalingX: !isEditable || isLane,
+        lockScalingX: !isEditable,
         lockScalingY: !isEditable,
         opacity: isEditable ? 1 : (block.type === 'facility' ? 1 : 0.5),
       });
