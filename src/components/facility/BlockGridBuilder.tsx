@@ -226,10 +226,28 @@ export function BlockGridBuilder({
   const [boundaryMargin, setBoundaryMargin] = useState(5);
   const [workingArea, setWorkingArea] = useState({ minX: 0, minY: 0, width: 1000, height: 1000 });
   
+  // Refs for panning to avoid stale closures
+  const isPanningRef = useRef(false);
+  const workingAreaRef = useRef(workingArea);
+  const zoomRef = useRef(zoom);
+  
   // Object pool pattern refs
   const objectPoolRef = useRef<Map<string, Group>>(new Map());
   const isDraggingRef = useRef(false);
   const lastDataHashRef = useRef<string>('');
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    isPanningRef.current = isPanning;
+  }, [isPanning]);
+
+  useEffect(() => {
+    workingAreaRef.current = workingArea;
+  }, [workingArea]);
+
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
 
   // Recalculate working area when elements change
   useEffect(() => {
@@ -928,7 +946,7 @@ export function BlockGridBuilder({
     if (!canvas) return;
 
     const handleMouseDown = (e: any) => {
-      if (isPanning) {
+      if (isPanningRef.current) {
         // Space key is already pressed
         canvas.selection = false;
         lastPosRef.current = { x: e.e.clientX, y: e.e.clientY };
@@ -941,7 +959,7 @@ export function BlockGridBuilder({
     };
 
     const handleMouseMove = (e: any) => {
-      if (!isPanning || !canvas.viewportTransform) return;
+      if (!isPanningRef.current || !canvas.viewportTransform) return;
       
       const vpt = canvas.viewportTransform;
       const deltaX = e.e.clientX - lastPosRef.current.x;
@@ -950,19 +968,20 @@ export function BlockGridBuilder({
       vpt[4] += deltaX;
       vpt[5] += deltaY;
       
-      // Constrain panning to keep working area in view
-      const { minX, minY, width: gridWidth, height: gridHeight } = workingArea;
-      const startX = minX * cellSize * zoom;
-      const startY = minY * cellSize * zoom;
-      const endX = startX + gridWidth * cellSize * zoom;
-      const endY = startY + gridHeight * cellSize * zoom;
+      // Constrain panning to keep working area in view - READ FROM REFS
+      const { minX, minY, width: gridWidth, height: gridHeight } = workingAreaRef.current;
+      const currentZoom = zoomRef.current;
+      const startX = minX * cellSize * currentZoom;
+      const startY = minY * cellSize * currentZoom;
+      const endX = startX + gridWidth * cellSize * currentZoom;
+      const endY = startY + gridHeight * cellSize * currentZoom;
       
       const containerWidth = containerRef.current?.clientWidth || 1000;
       const containerHeight = containerRef.current?.clientHeight || 700;
       
       // Allow panning slightly beyond edges (25% overflow)
-      const maxOffsetX = gridWidth * cellSize * zoom * 0.25;
-      const maxOffsetY = gridHeight * cellSize * zoom * 0.25;
+      const maxOffsetX = gridWidth * cellSize * currentZoom * 0.25;
+      const maxOffsetY = gridHeight * cellSize * currentZoom * 0.25;
       
       // Constrain X
       if (vpt[4] > maxOffsetX) vpt[4] = maxOffsetX;
@@ -981,7 +1000,7 @@ export function BlockGridBuilder({
     };
 
     const handleMouseUp = () => {
-      if (isPanning) {
+      if (isPanningRef.current) {
         setIsPanning(false);
         canvas.selection = true;
       }
@@ -996,7 +1015,7 @@ export function BlockGridBuilder({
       canvas.off('mouse:move', handleMouseMove);
       canvas.off('mouse:up', handleMouseUp);
     };
-  }, [canvas, isPanning, workingArea, zoom]);
+  }, [canvas]);
 
   return (
     <div ref={containerRef} className="relative w-full h-full">
