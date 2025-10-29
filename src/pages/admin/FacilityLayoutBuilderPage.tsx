@@ -21,9 +21,11 @@ import { CreateRoomDialog } from '@/components/facility/dialogs/CreateRoomDialog
 import { CreateOutsideAreaDialog } from '@/components/facility/dialogs/CreateOutsideAreaDialog';
 import { CreateStorageLocationDialog } from '@/components/facility/dialogs/CreateStorageLocationDialog';
 import { CreateZoneDialog } from '@/components/facility/dialogs/CreateZoneDialog';
+import { DefineBoundaryDialog } from '@/components/facility/dialogs/DefineBoundaryDialog';
 import { toast } from 'sonner';
 import { useDebouncedCallback } from '@/hooks/useDebouncedMutation';
 import { useQueryClient } from '@tanstack/react-query';
+import { calculateOptimalBoundary } from '@/utils/facilityBoundaryCalculator';
 
 export default function FacilityLayoutBuilderPage() {
   const { facilityId } = useParams<{ facilityId: string }>();
@@ -37,6 +39,7 @@ export default function FacilityLayoutBuilderPage() {
   const [showCreateOutsideDialog, setShowCreateOutsideDialog] = useState(false);
   const [showCreateStorageDialog, setShowCreateStorageDialog] = useState(false);
   const [showCreateZoneDialog, setShowCreateZoneDialog] = useState(false);
+  const [showBoundaryDialog, setShowBoundaryDialog] = useState(false);
   const [selectedBlock, setSelectedBlock] = useState<LayoutBlock | null>(null);
   const [showLibrary, setShowLibrary] = useState(true);
   const [showProperties, setShowProperties] = useState(true);
@@ -578,12 +581,21 @@ export default function FacilityLayoutBuilderPage() {
             <div>
               <h1 className="text-2xl font-bold">{facility.name}</h1>
               <p className="text-sm text-muted-foreground">
-                Layout Builder - {facility.grid_width}×{facility.grid_height} grid
+                Layout Builder - Infinite Canvas
+                {facility.is_bounded && ` (Boundary: ${facility.grid_width}×${facility.grid_height})`}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowBoundaryDialog(true)}
+            >
+              <LayoutGrid className="h-4 w-4 mr-2" />
+              Define Boundary
+            </Button>
             <Badge variant="outline">
               {editMode.charAt(0).toUpperCase() + editMode.slice(1)} Mode
             </Badge>
@@ -855,6 +867,13 @@ export default function FacilityLayoutBuilderPage() {
         open={showCreateZoneDialog}
         onOpenChange={setShowCreateZoneDialog}
         facilityId={facility.id}
+      />
+
+      <DefineBoundaryDialog
+        open={showBoundaryDialog}
+        onOpenChange={setShowBoundaryDialog}
+        facilityId={facility.id}
+        blocks={[...gateBlocks, ...laneBlocks, ...stationBlocks, ...roomBlocks, ...outsideBlocks, ...storageBlocks, ...zoneBlocks]}
       />
     </div>
   );

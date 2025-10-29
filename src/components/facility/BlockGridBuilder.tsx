@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Canvas as FabricCanvas, Rect, Text, Group } from 'fabric';
 import { Button } from '@/components/ui/button';
-import { ZoomIn, ZoomOut, Maximize2, Grid3x3 } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize2, Grid3x3, Eye, EyeOff } from 'lucide-react';
+import { calculateOptimalBoundary } from '@/utils/facilityBoundaryCalculator';
 
 export type EditMode = 'view' | 'facility' | 'gate' | 'lane' | 'station' | 'room' | 'outside' | 'storage' | 'zone';
 
@@ -159,6 +160,8 @@ export function BlockGridBuilder({
   const [cellSize, setCellSize] = useState(DEFAULT_CELL_SIZE);
   const [isPanning, setIsPanning] = useState(false);
   const lastPosRef = useRef({ x: 0, y: 0 });
+  const [showBoundaryPreview, setShowBoundaryPreview] = useState(false);
+  const [boundaryMargin, setBoundaryMargin] = useState(5);
   
   // Object pool pattern refs
   const objectPoolRef = useRef<Map<string, Group>>(new Map());
@@ -343,6 +346,41 @@ export function BlockGridBuilder({
     }
 
     // Facility boundary removed - infinite grid
+    
+    // Draw boundary preview if enabled
+    if (showBoundaryPreview) {
+      const allBlocks = [...gates, ...lanes, ...stations, ...rooms, ...outsideAreas, ...storageLocations, ...zones];
+      if (allBlocks.length > 0) {
+        const boundary = calculateOptimalBoundary(allBlocks, boundaryMargin);
+        
+        const boundaryRect = new Rect({
+          left: boundary.grid_x * cellSize,
+          top: boundary.grid_y * cellSize,
+          width: boundary.grid_width * cellSize,
+          height: boundary.grid_height * cellSize,
+          fill: 'rgba(59, 130, 246, 0.05)',
+          stroke: '#3b82f6',
+          strokeWidth: 3,
+          strokeDashArray: [10, 5],
+          selectable: false,
+          evented: false,
+        });
+        
+        // Add label
+        const boundaryLabel = new Text(`Boundary: ${boundary.grid_width}×${boundary.grid_height} (${boundary.elements_count} elements)`, {
+          left: boundary.grid_x * cellSize + 10,
+          top: boundary.grid_y * cellSize + 10,
+          fontSize: 14,
+          fill: '#3b82f6',
+          fontFamily: 'monospace',
+          selectable: false,
+          evented: false,
+        });
+        
+        canvas.add(boundaryRect);
+        canvas.add(boundaryLabel);
+      }
+    }
 
     // Helper to create new block
     const createBlock = (block: LayoutBlock) => {
@@ -837,6 +875,14 @@ export function BlockGridBuilder({
             title="Toggle Grid"
           >
             <Grid3x3 className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={showBoundaryPreview ? "default" : "outline"}
+            size="icon"
+            onClick={() => setShowBoundaryPreview(!showBoundaryPreview)}
+            title="Toggle Boundary Preview (B)"
+          >
+            {showBoundaryPreview ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
           </Button>
         </div>
       </div>

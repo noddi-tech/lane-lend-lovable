@@ -18,9 +18,8 @@ export function CreateFacilityDialog({ open, onOpenChange, onFacilityCreated }: 
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    grid_width: 100,
-    grid_height: 100,
     time_zone: 'Europe/Oslo',
+    is_bounded: false,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,9 +39,8 @@ export function CreateFacilityDialog({ open, onOpenChange, onFacilityCreated }: 
       setFormData({
         name: '',
         description: '',
-        grid_width: 100,
-        grid_height: 100,
         time_zone: 'Europe/Oslo',
+        is_bounded: false,
       });
     } catch (error) {
       // Error is already handled by the mutation (toast shown)
@@ -56,7 +54,7 @@ export function CreateFacilityDialog({ open, onOpenChange, onFacilityCreated }: 
         <DialogHeader>
           <DialogTitle>Create New Facility</DialogTitle>
           <DialogDescription>
-            Create a new service facility. You can add rooms, gates, lanes, and stations after creation.
+            Design your facility layout on an infinite canvas, then define boundaries later.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -81,35 +79,6 @@ export function CreateFacilityDialog({ open, onOpenChange, onFacilityCreated }: 
               rows={3}
               placeholder="Optional description of this facility"
             />
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="grid_width">Grid Width *</Label>
-              <Input
-                id="grid_width"
-                type="number"
-                min="50"
-                max="500"
-                value={formData.grid_width}
-                onChange={(e) => setFormData({ ...formData, grid_width: parseInt(e.target.value) || 100 })}
-                required
-              />
-              <p className="text-xs text-muted-foreground">Recommended: 100-200</p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="grid_height">Grid Height *</Label>
-              <Input
-                id="grid_height"
-                type="number"
-                min="50"
-                max="500"
-                value={formData.grid_height}
-                onChange={(e) => setFormData({ ...formData, grid_height: parseInt(e.target.value) || 100 })}
-                required
-              />
-              <p className="text-xs text-muted-foreground">Recommended: 100-200</p>
-            </div>
           </div>
           
           <div className="space-y-2">

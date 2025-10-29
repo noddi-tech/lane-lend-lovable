@@ -401,31 +401,40 @@ export type Database = {
       }
       facilities: {
         Row: {
+          boundary_margin: number | null
+          boundary_mode: string | null
           created_at: string | null
           description: string | null
-          grid_height: number
-          grid_width: number
+          grid_height: number | null
+          grid_width: number | null
           id: string
+          is_bounded: boolean | null
           name: string
           time_zone: string | null
           updated_at: string | null
         }
         Insert: {
+          boundary_margin?: number | null
+          boundary_mode?: string | null
           created_at?: string | null
           description?: string | null
-          grid_height?: number
-          grid_width?: number
+          grid_height?: number | null
+          grid_width?: number | null
           id?: string
+          is_bounded?: boolean | null
           name: string
           time_zone?: string | null
           updated_at?: string | null
         }
         Update: {
+          boundary_margin?: number | null
+          boundary_mode?: string | null
           created_at?: string | null
           description?: string | null
-          grid_height?: number
-          grid_width?: number
+          grid_height?: number | null
+          grid_width?: number | null
           id?: string
+          is_bounded?: boolean | null
           name?: string
           time_zone?: string | null
           updated_at?: string | null

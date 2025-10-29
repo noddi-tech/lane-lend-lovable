@@ -9,6 +9,9 @@ export interface Facility {
   grid_width: number;
   grid_height: number;
   time_zone: string;
+  is_bounded?: boolean;
+  boundary_margin?: number;
+  boundary_mode?: 'auto' | 'manual' | 'none';
   created_at: string;
   updated_at: string;
 }
