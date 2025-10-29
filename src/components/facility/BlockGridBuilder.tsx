@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { Canvas as FabricCanvas, Rect, Text, Group } from 'fabric';
 import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, Maximize2, Grid3x3, Eye, EyeOff, Home } from 'lucide-react';
 import { calculateOptimalBoundary } from '@/utils/facilityBoundaryCalculator';
-import { useDebouncedCallback } from '@/hooks/useDebouncedMutation';
 
 // Individual element types
 export type EditMode = 'view' | 'facility' | 'gate' | 'lane' | 'station' | 'room' | 'outside' | 'storage' | 'zone';
@@ -246,6 +245,10 @@ export function BlockGridBuilder({
   
   // Refs for callbacks to avoid dependency issues
   const onCanvasStateChangeRef = useRef(onCanvasStateChange);
+  
+  // FIX 3: Stabilize event handlers with refs for data lookups
+  const lanesRef = useRef(lanes);
+  const cellSizeRef = useRef(cellSize);
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -264,32 +267,54 @@ export function BlockGridBuilder({
   useEffect(() => {
     onCanvasStateChangeRef.current = onCanvasStateChange;
   }, [onCanvasStateChange]);
-
-  // Notify parent of canvas state changes
+  
+  // FIX 3: Keep data refs in sync
   useEffect(() => {
-    if (canvas && containerRef.current) {
+    lanesRef.current = lanes;
+  }, [lanes]);
+  
+  useEffect(() => {
+    cellSizeRef.current = cellSize;
+  }, [cellSize]);
+
+  // FIX 7: Throttle canvas state updates to 60fps
+  const throttledStateUpdate = useRef<NodeJS.Timeout>();
+  
+  useEffect(() => {
+    if (!canvas || !containerRef.current) return;
+    
+    if (throttledStateUpdate.current) {
+      clearTimeout(throttledStateUpdate.current);
+    }
+    
+    throttledStateUpdate.current = setTimeout(() => {
       onCanvasStateChangeRef.current?.({
         zoom,
         workingArea,
         viewportTransform: canvas.viewportTransform,
         containerSize: {
-          width: containerRef.current.clientWidth,
-          height: containerRef.current.clientHeight,
+          width: containerRef.current!.clientWidth,
+          height: containerRef.current!.clientHeight,
         },
       });
-    }
-  }, [zoom, workingArea, canvas]); // Removed onCanvasStateChange from deps
+    }, 16); // 60fps max
+    
+    return () => {
+      if (throttledStateUpdate.current) {
+        clearTimeout(throttledStateUpdate.current);
+      }
+    };
+  }, [zoom, workingArea, canvas]);
 
-  // Debounced working area recalculation to prevent rapid updates
-  const updateWorkingArea = useDebouncedCallback(() => {
-    const area = calculateWorkingArea(gates, lanes, stations, rooms, outsideAreas, storageLocations, zones);
-    setWorkingArea(area);
-  }, 100);
-
-  // Recalculate working area when elements change
+  // FIX 1: Remove debounced callback from dependencies - use setTimeout directly
   useEffect(() => {
-    updateWorkingArea();
-  }, [gates, lanes, stations, rooms, outsideAreas, storageLocations, zones, updateWorkingArea]);
+    const timeoutRef = setTimeout(() => {
+      const area = calculateWorkingArea(gates, lanes, stations, rooms, outsideAreas, storageLocations, zones);
+      setWorkingArea(area);
+    }, 100);
+    
+    return () => clearTimeout(timeoutRef);
+  }, [gates, lanes, stations, rooms, outsideAreas, storageLocations, zones]);
 
   // Calculate responsive canvas size and cell size
   useEffect(() => {
@@ -343,26 +368,19 @@ export function BlockGridBuilder({
     canvas.renderAll();
   }, [canvas, canvasDimensions]);
 
-  // Helper: Generate stable hash of data for change detection
-  const generateDataHash = (
-    gates: LayoutBlock[], 
-    lanes: LayoutBlock[], 
-    stations: LayoutBlock[], 
-    rooms: LayoutBlock[], 
-    outsideAreas: LayoutBlock[], 
-    storageLocations: LayoutBlock[], 
-    mode: EditMode
-  ) => {
+  // FIX 2: Move hash check OUTSIDE useEffect using useMemo
+  const currentDataHash = useMemo(() => {
     return JSON.stringify({
-      editMode: mode,
+      editMode,
       gates: gates.map(g => `${g.id}-${g.grid_x}-${g.grid_y}-${g.grid_width}-${g.grid_height}`),
       lanes: lanes.map(l => `${l.id}-${l.grid_x}-${l.grid_y}-${l.grid_width}-${l.grid_height}`),
       stations: stations.map(s => `${s.id}-${s.grid_x}-${s.grid_y}-${s.grid_width}-${s.grid_height}`),
       rooms: rooms.map(r => `${r.id}-${r.grid_x}-${r.grid_y}-${r.grid_width}-${r.grid_height}-${r.color}`),
       outsideAreas: outsideAreas.map(o => `${o.id}-${o.grid_x}-${o.grid_y}-${o.grid_width}-${o.grid_height}`),
       storageLocations: storageLocations.map(s => `${s.id}-${s.grid_x}-${s.grid_y}-${s.grid_width}-${s.grid_height}`),
+      zones: zones.map(z => `${z.id}-${z.grid_x}-${z.grid_y}-${z.grid_width}-${z.grid_height}`),
     });
-  };
+  }, [gates, lanes, stations, rooms, outsideAreas, storageLocations, zones, editMode]);
 
   // Helper: Update existing object without destroying it
   const updateBlockObject = (group: Group, block: LayoutBlock) => {
@@ -397,26 +415,22 @@ export function BlockGridBuilder({
     group.setCoords();
   };
 
-  // Stable object pool rendering - objects persist and update in-place
+  // FIX 2 & 4 & 5: Stable object pool rendering with optimized hash checking
   useEffect(() => {
     if (!canvas) return;
     
-    // Skip updates during drag to prevent interference
+    // FIX 4: Skip updates during drag to prevent interference
     if (isDraggingRef.current) {
       console.log('⏸️ Skipping render during drag');
       return;
     }
     
-    // Check if data actually changed
-    const currentHash = generateDataHash(gates, lanes, stations, rooms, outsideAreas, storageLocations, editMode);
-    const dataChanged = currentHash !== lastDataHashRef.current;
-    lastDataHashRef.current = currentHash;
-    
-    if (!dataChanged && objectPoolRef.current.size > 0) {
-      console.log('✓ Data unchanged, skipping render');
-      return;
+    // FIX 2: Hash comparison happens BEFORE effect runs (via useMemo)
+    if (currentDataHash === lastDataHashRef.current && objectPoolRef.current.size > 0) {
+      return; // Effect doesn't execute if data unchanged
     }
-
+    
+    lastDataHashRef.current = currentDataHash;
     console.log('🔄 Updating canvas objects');
 
     // Clear only static elements (grid, facility boundary)
@@ -621,82 +635,82 @@ export function BlockGridBuilder({
       }
     });
     
-    // Update or create blocks (maintain Z-order: lanes, gates, stations)
+    // FIX 5 & 6: Update or create blocks with drag detection and batched updates
+    const updatedObjects: Group[] = [];
+    const activeObject = canvas.getActiveObject();
+    
     allBlocks.forEach(block => {
       const existing = objectPoolRef.current.get(block.id);
       
       if (existing) {
+        // FIX 5: Skip updates if user is actively dragging THIS object
+        if (isDraggingRef.current && activeObject === existing) {
+          console.log(`⏸️ Skipping update for dragged object: ${block.id}`);
+          return;
+        }
+        
         // Update existing object
         updateBlockObject(existing, block);
         
         // Update interactivity based on current editMode
         const isEditable = block.type === editMode;
-        const isLane = block.type === 'lane';
         
-      console.log(`🔄 Updating ${block.type} ${block.id}:`, { 
-        isEditable, 
-        selectable: isEditable,
-        evented: isEditable,
-        lockMovementX: !isEditable,
-        lockMovementY: !isEditable
-      });
-      
-      existing.set({
-        selectable: isEditable,
-        evented: isEditable,
-        hasControls: isEditable,
-        hoverCursor: isEditable ? 'move' : 'default',
-        lockMovementX: !isEditable,
-        lockMovementY: !isEditable,
-        lockScalingX: !isEditable,
-        lockScalingY: !isEditable,
-        opacity: isEditable ? 1 : (block.type === 'facility' ? 1 : 0.5),
-      });
-      
-      existing.setCoords(); // Update interaction boundaries
+        existing.set({
+          selectable: isEditable,
+          evented: isEditable,
+          hasControls: isEditable,
+          hoverCursor: isEditable ? 'move' : 'default',
+          lockMovementX: !isEditable,
+          lockMovementY: !isEditable,
+          lockScalingX: !isEditable,
+          lockScalingY: !isEditable,
+          opacity: isEditable ? 1 : (block.type === 'facility' ? 1 : 0.5),
+        });
         
         // Update data reference
         existing.set({ data: block } as any);
+        
+        // FIX 6: Batch setCoords calls
+        updatedObjects.push(existing);
       } else {
         // Create new object
         console.log(`✨ Creating new block: ${block.id}`);
         const newObj = createBlock(block);
         objectPoolRef.current.set(block.id, newObj);
         canvas.add(newObj);
-    }
-  });
-  
-  // Force thorough canvas refresh
-  canvas.getObjects().forEach(obj => {
-    if ((obj as any).data) {
-      obj.setCoords();
-    }
-  });
-  canvas.requestRenderAll();
-  }, [canvas, facility, gates, lanes, stations, rooms, outsideAreas, storageLocations, zones, showGrid, editMode, cellSize]);
+        updatedObjects.push(newObj);
+      }
+    });
+    
+    // FIX 6: Batch setCoords calls for better performance
+    updatedObjects.forEach(obj => obj.setCoords());
+    canvas.requestRenderAll();
+  }, [canvas, currentDataHash, showGrid, editMode, cellSize]);
 
   // Handle object interactions
   useEffect(() => {
     if (!canvas) return;
 
   const handleObjectMoving = (e: any) => {
-    isDraggingRef.current = true; // Mark drag as active
+    isDraggingRef.current = true; // FIX 4: Mark drag as active
     
     const obj = e.target;
       if (!obj?.data) return;
 
       const block = obj.data as LayoutBlock;
-      console.log(`👆 Object moving:`, { type: block?.type, id: block?.id });
       const left = obj.left || 0;
       const top = obj.top || 0;
 
+      // FIX 3: Use refs for data lookups
+      const currentCellSize = cellSizeRef.current;
+
       // Snap to grid
-      let snappedX = Math.round(left / cellSize);
-      let snappedY = Math.round(top / cellSize);
+      let snappedX = Math.round(left / currentCellSize);
+      let snappedY = Math.round(top / currentCellSize);
 
       // Station-to-Lane parenting constraint
       if (block.type === 'station' && block.parent_id) {
-        const parentLane = lanes.find(l => l.id === block.parent_id);
+        const parentLane = lanesRef.current.find(l => l.id === block.parent_id);
         if (parentLane) {
           // Constrain to parent lane bounds
           const laneMinX = parentLane.grid_x;
@@ -729,8 +743,8 @@ export function BlockGridBuilder({
 
       // Allow free movement for all blocks (account for centered origin)
       obj.set({
-        left: snappedX * cellSize + (block.grid_width * cellSize) / 2,
-        top: snappedY * cellSize + (block.grid_height * cellSize) / 2,
+        left: snappedX * currentCellSize + (block.grid_width * currentCellSize) / 2,
+        top: snappedY * currentCellSize + (block.grid_height * currentCellSize) / 2,
       });
 
       // Constrain to facility bounds (for non-station blocks)
@@ -740,8 +754,8 @@ export function BlockGridBuilder({
 
         if (snappedX < 0) obj.set({ left: 0 });
         if (snappedY < 0) obj.set({ top: 0 });
-        if (snappedX > maxX) obj.set({ left: maxX * cellSize });
-        if (snappedY > maxY) obj.set({ top: maxY * cellSize });
+        if (snappedX > maxX) obj.set({ left: maxX * currentCellSize });
+        if (snappedY > maxY) obj.set({ top: maxY * currentCellSize });
       }
     };
 
@@ -750,39 +764,34 @@ export function BlockGridBuilder({
       if (!obj?.data) return;
 
       const block = obj.data as LayoutBlock;
-      const scaleX = obj.scaleX || 1;
-      const scaleY = obj.scaleY || 1;
-
-      // Get current dimensions
-      const currentWidth = (obj.width || 0) * scaleX;
-      const currentHeight = (obj.height || 0) * scaleY;
-
-      // Snap to grid
-      const newWidth = Math.max(
-        cellSize * 2,
-        Math.round(currentWidth / cellSize) * cellSize
-      );
-      const newHeight = Math.max(
-        cellSize * 2,
-        Math.round(currentHeight / cellSize) * cellSize
-      );
-
-      // Allow free resizing for all blocks
+      
+      // FIX 3 & 9: Use cellSizeRef and fix resize logic
+      const currentCellSize = cellSizeRef.current;
+      
+      // Calculate new dimensions from scale
+      const newWidth = Math.max(1, Math.round((obj.width * obj.scaleX) / currentCellSize));
+      const newHeight = Math.max(1, Math.round((obj.height * obj.scaleY) / currentCellSize));
+      
+      const pixelWidth = newWidth * currentCellSize;
+      const pixelHeight = newHeight * currentCellSize;
+      
+      // FIX 9: Reset scale to 1 and update dimensions directly
+      // This prevents fighting with the rendering loop
       obj.set({
-        width: newWidth,
-        height: newHeight,
         scaleX: 1,
         scaleY: 1,
+        width: pixelWidth,
+        height: pixelHeight,
       });
 
       // Update rect position to stay centered
       const rect = obj._objects?.[0];
       if (rect) {
         rect.set({
-          left: -newWidth / 2,
-          top: -newHeight / 2,
-          width: newWidth,
-          height: newHeight,
+          left: -pixelWidth / 2,
+          top: -pixelHeight / 2,
+          width: pixelWidth,
+          height: pixelHeight,
         });
       }
 
@@ -807,27 +816,31 @@ export function BlockGridBuilder({
       const objWidth = obj.width || 0;
       const objHeight = obj.height || 0;
       
+      // FIX 3: Use cellSizeRef
+      const currentCellSize = cellSizeRef.current;
+      
       // Calculate grid position from center
-      const gridX = Math.round((obj.left! - objWidth / 2) / cellSize);
-      const gridY = Math.round((obj.top! - objHeight / 2) / cellSize);
-      const gridWidth = Math.round(objWidth / cellSize);
-      const gridHeight = Math.round(objHeight / cellSize);
+      const gridX = Math.round((obj.left! - objWidth / 2) / currentCellSize);
+      const gridY = Math.round((obj.top! - objHeight / 2) / currentCellSize);
+      const gridWidth = Math.round(objWidth / currentCellSize);
+      const gridHeight = Math.round(objHeight / currentCellSize);
 
       // Update the data reference so our object pool stays in sync
       obj.set({ data: { ...block, grid_x: gridX, grid_y: gridY, grid_width: gridWidth, grid_height: gridHeight } } as any);
 
-      if (gridX !== block.grid_x || gridY !== block.grid_y) {
-        onBlockMove(block.id, gridX, gridY);
-      }
-
-      if (gridWidth !== block.grid_width || gridHeight !== block.grid_height) {
-        onBlockResize(block.id, gridX, gridY, gridWidth, gridHeight);
-      }
+      // FIX 4: Clear drag flag BEFORE calling callbacks to prevent race conditions
+      isDraggingRef.current = false;
       
-      // Reset drag flag after a brief delay to allow mutation to complete
-      setTimeout(() => {
-        isDraggingRef.current = false;
-      }, 150);
+      // FIX 4 & 8: Use requestAnimationFrame to prevent re-render race condition
+      requestAnimationFrame(() => {
+        if (gridX !== block.grid_x || gridY !== block.grid_y) {
+          onBlockMove(block.id, gridX, gridY);
+        }
+
+        if (gridWidth !== block.grid_width || gridHeight !== block.grid_height) {
+          onBlockResize(block.id, gridX, gridY, gridWidth, gridHeight);
+        }
+      });
     };
 
     const handleSelection = (e: any) => {
@@ -856,7 +869,7 @@ export function BlockGridBuilder({
       canvas.off('selection:updated', handleSelection);
       canvas.off('selection:cleared', handleSelectionCleared);
     };
-  }, [canvas, facility, lanes, onBlockMove, onBlockResize, onBlockSelect, cellSize]);
+  }, [canvas, facility, onBlockMove, onBlockResize, onBlockSelect]); // FIX 3: Removed unstable dependencies
 
   const handleZoomIn = () => {
     setZoom((prev) => Math.min(prev + 0.1, 5.0));
