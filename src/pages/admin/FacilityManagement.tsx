@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Building2, Plus, Layers, Settings, Trash2 } from 'lucide-react';
 import { FacilityOverview } from '@/components/facility/FacilityOverview';
 import { FacilityConfiguration } from '@/components/facility/FacilityConfiguration';
+import { CreateFacilityDialog } from '@/components/facility/dialogs/CreateFacilityDialog';
 
 export default function FacilityManagement() {
   const navigate = useNavigate();
@@ -15,6 +16,12 @@ export default function FacilityManagement() {
   const { data: drivingGates, isLoading: loadingGates } = useDrivingGates();
   const [selectedFacilityId, setSelectedFacilityId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+
+  const handleFacilityCreated = (facilityId: string) => {
+    setSelectedFacilityId(facilityId);
+    setActiveTab('overview');
+  };
 
   const selectedFacility = facilities?.find(f => f.id === selectedFacilityId);
 
@@ -73,7 +80,11 @@ export default function FacilityManagement() {
               <Layers className="h-4 w-4" />
               Facilities
             </h3>
-            <Button size="sm" variant="outline">
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={() => setCreateDialogOpen(true)}
+            >
               <Plus className="h-3 w-3" />
             </Button>
           </div>
@@ -146,6 +157,12 @@ export default function FacilityManagement() {
           )}
         </div>
       </div>
+
+      <CreateFacilityDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        onFacilityCreated={handleFacilityCreated}
+      />
     </div>
   );
 }
