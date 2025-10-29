@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useFacilities } from '@/hooks/admin/useFacilities';
 import { useDrivingGates, useUpdateDrivingGate, useAssignGateToFacility, useUnassignGateFromFacility, useDeleteDrivingGate } from '@/hooks/admin/useDrivingGates';
@@ -203,11 +203,30 @@ export default function FacilityLayoutBuilderPage() {
     );
   }
 
-  const drivingGates = allDrivingGates?.filter(g => g.facility_id === facility.id) || [];
-  const facilityGateIds = drivingGates.map(g => g.id);
-  const facilityLanes = allLanes?.filter(lane => lane.facility_id === facility.id) || [];
-  const facilityLaneIds = facilityLanes.map(l => l.id);
-  const facilityStations = allStations?.filter(station => facilityLaneIds.includes(station.lane_id)) || [];
+  const drivingGates = useMemo(
+    () => allDrivingGates?.filter(g => g.facility_id === facility.id) || [],
+    [allDrivingGates, facility.id]
+  );
+  
+  const facilityGateIds = useMemo(
+    () => drivingGates.map(g => g.id),
+    [drivingGates]
+  );
+  
+  const facilityLanes = useMemo(
+    () => allLanes?.filter(lane => lane.facility_id === facility.id) || [],
+    [allLanes, facility.id]
+  );
+  
+  const facilityLaneIds = useMemo(
+    () => facilityLanes.map(l => l.id),
+    [facilityLanes]
+  );
+  
+  const facilityStations = useMemo(
+    () => allStations?.filter(station => facilityLaneIds.includes(station.lane_id)) || [],
+    [allStations, facilityLaneIds]
+  );
 
   const facilityBlock: LayoutBlock = {
     id: facility.id,
@@ -219,91 +238,112 @@ export default function FacilityLayoutBuilderPage() {
     grid_height: facility.grid_height,
   };
 
-  const gateBlocks: LayoutBlock[] = drivingGates.map(gate => ({
-    id: gate.id,
-    type: 'gate',
-    name: gate.name,
-    grid_x: gate.grid_position_x || 0,
-    grid_y: gate.grid_position_y || 0,
-    grid_width: gate.grid_width,
-    grid_height: gate.grid_height,
-    parent_id: facility.id,
-  }));
+  const gateBlocks: LayoutBlock[] = useMemo(
+    () => drivingGates.map(gate => ({
+      id: gate.id,
+      type: 'gate',
+      name: gate.name,
+      grid_x: gate.grid_position_x || 0,
+      grid_y: gate.grid_position_y || 0,
+      grid_width: gate.grid_width,
+      grid_height: gate.grid_height,
+      parent_id: facility.id,
+    })),
+    [drivingGates, facility.id]
+  );
 
-  const laneBlocks: LayoutBlock[] = facilityLanes.map(lane => ({
-    id: lane.id,
-    type: 'lane',
-    name: lane.name,
-    grid_x: lane.grid_position_x || 0,
-    grid_y: lane.grid_position_y || 0,
-    grid_width: lane.grid_width,
-    grid_height: lane.grid_height || 2,
-    parent_id: facility.id,
-  }));
+  const laneBlocks: LayoutBlock[] = useMemo(
+    () => facilityLanes.map(lane => ({
+      id: lane.id,
+      type: 'lane',
+      name: lane.name,
+      grid_x: lane.grid_position_x || 0,
+      grid_y: lane.grid_position_y || 0,
+      grid_width: lane.grid_width,
+      grid_height: lane.grid_height || 2,
+      parent_id: facility.id,
+    })),
+    [facilityLanes, facility.id]
+  );
 
-  const stationBlocks: LayoutBlock[] = facilityStations.map(station => ({
-    id: station.id,
-    type: 'station',
-    name: station.name,
-    grid_x: station.grid_position_x,
-    grid_y: station.grid_position_y,
-    grid_width: station.grid_width,
-    grid_height: station.grid_height,
-    parent_id: station.lane_id,
-  }));
+  const stationBlocks: LayoutBlock[] = useMemo(
+    () => facilityStations.map(station => ({
+      id: station.id,
+      type: 'station',
+      name: station.name,
+      grid_x: station.grid_position_x,
+      grid_y: station.grid_position_y,
+      grid_width: station.grid_width,
+      grid_height: station.grid_height,
+      parent_id: station.lane_id,
+    })),
+    [facilityStations]
+  );
 
-  const roomBlocks: LayoutBlock[] = (allRooms || []).map(room => ({
-    id: room.id,
-    type: 'room',
-    name: room.name,
-    grid_x: room.grid_position_x,
-    grid_y: room.grid_position_y,
-    grid_width: room.grid_width,
-    grid_height: room.grid_height,
-    parent_id: facility.id,
-    color: room.color,
-  }));
+  const roomBlocks: LayoutBlock[] = useMemo(
+    () => (allRooms || []).map(room => ({
+      id: room.id,
+      type: 'room',
+      name: room.name,
+      grid_x: room.grid_position_x,
+      grid_y: room.grid_position_y,
+      grid_width: room.grid_width,
+      grid_height: room.grid_height,
+      parent_id: facility.id,
+      color: room.color,
+    })),
+    [allRooms, facility.id]
+  );
 
-  const outsideBlocks: LayoutBlock[] = (allOutsideAreas || []).map(area => ({
-    id: area.id,
-    type: 'outside',
-    name: area.name,
-    grid_x: area.grid_position_x,
-    grid_y: area.grid_position_y,
-    grid_width: area.grid_width,
-    grid_height: area.grid_height,
-    parent_id: facility.id,
-    color: area.color,
-    area_type: area.area_type,
-  }));
+  const outsideBlocks: LayoutBlock[] = useMemo(
+    () => (allOutsideAreas || []).map(area => ({
+      id: area.id,
+      type: 'outside',
+      name: area.name,
+      grid_x: area.grid_position_x,
+      grid_y: area.grid_position_y,
+      grid_width: area.grid_width,
+      grid_height: area.grid_height,
+      parent_id: facility.id,
+      color: area.color,
+      area_type: area.area_type,
+    })),
+    [allOutsideAreas, facility.id]
+  );
 
-  const storageBlocks: LayoutBlock[] = (allStorageLocations || [])
-    .filter(loc => loc.lane_id && facilityLaneIds.includes(loc.lane_id))
-    .map(storage => ({
-      id: storage.id,
-      type: 'storage',
-      name: storage.name,
-      grid_x: storage.grid_position_x,
-      grid_y: storage.grid_position_y,
-      grid_width: storage.grid_width,
-      grid_height: storage.grid_height,
-      parent_id: storage.lane_id || storage.room_id,
-      storage_type: storage.storage_type,
-      status: storage.status,
-    }));
+  const storageBlocks: LayoutBlock[] = useMemo(
+    () => (allStorageLocations || [])
+      .filter(loc => loc.lane_id && facilityLaneIds.includes(loc.lane_id))
+      .map(storage => ({
+        id: storage.id,
+        type: 'storage',
+        name: storage.name,
+        grid_x: storage.grid_position_x,
+        grid_y: storage.grid_position_y,
+        grid_width: storage.grid_width,
+        grid_height: storage.grid_height,
+        parent_id: storage.lane_id || storage.room_id,
+        storage_type: storage.storage_type,
+        status: storage.status,
+      })),
+    [allStorageLocations, facilityLaneIds]
+  );
 
-  const zoneBlocks: LayoutBlock[] = (allZones || []).map(zone => ({
-    id: zone.id,
-    type: 'zone',
-    name: zone.name,
-    grid_x: zone.grid_position_x,
-    grid_y: zone.grid_position_y,
-    grid_width: zone.grid_width,
-    grid_height: zone.grid_height,
-    parent_id: facility.id,
-    color: zone.color,
-    zone_type: zone.zone_type,
-  }));
+  const zoneBlocks: LayoutBlock[] = useMemo(
+    () => (allZones || []).map(zone => ({
+      id: zone.id,
+      type: 'zone',
+      name: zone.name,
+      grid_x: zone.grid_position_x,
+      grid_y: zone.grid_position_y,
+      grid_width: zone.grid_width,
+      grid_height: zone.grid_height,
+      parent_id: facility.id,
+      color: zone.color,
+      zone_type: zone.zone_type,
+    })),
+    [allZones, facility.id]
+  );
 
   const handleBlockMove = async (blockId: string, gridX: number, gridY: number) => {
     const block = [...gateBlocks, ...laneBlocks, ...stationBlocks, ...roomBlocks, ...outsideBlocks, ...storageBlocks, ...zoneBlocks].find(b => b.id === blockId);
