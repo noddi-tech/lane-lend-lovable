@@ -241,14 +241,18 @@ export function BlockGridBuilder({
   // Helper: Update existing object without destroying it
   const updateBlockObject = (group: Group, block: LayoutBlock) => {
     group.set({
-      left: block.grid_x * cellSize,
-      top: block.grid_y * cellSize,
+      left: block.grid_x * cellSize + (block.grid_width * cellSize) / 2,
+      top: block.grid_y * cellSize + (block.grid_height * cellSize) / 2,
+      originX: 'center',
+      originY: 'center',
     });
     
     // Update rect dimensions
     const rect = group._objects?.[0] as Rect;
     if (rect) {
       rect.set({
+        left: -(block.grid_width * cellSize) / 2,
+        top: -(block.grid_height * cellSize) / 2,
         width: block.grid_width * cellSize,
         height: block.grid_height * cellSize,
       });
@@ -259,8 +263,8 @@ export function BlockGridBuilder({
     if (text) {
       text.set({
         text: block.name,
-        left: (block.grid_width * cellSize) / 2,
-        top: (block.grid_height * cellSize) / 2,
+        left: 0,
+        top: 0,
       });
     }
     
@@ -356,8 +360,8 @@ export function BlockGridBuilder({
         : COLORS[block.type];
       
       const rect = new Rect({
-        left: 0,
-        top: 0,
+        left: -(block.grid_width * cellSize) / 2,
+        top: -(block.grid_height * cellSize) / 2,
         width: block.grid_width * cellSize,
         height: block.grid_height * cellSize,
         fill: colors.fill,
@@ -370,8 +374,8 @@ export function BlockGridBuilder({
       });
 
       const text = new Text(block.name, {
-        left: (block.grid_width * cellSize) / 2,
-        top: (block.grid_height * cellSize) / 2,
+        left: 0,
+        top: 0,
         fontSize: Math.max(12, Math.min(18, block.grid_width * 1.5)),
         fill: COLORS[block.type].text,
         originX: 'center',
@@ -381,8 +385,10 @@ export function BlockGridBuilder({
       });
 
       const group = new Group([rect, text], {
-        left: block.grid_x * cellSize,
-        top: block.grid_y * cellSize,
+        left: block.grid_x * cellSize + (block.grid_width * cellSize) / 2,
+        top: block.grid_y * cellSize + (block.grid_height * cellSize) / 2,
+        originX: 'center',
+        originY: 'center',
         selectable: isEditable,
         hasControls: isEditable,
         lockRotation: true,
@@ -519,10 +525,10 @@ export function BlockGridBuilder({
         }
       }
 
-      // Allow free movement for all blocks
+      // Allow free movement for all blocks (account for centered origin)
       obj.set({
-        left: snappedX * cellSize,
-        top: snappedY * cellSize,
+        left: snappedX * cellSize + (block.grid_width * cellSize) / 2,
+        top: snappedY * cellSize + (block.grid_height * cellSize) / 2,
       });
 
       // Constrain to facility bounds (for non-station blocks)
@@ -567,15 +573,27 @@ export function BlockGridBuilder({
         scaleY: 1,
       });
 
-      // Update text position in the group
-      const text = obj._objects?.[1];
-      if (text) {
-        text.set({
-          left: newWidth / 2,
-          top: newHeight / 2,
+      // Update rect position to stay centered
+      const rect = obj._objects?.[0];
+      if (rect) {
+        rect.set({
+          left: -newWidth / 2,
+          top: -newHeight / 2,
+          width: newWidth,
+          height: newHeight,
         });
       }
 
+      // Update text position in the group (stays centered)
+      const text = obj._objects?.[1];
+      if (text) {
+        text.set({
+          left: 0,
+          top: 0,
+        });
+      }
+
+      obj.setCoords();
       canvas.renderAll();
     };
 
@@ -584,10 +602,14 @@ export function BlockGridBuilder({
       if (!obj?.data) return;
 
       const block = obj.data as LayoutBlock;
-      const gridX = Math.round((obj.left || 0) / cellSize);
-      const gridY = Math.round((obj.top || 0) / cellSize);
-      const gridWidth = Math.round((obj.width || 0) / cellSize);
-      const gridHeight = Math.round((obj.height || 0) / cellSize);
+      const objWidth = obj.width || 0;
+      const objHeight = obj.height || 0;
+      
+      // Calculate grid position from center
+      const gridX = Math.round((obj.left! - objWidth / 2) / cellSize);
+      const gridY = Math.round((obj.top! - objHeight / 2) / cellSize);
+      const gridWidth = Math.round(objWidth / cellSize);
+      const gridHeight = Math.round(objHeight / cellSize);
 
       // Update the data reference so our object pool stays in sync
       obj.set({ data: { ...block, grid_x: gridX, grid_y: gridY, grid_width: gridWidth, grid_height: gridHeight } } as any);
