@@ -15,6 +15,7 @@ import { BlockGridBuilder, type EditMode, type LayoutBlock, ELEMENT_TO_GROUP } f
 import { BlockProperties } from '@/components/facility/BlockProperties';
 import { LibraryPalette, type LibraryItem } from '@/components/facility/LibraryPalette';
 import { EditModeSelector } from '@/components/facility/EditModeSelector';
+import { LayoutToolbar } from '@/components/facility/LayoutToolbar';
 import { CreateGateDialog } from '@/components/facility/dialogs/CreateGateDialog';
 import { CreateLaneDialog } from '@/components/facility/dialogs/CreateLaneDialog';
 import { CreateStationDialog } from '@/components/facility/dialogs/CreateStationDialog';
@@ -681,14 +682,24 @@ export default function FacilityLayoutBuilderPage() {
         </div>
       </header>
 
-      {/* Toolbar - Tabbed Groups */}
-      <div className="flex-shrink-0 border-b bg-muted/30 px-6 py-4">
-        <EditModeSelector
-          currentMode={editMode}
-          onModeChange={setEditMode}
-          onShowCreateDialog={handleShowCreateDialog}
-        />
-      </div>
+      {/* Toolbar */}
+      <LayoutToolbar
+        editMode={editMode}
+        facilityName={facility.name}
+        viewContext={{
+          type: viewContext.type,
+          name: viewContext.name,
+        }}
+        showLibrary={showLibrary}
+        showProperties={showProperties}
+        onEditModeChange={setEditMode}
+        onShowCreateDialog={handleShowCreateDialog}
+        onToggleLibrary={() => setShowLibrary(prev => !prev)}
+        onToggleProperties={() => {
+          setShowProperties(prev => !prev);
+          if (!showProperties) setPropertiesPinned(true);
+        }}
+      />
 
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden">
