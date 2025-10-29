@@ -151,7 +151,7 @@ export default function FacilityLayoutBuilderPage() {
     name: lane.name,
     grid_x: lane.grid_position_x || 0,
     grid_y: lane.grid_position_y || 0,
-    grid_width: lane.grid_width || 100,
+    grid_width: lane.grid_width,
     grid_height: lane.grid_height || 2,
     parent_id: facility.id,
   }));

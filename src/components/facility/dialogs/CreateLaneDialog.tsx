@@ -14,7 +14,9 @@ interface CreateLaneDialogProps {
 
 export function CreateLaneDialog({ open, onOpenChange, facilityId }: CreateLaneDialogProps) {
   const [name, setName] = useState("");
+  const [gridX, setGridX] = useState(0);
   const [gridY, setGridY] = useState(5);
+  const [gridWidth, setGridWidth] = useState(50);
   const [gridHeight, setGridHeight] = useState(2);
 
   const createLane = useCreateLane();
@@ -26,12 +28,16 @@ export function CreateLaneDialog({ open, onOpenChange, facilityId }: CreateLaneD
       facility_id: facilityId,
       name,
       position_order: 1,
+      grid_position_x: gridX,
       grid_position_y: gridY,
+      grid_width: gridWidth,
       grid_height: gridHeight,
     } as any);
     onOpenChange(false);
     setName("");
+    setGridX(0);
     setGridY(5);
+    setGridWidth(50);
     setGridHeight(2);
   };
 
@@ -41,7 +47,7 @@ export function CreateLaneDialog({ open, onOpenChange, facilityId }: CreateLaneD
         <DialogHeader>
           <DialogTitle>Create New Lane</DialogTitle>
           <DialogDescription>
-            Add a new lane to this facility. Lanes span the full width of the facility.
+            Add a new lane to this facility. You can customize its position and width.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -56,6 +62,16 @@ export function CreateLaneDialog({ open, onOpenChange, facilityId }: CreateLaneD
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
+              <Label htmlFor="lane-x">Grid X Position</Label>
+              <Input
+                id="lane-x"
+                type="number"
+                value={gridX}
+                onChange={(e) => setGridX(Number(e.target.value))}
+                min={0}
+              />
+            </div>
+            <div>
               <Label htmlFor="lane-y">Grid Y Position</Label>
               <Input
                 id="lane-y"
@@ -65,6 +81,19 @@ export function CreateLaneDialog({ open, onOpenChange, facilityId }: CreateLaneD
                 min={0}
               />
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="lane-width">Width (cells)</Label>
+              <Input
+                id="lane-width"
+                type="number"
+                value={gridWidth}
+                onChange={(e) => setGridWidth(Number(e.target.value))}
+                min={10}
+                max={100}
+              />
+            </div>
             <div>
               <Label htmlFor="lane-height">Height (cells)</Label>
               <Input
@@ -72,7 +101,7 @@ export function CreateLaneDialog({ open, onOpenChange, facilityId }: CreateLaneD
                 type="number"
                 value={gridHeight}
                 onChange={(e) => setGridHeight(Number(e.target.value))}
-                min={3}
+                min={2}
                 max={15}
               />
             </div>
