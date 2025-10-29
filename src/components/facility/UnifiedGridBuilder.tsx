@@ -192,9 +192,20 @@ export function UnifiedGridBuilder({
   const containerRef = useRef<HTMLDivElement>(null);
   const [canvas, setCanvas] = useState<FabricCanvas | null>(null);
   const [zoom, setZoom] = useState(1);
-  const [isPanning, setIsPanning] = useState(false);
-  const [lastPanPoint, setLastPanPoint] = useState<{ x: number; y: number } | null>(null);
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 1200, height: 800 });
+  
+  // Use refs for panning state to avoid stale closures
+  const isPanningRef = useRef(false);
+  const lastPanPointRef = useRef<{ x: number; y: number } | null>(null);
+  
+  // Store data in ref to prevent event handler re-registration
+  const dataRef = useRef({
+    lanes,
+    rooms,
+    outsideAreas,
+    stations,
+    storageLocations,
+  });
   
   // Store callbacks in refs to prevent useEffect re-runs
   const callbacksRef = useRef({
@@ -238,7 +249,18 @@ export function UnifiedGridBuilder({
     };
   });
 
-  // Validate element placement based on containment rules
+  // Update data ref when data changes
+  useEffect(() => {
+    dataRef.current = {
+      lanes,
+      rooms,
+      outsideAreas,
+      stations,
+      storageLocations,
+    };
+  }, [lanes, rooms, outsideAreas, stations, storageLocations]);
+
+  // Validate element placement based on containment rules - use dataRef for current data
   const validatePlacement = (
     type: string,
     gridX: number,
@@ -248,7 +270,7 @@ export function UnifiedGridBuilder({
   ): { valid: boolean; reason?: string; parentLaneId?: string } => {
     // Stations must be inside a lane
     if (type === 'station') {
-      const containingLane = lanes?.find(lane => {
+      const containingLane = dataRef.current.lanes?.find(lane => {
         const laneY = lane.grid_y || 0;
         const laneHeight = lane.grid_height || 5;
         return gridY >= laneY && gridY + gridHeight <= laneY + laneHeight;
@@ -263,13 +285,13 @@ export function UnifiedGridBuilder({
     
     // Storage must be inside a lane or room
     if (type === 'storage') {
-      const inLane = lanes?.some(lane => {
+      const inLane = dataRef.current.lanes?.some(lane => {
         const laneY = lane.grid_y || 0;
         const laneHeight = lane.grid_height || 5;
         return gridY >= laneY && gridY + gridHeight <= laneY + laneHeight;
       });
       
-      const inRoom = rooms?.some(room => {
+      const inRoom = dataRef.current.rooms?.some(room => {
         const roomX = room.grid_x || 0;
         const roomY = room.grid_y || 0;
         const roomWidth = room.grid_width || 10;
@@ -340,6 +362,7 @@ export function UnifiedGridBuilder({
     if (!canvas) return;
 
     const handleObjectMoving = (e: any) => {
+      console.log('🔄 object:moving', e.target?.data);
       const obj = e.target;
       if (!obj?.data) return;
 
@@ -407,6 +430,7 @@ export function UnifiedGridBuilder({
     };
 
     const handleObjectModified = (e: any) => {
+      console.log('✅ object:modified', e.target?.data);
       const obj = e.target;
       if (!obj?.data) return;
 
@@ -473,6 +497,7 @@ export function UnifiedGridBuilder({
     };
 
     const handleSelectionCreated = (e: any) => {
+      console.log('🎯 selection:created', e.selected?.[0]?.data);
       const obj = e.selected?.[0];
       if (obj?.data) {
         callbacksRef.current.onElementSelect?.(obj.data);
@@ -494,40 +519,46 @@ export function UnifiedGridBuilder({
     };
   }, [canvas]);
 
-  // Panning handlers
+  // Panning handlers - use refs to prevent stale closures
   useEffect(() => {
     if (!canvas) return;
 
     const handleMouseDown = (e: any) => {
+      console.log('🖱️ mouse:down', { 
+        hasTarget: !!e.target, 
+        targetType: e.target?.data?.type,
+        altKey: e.e.altKey, 
+        button: e.e.button 
+      });
+      
       // Only pan with Alt/middle-click AND when clicking empty space (not an object)
       if ((e.e.altKey || e.e.button === 1) && !e.target) {
-        setIsPanning(true);
-        setLastPanPoint({ x: e.e.clientX, y: e.e.clientY });
+        e.e.preventDefault();
+        isPanningRef.current = true;
+        lastPanPointRef.current = { x: e.e.clientX, y: e.e.clientY };
         canvas.defaultCursor = 'grabbing';
-        
-        // Prevent object selection during pan
         canvas.discardActiveObject();
         canvas.renderAll();
       }
-      // Otherwise, allow normal object interaction (selection/dragging)
     };
 
     const handleMouseMove = (e: any) => {
-      if (isPanning && lastPanPoint) {
+      if (isPanningRef.current && lastPanPointRef.current) {
         const delta = {
-          x: e.e.clientX - lastPanPoint.x,
-          y: e.e.clientY - lastPanPoint.y,
+          x: e.e.clientX - lastPanPointRef.current.x,
+          y: e.e.clientY - lastPanPointRef.current.y,
         };
         canvas.relativePan({ x: delta.x, y: delta.y } as any);
-        setLastPanPoint({ x: e.e.clientX, y: e.e.clientY });
-        canvas.defaultCursor = 'grabbing';
+        lastPanPointRef.current = { x: e.e.clientX, y: e.e.clientY };
       }
     };
 
     const handleMouseUp = () => {
-      setIsPanning(false);
-      setLastPanPoint(null);
-      canvas.defaultCursor = 'default';
+      if (isPanningRef.current) {
+        isPanningRef.current = false;
+        lastPanPointRef.current = null;
+        canvas.defaultCursor = 'default';
+      }
     };
 
     canvas.on('mouse:down', handleMouseDown);
@@ -539,10 +570,15 @@ export function UnifiedGridBuilder({
       canvas.off('mouse:move', handleMouseMove);
       canvas.off('mouse:up', handleMouseUp);
     };
-  }, [canvas, editMode]);
+  }, [canvas]);
 
   useEffect(() => {
     if (!canvas || !canvas.upperCanvasEl) return;
+
+    // Preserve active selection before clearing
+    const activeObject = canvas.getActiveObject() as any;
+    const activeId = activeObject?.data?.id;
+    const activeType = activeObject?.data?.type;
 
     canvas.clear();
     canvas.backgroundColor = COLORS.facility.background;
@@ -920,6 +956,16 @@ export function UnifiedGridBuilder({
 
       canvas.add(storageGroup);
     });
+
+    // Restore selection after re-render if element still exists
+    if (activeId && activeType) {
+      const objectToSelect = canvas.getObjects().find((obj: any) => 
+        obj.data?.id === activeId && obj.data?.type === activeType
+      );
+      if (objectToSelect) {
+        canvas.setActiveObject(objectToSelect);
+      }
+    }
 
     canvas.renderAll();
   }, [canvas, gridWidth, gridHeight, gates, lanes, stations, rooms, outsideAreas, storageLocations, zones, editMode]);
