@@ -499,8 +499,8 @@ export function UnifiedGridBuilder({
     if (!canvas) return;
 
     const handleMouseDown = (e: any) => {
-      // Only pan with Alt key or middle-click
-      if (e.e.altKey || e.e.button === 1) {
+      // Only pan with Alt/middle-click AND when clicking empty space (not an object)
+      if ((e.e.altKey || e.e.button === 1) && !e.target) {
         setIsPanning(true);
         setLastPanPoint({ x: e.e.clientX, y: e.e.clientY });
         canvas.defaultCursor = 'grabbing';
@@ -539,7 +539,7 @@ export function UnifiedGridBuilder({
       canvas.off('mouse:move', handleMouseMove);
       canvas.off('mouse:up', handleMouseUp);
     };
-  }, [canvas, isPanning, lastPanPoint, editMode]);
+  }, [canvas, editMode]);
 
   useEffect(() => {
     if (!canvas || !canvas.upperCanvasEl) return;
