@@ -359,6 +359,50 @@ export default function FacilityLayoutBuilderPage() {
     350
   );
 
+  // Helper function to detect parent container at drop position
+  const detectParentContainer = (gridX: number, gridY: number, itemType: string): { parentType: string; parentId: string | null; roomId?: string | null } => {
+    // For stations and storage, check if they're inside a zone or lane
+    if (itemType === 'station' || itemType === 'storage') {
+      // First check zones
+      for (const zone of zoneBlocks) {
+        if (gridX >= zone.grid_x && gridX < zone.grid_x + zone.grid_width &&
+            gridY >= zone.grid_y && gridY < zone.grid_y + zone.grid_height) {
+          return { parentType: 'zone', parentId: zone.id };
+        }
+      }
+      
+      // Then check lanes
+      for (const lane of laneBlocks) {
+        if (gridX >= lane.grid_x && gridX < lane.grid_x + lane.grid_width &&
+            gridY >= lane.grid_y && gridY < lane.grid_y + lane.grid_height) {
+          return { parentType: 'lane', parentId: lane.id };
+        }
+      }
+    }
+    
+    // For lanes and zones, check if they're inside a room or outside area
+    if (itemType === 'lane' || itemType === 'zone') {
+      // Check rooms
+      for (const room of roomBlocks) {
+        if (gridX >= room.grid_x && gridX < room.grid_x + room.grid_width &&
+            gridY >= room.grid_y && gridY < room.grid_y + room.grid_height) {
+          return { parentType: 'room', parentId: room.id, roomId: room.id };
+        }
+      }
+      
+      // Check outside areas
+      for (const outside of outsideBlocks) {
+        if (gridX >= outside.grid_x && gridX < outside.grid_x + outside.grid_width &&
+            gridY >= outside.grid_y && gridY < outside.grid_y + outside.grid_height) {
+          return { parentType: 'outside', parentId: outside.id, roomId: outside.id };
+        }
+      }
+    }
+    
+    // Default to facility
+    return { parentType: 'facility', parentId: facility.id };
+  };
+
   const handleCanvasDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     
@@ -366,7 +410,7 @@ export default function FacilityLayoutBuilderPage() {
       const data = e.dataTransfer.getData('application/json');
       if (!data) return;
       
-      const { item, type } = JSON.parse(data) as { item: LibraryItem; type: 'gate' | 'lane' | 'station' };
+      const { item, type } = JSON.parse(data) as { item: LibraryItem; type: 'gate' | 'lane' | 'station' | 'storage' | 'zone' };
       
       const rect = (e.target as HTMLElement).getBoundingClientRect();
       const canvasX = e.clientX - rect.left;
@@ -375,6 +419,9 @@ export default function FacilityLayoutBuilderPage() {
       const CELL_SIZE = 30;
       const gridX = Math.floor(canvasX / CELL_SIZE);
       const gridY = Math.floor(canvasY / CELL_SIZE);
+      
+      // Detect parent container
+      const parent = detectParentContainer(gridX, gridY, type);
       
       if (type === 'gate') {
         await assignGate.mutateAsync({
@@ -394,31 +441,74 @@ export default function FacilityLayoutBuilderPage() {
           gridY,
           positionOrder,
         });
-        toast.success(`Lane "${item.name}" placed in facility`);
+        
+        if (parent.roomId) {
+          await updateLane.mutateAsync({
+            id: item.id,
+            room_id: parent.roomId,
+          } as any);
+        }
+        
+        toast.success(`Lane "${item.name}" placed in ${parent.parentType}`);
+      } else if (type === 'zone') {
+        const updates: any = {
+          facility_id: facility.id,
+          grid_position_x: gridX,
+          grid_position_y: gridY,
+        };
+        
+        if (parent.roomId) {
+          updates.room_id = parent.roomId;
+        }
+        
+        await updateZone.mutateAsync({
+          id: item.id,
+          ...updates,
+        });
+        
+        toast.success(`Zone "${item.name}" placed in ${parent.parentType}`);
       } else if (type === 'station') {
-        if (facilityLanes.length === 0) {
-          toast.error('Please create a lane first before adding stations');
+        const updates: any = {
+          grid_position_x: gridX,
+          grid_position_y: gridY,
+        };
+        
+        if (parent.parentType === 'lane') {
+          updates.lane_id = parent.parentId;
+        } else if (parent.parentType === 'zone') {
+          updates.zone_id = parent.parentId;
+        } else {
+          toast.error('Please drop the station inside a lane or zone');
           return;
         }
         
-        const targetLane = facilityLanes.find(lane => {
-          const laneTop = lane.grid_position_y;
-          const laneBottom = laneTop + (lane.grid_height || 2);
-          return gridY >= laneTop && gridY < laneBottom;
-        });
+        await updateStation.mutateAsync({
+          id: item.id,
+          ...updates,
+        } as any);
         
-        if (!targetLane) {
-          toast.error('Please drop the station inside a lane');
+        toast.success(`Station "${item.name}" placed in ${parent.parentType}`);
+      } else if (type === 'storage') {
+        const updates: any = {
+          grid_position_x: gridX,
+          grid_position_y: gridY,
+        };
+        
+        if (parent.parentType === 'lane') {
+          updates.lane_id = parent.parentId;
+        } else if (parent.parentType === 'zone') {
+          updates.zone_id = parent.parentId;
+        } else {
+          toast.error('Please drop storage inside a lane or zone');
           return;
         }
         
-        await assignStation.mutateAsync({
-          stationId: item.id,
-          laneId: targetLane.id,
-          gridX,
-          gridY,
-        });
-        toast.success(`Station "${item.name}" placed in lane`);
+        await updateStorageLocation.mutateAsync({
+          id: item.id,
+          ...updates,
+        } as any);
+        
+        toast.success(`Storage "${item.name}" placed in ${parent.parentType}`);
       }
     } catch (error) {
       console.error('Failed to place item:', error);
@@ -645,7 +735,7 @@ export default function FacilityLayoutBuilderPage() {
         )}
 
         {/* Canvas */}
-        <div className="flex-1 overflow-auto p-6 bg-muted/20">
+        <div className="flex-1 overflow-hidden bg-muted/20 relative">
           <BlockGridBuilder
             facility={facilityBlock}
             gates={gateBlocks}

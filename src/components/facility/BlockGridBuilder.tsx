@@ -171,7 +171,7 @@ export function BlockGridBuilder({
 
     const resizeObserver = new ResizeObserver((entries) => {
       const { width, height } = entries[0].contentRect;
-      const padding = 40;
+      const padding = 0; // No padding needed - controls are positioned absolutely
       
       setCanvasDimensions({ 
         width: width - padding, 

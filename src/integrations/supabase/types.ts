@@ -931,6 +931,7 @@ export type Database = {
           room_id: string | null
           station_type: string
           updated_at: string | null
+          zone_id: string | null
         }
         Insert: {
           active?: boolean | null
@@ -948,6 +949,7 @@ export type Database = {
           room_id?: string | null
           station_type?: string
           updated_at?: string | null
+          zone_id?: string | null
         }
         Update: {
           active?: boolean | null
@@ -965,6 +967,7 @@ export type Database = {
           room_id?: string | null
           station_type?: string
           updated_at?: string | null
+          zone_id?: string | null
         }
         Relationships: [
           {
@@ -979,6 +982,13 @@ export type Database = {
             columns: ["room_id"]
             isOneToOne: false
             referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stations_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "zones"
             referencedColumns: ["id"]
           },
         ]
@@ -998,6 +1008,7 @@ export type Database = {
           status: string | null
           storage_type: string | null
           updated_at: string | null
+          zone_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -1013,6 +1024,7 @@ export type Database = {
           status?: string | null
           storage_type?: string | null
           updated_at?: string | null
+          zone_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -1028,6 +1040,7 @@ export type Database = {
           status?: string | null
           storage_type?: string | null
           updated_at?: string | null
+          zone_id?: string | null
         }
         Relationships: [
           {
@@ -1042,6 +1055,13 @@ export type Database = {
             columns: ["room_id"]
             isOneToOne: false
             referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "storage_locations_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "zones"
             referencedColumns: ["id"]
           },
         ]
