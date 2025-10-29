@@ -10,7 +10,8 @@ import { useStorageLocations, useUpdateStorageLocation, useDeleteStorageLocation
 import { useZones, useUpdateZone, useDeleteZone } from '@/hooks/admin/useZones';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, MapPin, Layers, Box, Home, Plus, ChevronLeft, ChevronRight, LayoutGrid, Map, Archive, Square } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ArrowLeft, MapPin, Layers, Box, Home, Plus, ChevronLeft, ChevronRight, LayoutGrid, Map, Archive, Square, Settings } from 'lucide-react';
 import { BlockGridBuilder, type EditMode, type LayoutBlock, ELEMENT_TO_GROUP } from '@/components/facility/BlockGridBuilder';
 import { BlockProperties } from '@/components/facility/BlockProperties';
 import { LibraryPalette, type LibraryItem } from '@/components/facility/LibraryPalette';
@@ -728,51 +729,9 @@ export default function FacilityLayoutBuilderPage() {
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Library Panel */}
-        <div
-          className={`flex-shrink-0 border-r bg-card overflow-y-auto transition-all duration-300 ease-in-out ${
-            showLibrary ? 'w-60 opacity-100' : 'w-0 opacity-0'
-          } ${isDraggingFromLibrary ? 'opacity-40' : ''}`}
-        >
-          {showLibrary && (
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold">Library</h3>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowLibrary(false)}
-                  title="Close Library (L)"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-              </div>
-              <LibraryPalette
-                editMode={editMode}
-                onItemDragStart={() => setIsDraggingFromLibrary(true)}
-                onItemDragEnd={() => setIsDraggingFromLibrary(false)}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Toggle Library Button */}
-        {!showLibrary && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="absolute left-4 top-32 z-10 shadow-lg"
-            onClick={() => setShowLibrary(true)}
-            title="Open Library (L)"
-          >
-            <ChevronRight className="h-4 w-4 mr-1" />
-            Library
-          </Button>
-        )}
-
-        {/* Canvas */}
-        <div className="flex-1 overflow-hidden bg-muted/20 relative">
+      <div className="flex-1 relative overflow-hidden">
+        {/* Canvas - Full width, panels overlay on top */}
+        <div className="absolute inset-0 overflow-hidden bg-muted/20">
           <BlockGridBuilder
             facility={facilityBlock}
             gates={gateBlocks}
@@ -823,16 +782,90 @@ export default function FacilityLayoutBuilderPage() {
           )}
         </div>
 
-        {/* Properties Panel */}
+        {/* Library Panel - Floating Overlay */}
         <div
-          className={`flex-shrink-0 border-l bg-card overflow-y-auto transition-all duration-300 ease-in-out ${
-            showProperties ? 'w-60 opacity-100' : 'w-0 opacity-0'
+          className={`absolute left-0 top-0 bottom-0 z-20 bg-card/95 backdrop-blur-sm border-r shadow-lg overflow-y-auto transition-all duration-300 ease-in-out ${
+            showLibrary ? 'w-60' : 'w-12'
+          } ${isDraggingFromLibrary ? 'opacity-40' : ''}`}
+        >
+          {/* Header with Toggle */}
+          <div className="flex items-center justify-between p-3 border-b bg-card/50 sticky top-0 z-10">
+            {showLibrary ? (
+              <>
+                <h3 className="font-semibold text-sm">Library</h3>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowLibrary(false)}
+                  title="Close Library (L)"
+                  className="h-7 w-7"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+              </>
+            ) : (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setShowLibrary(true)}
+                      className="mx-auto h-7 w-7"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Open Library (L)</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+
+          {/* Content - Only show when expanded */}
+          {showLibrary && (
+            <div className="p-4">
+              <LibraryPalette
+                editMode={editMode}
+                onItemDragStart={() => setIsDraggingFromLibrary(true)}
+                onItemDragEnd={() => setIsDraggingFromLibrary(false)}
+              />
+            </div>
+          )}
+
+          {/* Icon strip when collapsed */}
+          {!showLibrary && (
+            <div className="flex flex-col items-center gap-2 p-2">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setShowLibrary(true)}
+                      className="h-8 w-8"
+                    >
+                      <LayoutGrid className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Open Library (L)</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          )}
+        </div>
+
+        {/* Properties Panel - Floating Overlay */}
+        <div
+          className={`absolute right-0 top-0 bottom-0 z-20 bg-card/95 backdrop-blur-sm border-l shadow-lg overflow-y-auto transition-all duration-300 ease-in-out ${
+            showProperties ? 'w-60' : 'w-12'
           }`}
         >
-          {showProperties && (
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold">Properties</h3>
+          {/* Header with Toggle */}
+          <div className="flex items-center justify-between p-3 border-b bg-card/50 sticky top-0 z-10">
+            {showProperties ? (
+              <>
+                <h3 className="font-semibold text-sm">Properties</h3>
                 <div className="flex items-center gap-1">
                   <Button
                     variant="ghost"
@@ -842,6 +875,7 @@ export default function FacilityLayoutBuilderPage() {
                       toast.success(propertiesPinned ? 'Properties unpinned' : 'Properties pinned');
                     }}
                     title={propertiesPinned ? 'Unpin (Auto-hide)' : 'Pin (Always visible)'}
+                    className="h-7 w-7"
                   >
                     <MapPin className={`h-4 w-4 ${propertiesPinned ? 'fill-current' : ''}`} />
                   </Button>
@@ -853,11 +887,37 @@ export default function FacilityLayoutBuilderPage() {
                       setPropertiesPinned(false);
                     }}
                     title="Close Properties (P)"
+                    className="h-7 w-7"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
-              </div>
+              </>
+            ) : (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setShowProperties(true);
+                        setPropertiesPinned(true);
+                      }}
+                      className="mx-auto h-7 w-7"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">Open Properties (P)</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+
+          {/* Content - Only show when expanded */}
+          {showProperties && (
+            <div className="p-4">
               {selectedBlock ? (
                 <BlockProperties
                   block={selectedBlock}
@@ -879,24 +939,31 @@ export default function FacilityLayoutBuilderPage() {
               )}
             </div>
           )}
-        </div>
 
-        {/* Toggle Properties Button */}
-        {!showProperties && selectedBlock && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="absolute right-4 top-32 z-10 shadow-lg"
-            onClick={() => {
-              setShowProperties(true);
-              setPropertiesPinned(true);
-            }}
-            title="Open Properties (P)"
-          >
-            Properties
-            <ChevronLeft className="h-4 w-4 ml-1" />
-          </Button>
-        )}
+          {/* Icon when collapsed */}
+          {!showProperties && (
+            <div className="flex flex-col items-center gap-2 p-2">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setShowProperties(true);
+                        setPropertiesPinned(true);
+                      }}
+                      className="h-8 w-8"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">Open Properties (P)</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Dialogs */}
