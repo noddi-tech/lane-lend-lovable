@@ -3,7 +3,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Search, DoorOpen, Layers, Box, GripVertical, Info, Home, Map, Archive } from 'lucide-react';
+import { Search, DoorOpen, Layers, Box, GripVertical, Info, Home, Map, Archive, Square } from 'lucide-react';
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useLibraryGates } from '@/hooks/admin/useDrivingGates';
@@ -12,6 +12,7 @@ import { useLibraryStations } from '@/hooks/admin/useStations';
 import { useLibraryRooms } from '@/hooks/admin/useRooms';
 import { useLibraryOutsideAreas } from '@/hooks/admin/useOutsideAreas';
 import { useLibraryStorageLocations } from '@/hooks/admin/useStorageLocations';
+import { useLibraryZones } from '@/hooks/admin/useZones';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface LibraryPaletteProps {
