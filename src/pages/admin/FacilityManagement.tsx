@@ -5,7 +5,7 @@ import { useDrivingGates } from '@/hooks/admin/useDrivingGates';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
-import { Building2, Plus, Layers } from 'lucide-react';
+import { Building2, Plus, Layers, Settings, Trash2 } from 'lucide-react';
 import { FacilityOverview } from '@/components/facility/FacilityOverview';
 import { FacilityConfiguration } from '@/components/facility/FacilityConfiguration';
 
@@ -38,6 +38,31 @@ export default function FacilityManagement() {
             Manage facilities, driving gates, lanes, and stations in one unified interface
           </p>
         </div>
+        
+        {selectedFacility && (
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setActiveTab('config')}
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Settings
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => {
+                setActiveTab('config');
+                setTimeout(() => {
+                  const dangerZone = document.getElementById('danger-zone');
+                  dangerZone?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+              }}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Facility
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-12 gap-6">
@@ -85,7 +110,10 @@ export default function FacilityManagement() {
               </TabsList>
 
               <TabsContent value="overview" className="space-y-4">
-                <FacilityOverview facility={selectedFacility} />
+                <FacilityOverview 
+                  facility={selectedFacility} 
+                  onNavigateToConfig={() => setActiveTab('config')}
+                />
               </TabsContent>
 
               <TabsContent value="layout" className="space-y-4">

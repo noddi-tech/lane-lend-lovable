@@ -22,6 +22,26 @@ export interface FacilityWithGates extends Facility {
     grid_width: number;
     grid_height: number;
   }>;
+  lanes: Array<{
+    id: string;
+    name: string;
+    lane_type: string;
+  }>;
+  rooms: Array<{
+    id: string;
+    name: string;
+    color: string;
+  }>;
+  zones: Array<{
+    id: string;
+    name: string;
+    zone_type: string;
+  }>;
+  outside_areas: Array<{
+    id: string;
+    name: string;
+    area_type: string;
+  }>;
 }
 
 export function useFacilities() {
@@ -39,6 +59,26 @@ export function useFacilities() {
             grid_position_y,
             grid_width,
             grid_height
+          ),
+          lanes:lanes_new!facility_id(
+            id,
+            name,
+            lane_type
+          ),
+          rooms:rooms!facility_id(
+            id,
+            name,
+            color
+          ),
+          zones:zones!facility_id(
+            id,
+            name,
+            zone_type
+          ),
+          outside_areas:outside_areas!facility_id(
+            id,
+            name,
+            area_type
           )
         `)
         .order('name');
@@ -48,6 +88,10 @@ export function useFacilities() {
       return data.map((facility: any) => ({
         ...facility,
         driving_gates: facility.driving_gates || [],
+        lanes: facility.lanes || [],
+        rooms: facility.rooms || [],
+        zones: facility.zones || [],
+        outside_areas: facility.outside_areas || [],
       })) as FacilityWithGates[];
     },
   });

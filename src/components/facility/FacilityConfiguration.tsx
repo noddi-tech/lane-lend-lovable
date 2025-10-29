@@ -121,7 +121,7 @@ export function FacilityConfiguration({ facility }: FacilityConfigurationProps) 
         </CardContent>
       </Card>
 
-      <Card className="border-destructive">
+      <Card className="border-destructive" id="danger-zone">
         <CardHeader>
           <CardTitle className="text-destructive flex items-center gap-2">
             <Trash2 className="h-5 w-5" />
