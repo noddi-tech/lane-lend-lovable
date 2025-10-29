@@ -3,6 +3,7 @@ import { Canvas as FabricCanvas, Rect, Text, Group } from 'fabric';
 import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, Maximize2, Grid3x3, Eye, EyeOff, Home } from 'lucide-react';
 import { calculateOptimalBoundary } from '@/utils/facilityBoundaryCalculator';
+import { useDebouncedCallback } from '@/hooks/useDebouncedMutation';
 
 // Individual element types
 export type EditMode = 'view' | 'facility' | 'gate' | 'lane' | 'station' | 'room' | 'outside' | 'storage' | 'zone';
@@ -242,6 +243,9 @@ export function BlockGridBuilder({
   const objectPoolRef = useRef<Map<string, Group>>(new Map());
   const isDraggingRef = useRef(false);
   const lastDataHashRef = useRef<string>('');
+  
+  // Refs for callbacks to avoid dependency issues
+  const onCanvasStateChangeRef = useRef(onCanvasStateChange);
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -255,11 +259,16 @@ export function BlockGridBuilder({
   useEffect(() => {
     zoomRef.current = zoom;
   }, [zoom]);
+  
+  // Keep callback ref in sync
+  useEffect(() => {
+    onCanvasStateChangeRef.current = onCanvasStateChange;
+  }, [onCanvasStateChange]);
 
   // Notify parent of canvas state changes
   useEffect(() => {
     if (canvas && containerRef.current) {
-      onCanvasStateChange?.({
+      onCanvasStateChangeRef.current?.({
         zoom,
         workingArea,
         viewportTransform: canvas.viewportTransform,
@@ -269,13 +278,18 @@ export function BlockGridBuilder({
         },
       });
     }
-  }, [zoom, workingArea, canvas, onCanvasStateChange]);
+  }, [zoom, workingArea, canvas]); // Removed onCanvasStateChange from deps
+
+  // Debounced working area recalculation to prevent rapid updates
+  const updateWorkingArea = useDebouncedCallback(() => {
+    const area = calculateWorkingArea(gates, lanes, stations, rooms, outsideAreas, storageLocations, zones);
+    setWorkingArea(area);
+  }, 100);
 
   // Recalculate working area when elements change
   useEffect(() => {
-    const area = calculateWorkingArea(gates, lanes, stations, rooms, outsideAreas, storageLocations, zones);
-    setWorkingArea(area);
-  }, [gates, lanes, stations, rooms, outsideAreas, storageLocations, zones]);
+    updateWorkingArea();
+  }, [gates, lanes, stations, rooms, outsideAreas, storageLocations, zones, updateWorkingArea]);
 
   // Calculate responsive canvas size and cell size
   useEffect(() => {

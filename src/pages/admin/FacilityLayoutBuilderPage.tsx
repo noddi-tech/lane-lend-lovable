@@ -65,6 +65,16 @@ export default function FacilityLayoutBuilderPage() {
     viewportTransform: null,
     containerSize: { width: 1000, height: 700 },
   });
+  
+  // Memoized canvas state change handler to prevent infinite loops
+  const handleCanvasStateChange = useCallback((state: {
+    zoom: number;
+    workingArea: { minX: number; minY: number; width: number; height: number };
+    viewportTransform: number[] | null;
+    containerSize: { width: number; height: number };
+  }) => {
+    setCanvasState(state);
+  }, []);
   const { data: facilities, isLoading: loadingFacilities } = useFacilities();
   const { data: allDrivingGates } = useDrivingGates();
   const { data: allLanes } = useLanes();
@@ -749,7 +759,7 @@ export default function FacilityLayoutBuilderPage() {
             onDrop={handleCanvasDrop}
             onDelete={handleDeleteBlock}
             onReturnToLibrary={handleReturnToLibrary}
-            onCanvasStateChange={setCanvasState}
+            onCanvasStateChange={handleCanvasStateChange}
             onEnterRoom={(roomId) => {
               const room = allRooms?.find(r => r.id === roomId);
               if (room) {
