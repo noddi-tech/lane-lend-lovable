@@ -238,6 +238,58 @@ export function UnifiedGridBuilder({
     };
   });
 
+  // Validate element placement based on containment rules
+  const validatePlacement = (
+    type: string,
+    gridX: number,
+    gridY: number,
+    gridWidth: number,
+    gridHeight: number
+  ): { valid: boolean; reason?: string; parentLaneId?: string } => {
+    // Stations must be inside a lane
+    if (type === 'station') {
+      const containingLane = lanes?.find(lane => {
+        const laneY = lane.grid_y || 0;
+        const laneHeight = lane.grid_height || 5;
+        return gridY >= laneY && gridY + gridHeight <= laneY + laneHeight;
+      });
+      
+      if (!containingLane) {
+        return { valid: false, reason: 'Stations must be placed within a lane' };
+      }
+      
+      return { valid: true, parentLaneId: containingLane.id };
+    }
+    
+    // Storage must be inside a lane or room
+    if (type === 'storage') {
+      const inLane = lanes?.some(lane => {
+        const laneY = lane.grid_y || 0;
+        const laneHeight = lane.grid_height || 5;
+        return gridY >= laneY && gridY + gridHeight <= laneY + laneHeight;
+      });
+      
+      const inRoom = rooms?.some(room => {
+        const roomX = room.grid_x || 0;
+        const roomY = room.grid_y || 0;
+        const roomWidth = room.grid_width || 10;
+        const roomHeight = room.grid_height || 10;
+        return (
+          gridX >= roomX && 
+          gridX + gridWidth <= roomX + roomWidth &&
+          gridY >= roomY && 
+          gridY + gridHeight <= roomY + roomHeight
+        );
+      });
+      
+      if (!inLane && !inRoom) {
+        return { valid: false, reason: 'Storage must be inside a lane or room' };
+      }
+    }
+    
+    return { valid: true };
+  };
+
   // Responsive canvas sizing
   useEffect(() => {
     if (!containerRef.current) return;
@@ -307,6 +359,25 @@ export function UnifiedGridBuilder({
       } else {
         obj.set({ left: snappedLeft, top: snappedTop });
       }
+
+      // Visual feedback for validation during drag
+      const rect = obj._objects?.[0];
+      if (rect && (type === 'station' || type === 'storage')) {
+        const gridX = Math.round(snappedLeft / CELL_SIZE);
+        const gridY = Math.round(snappedTop / CELL_SIZE);
+        const gridWidth = Math.round((rect.width || 0) / CELL_SIZE);
+        const gridHeight = Math.round((rect.height || 0) / CELL_SIZE);
+        
+        const validation = validatePlacement(type, gridX, gridY, gridWidth, gridHeight);
+        
+        // Change border color based on validity
+        rect.set({
+          stroke: validation.valid ? (type === 'station' ? COLORS.stations.stroke : COLORS.storage.stroke) : '#ef4444',
+          strokeWidth: validation.valid ? (type === 'station' ? COLORS.stations.strokeWidth : COLORS.storage.strokeWidth) : 4,
+        });
+      }
+
+      canvas.renderAll();
     };
 
     const handleObjectScaling = (e: any) => {
@@ -350,6 +421,36 @@ export function UnifiedGridBuilder({
       const rect = obj._objects?.[0];
       const gridWidth = Math.round((rect?.width || 0) / CELL_SIZE);
       const gridHeight = Math.round((rect?.height || 0) / CELL_SIZE);
+
+      // Validate placement for containment rules
+      const validation = validatePlacement(type, gridX, gridY, gridWidth, gridHeight);
+      
+      if (!validation.valid) {
+        // Show error and revert by re-rendering all elements
+        import('sonner').then(({ toast }) => {
+          toast.error(validation.reason || 'Invalid placement');
+        });
+        
+        // Reset border color
+        if (rect) {
+          rect.set({
+            stroke: type === 'station' ? COLORS.stations.stroke : COLORS.storage.stroke,
+            strokeWidth: type === 'station' ? COLORS.stations.strokeWidth : COLORS.storage.strokeWidth,
+          });
+        }
+        
+        // Re-render to reset position
+        canvas.renderAll();
+        return;
+      }
+
+      // Reset border color on successful placement
+      if (rect && (type === 'station' || type === 'storage')) {
+        rect.set({
+          stroke: type === 'station' ? COLORS.stations.stroke : COLORS.storage.stroke,
+          strokeWidth: type === 'station' ? COLORS.stations.strokeWidth : COLORS.storage.strokeWidth,
+        });
+      }
 
       if (type === 'gate') {
         callbacksRef.current.onGateMove?.(id, gridX, gridY);
@@ -486,6 +587,156 @@ export function UnifiedGridBuilder({
       });
       canvas.add(line);
     }
+
+    // Render in proper z-order (back to front):
+    // 1. Zones (background containers)
+    // 2. Rooms (containers)
+    // 3. Outside Areas (containers)
+    // 4. Lanes (horizontal containers)
+    // 5. Gates (entry/exit)
+    // 6. Storage (content)
+    // 7. Stations (content - on top)
+
+    // Render zones first (background)
+    zones.forEach((zone) => {
+      const zoneX = (zone.grid_x || 0) * CELL_SIZE;
+      const zoneY = (zone.grid_y || 0) * CELL_SIZE;
+      const zoneWidth = (zone.grid_width || 6) * CELL_SIZE;
+      const zoneHeight = (zone.grid_height || 6) * CELL_SIZE;
+      const opacity = editMode === 'zone' ? 1 : 0.2;
+
+      const zoneRect = new Rect({
+        left: 0,
+        top: 0,
+        width: zoneWidth,
+        height: zoneHeight,
+        fill: zone.color || COLORS.zones.fill,
+        stroke: COLORS.zones.stroke,
+        strokeWidth: COLORS.zones.strokeWidth,
+        opacity,
+        rx: 4,
+        ry: 4,
+      });
+
+      const zoneText = new FabricText(zone.name, {
+        left: zoneWidth / 2 - 25,
+        top: zoneHeight / 2 - 8,
+        fontSize: 12,
+        fill: COLORS.zones.text,
+        fontWeight: 'bold',
+      });
+
+      const zoneGroup = new Group([zoneRect, zoneText], {
+        left: zoneX,
+        top: zoneY,
+        selectable: editMode === 'zone',
+        hasControls: editMode === 'zone',
+        lockRotation: true,
+        evented: editMode === 'zone',
+        cornerStyle: 'circle',
+        borderColor: COLORS.selected.stroke,
+        cornerColor: COLORS.selected.stroke,
+        hoverCursor: editMode === 'zone' ? 'move' : 'default',
+        moveCursor: 'move',
+        data: { type: 'zone', id: zone.id, originalData: zone },
+      } as any);
+
+      canvas.add(zoneGroup);
+    });
+
+    // Render rooms
+    rooms.forEach((room) => {
+      const roomX = (room.grid_x || 0) * CELL_SIZE;
+      const roomY = (room.grid_y || 0) * CELL_SIZE;
+      const roomWidth = (room.grid_width || 10) * CELL_SIZE;
+      const roomHeight = (room.grid_height || 10) * CELL_SIZE;
+      const opacity = editMode === 'room' ? 1 : 0.2;
+
+      const roomRect = new Rect({
+        left: 0,
+        top: 0,
+        width: roomWidth,
+        height: roomHeight,
+        fill: room.color || COLORS.rooms.fill,
+        stroke: COLORS.rooms.stroke,
+        strokeWidth: COLORS.rooms.strokeWidth,
+        opacity,
+        rx: 4,
+        ry: 4,
+      });
+
+      const roomText = new FabricText(room.name, {
+        left: roomWidth / 2 - 30,
+        top: roomHeight / 2 - 8,
+        fontSize: 14,
+        fill: COLORS.rooms.text,
+        fontWeight: 'bold',
+      });
+
+      const roomGroup = new Group([roomRect, roomText], {
+        left: roomX,
+        top: roomY,
+        selectable: editMode === 'room',
+        hasControls: editMode === 'room',
+        lockRotation: true,
+        evented: editMode === 'room',
+        cornerStyle: 'circle',
+        borderColor: COLORS.selected.stroke,
+        cornerColor: COLORS.selected.stroke,
+        hoverCursor: editMode === 'room' ? 'move' : 'default',
+        moveCursor: 'move',
+        data: { type: 'room', id: room.id, originalData: room },
+      } as any);
+
+      canvas.add(roomGroup);
+    });
+
+    // Render outside areas
+    outsideAreas.forEach((area) => {
+      const areaX = (area.grid_x || 0) * CELL_SIZE;
+      const areaY = (area.grid_y || 0) * CELL_SIZE;
+      const areaWidth = (area.grid_width || 8) * CELL_SIZE;
+      const areaHeight = (area.grid_height || 8) * CELL_SIZE;
+      const opacity = editMode === 'outside' ? 1 : 0.2;
+
+      const areaRect = new Rect({
+        left: 0,
+        top: 0,
+        width: areaWidth,
+        height: areaHeight,
+        fill: area.color || COLORS.outside.fill,
+        stroke: COLORS.outside.stroke,
+        strokeWidth: COLORS.outside.strokeWidth,
+        opacity,
+        rx: 2,
+        ry: 2,
+      });
+
+      const areaText = new FabricText(area.name, {
+        left: areaWidth / 2 - 30,
+        top: areaHeight / 2 - 8,
+        fontSize: 13,
+        fill: COLORS.outside.text,
+        fontWeight: 'bold',
+      });
+
+      const areaGroup = new Group([areaRect, areaText], {
+        left: areaX,
+        top: areaY,
+        selectable: editMode === 'outside',
+        hasControls: editMode === 'outside',
+        lockRotation: true,
+        evented: editMode === 'outside',
+        cornerStyle: 'circle',
+        borderColor: COLORS.selected.stroke,
+        cornerColor: COLORS.selected.stroke,
+        hoverCursor: editMode === 'outside' ? 'move' : 'default',
+        moveCursor: 'move',
+        data: { type: 'outside', id: area.id, originalData: area },
+      } as any);
+
+      canvas.add(areaGroup);
+    });
 
     // Render lanes
     lanes.forEach((lane) => {
@@ -625,100 +876,6 @@ export function UnifiedGridBuilder({
       canvas.add(stationGroup);
     });
 
-    // Render rooms
-    rooms.forEach((room) => {
-      const roomX = (room.grid_x || 0) * CELL_SIZE;
-      const roomY = (room.grid_y || 0) * CELL_SIZE;
-      const roomWidth = (room.grid_width || 10) * CELL_SIZE;
-      const roomHeight = (room.grid_height || 10) * CELL_SIZE;
-      const opacity = editMode === 'room' ? 1 : 0.2;
-
-      const roomRect = new Rect({
-        left: 0,
-        top: 0,
-        width: roomWidth,
-        height: roomHeight,
-        fill: room.color || COLORS.rooms.fill,
-        stroke: COLORS.rooms.stroke,
-        strokeWidth: COLORS.rooms.strokeWidth,
-        opacity,
-        rx: 4,
-        ry: 4,
-      });
-
-      const roomText = new FabricText(room.name, {
-        left: roomWidth / 2 - 30,
-        top: roomHeight / 2 - 8,
-        fontSize: 14,
-        fill: COLORS.rooms.text,
-        fontWeight: 'bold',
-      });
-
-      const roomGroup = new Group([roomRect, roomText], {
-        left: roomX,
-        top: roomY,
-        selectable: editMode === 'room',
-        hasControls: editMode === 'room',
-        lockRotation: true,
-        evented: editMode === 'room',
-        cornerStyle: 'circle',
-        borderColor: COLORS.selected.stroke,
-        cornerColor: COLORS.selected.stroke,
-        hoverCursor: editMode === 'room' ? 'move' : 'default',
-        moveCursor: 'move',
-        data: { type: 'room', id: room.id, originalData: room },
-      } as any);
-
-      canvas.add(roomGroup);
-    });
-
-    // Render outside areas
-    outsideAreas.forEach((area) => {
-      const areaX = (area.grid_x || 0) * CELL_SIZE;
-      const areaY = (area.grid_y || 0) * CELL_SIZE;
-      const areaWidth = (area.grid_width || 8) * CELL_SIZE;
-      const areaHeight = (area.grid_height || 8) * CELL_SIZE;
-      const opacity = editMode === 'outside' ? 1 : 0.2;
-
-      const areaRect = new Rect({
-        left: 0,
-        top: 0,
-        width: areaWidth,
-        height: areaHeight,
-        fill: area.color || COLORS.outside.fill,
-        stroke: COLORS.outside.stroke,
-        strokeWidth: COLORS.outside.strokeWidth,
-        opacity,
-        rx: 2,
-        ry: 2,
-      });
-
-      const areaText = new FabricText(area.name, {
-        left: areaWidth / 2 - 30,
-        top: areaHeight / 2 - 8,
-        fontSize: 13,
-        fill: COLORS.outside.text,
-        fontWeight: 'bold',
-      });
-
-      const areaGroup = new Group([areaRect, areaText], {
-        left: areaX,
-        top: areaY,
-        selectable: editMode === 'outside',
-        hasControls: editMode === 'outside',
-        lockRotation: true,
-        evented: editMode === 'outside',
-        cornerStyle: 'circle',
-        borderColor: COLORS.selected.stroke,
-        cornerColor: COLORS.selected.stroke,
-        hoverCursor: editMode === 'outside' ? 'move' : 'default',
-        moveCursor: 'move',
-        data: { type: 'outside', id: area.id, originalData: area },
-      } as any);
-
-      canvas.add(areaGroup);
-    });
-
     // Render storage locations
     storageLocations.forEach((storage) => {
       const storageX = (storage.grid_x || 0) * CELL_SIZE;
@@ -764,53 +921,6 @@ export function UnifiedGridBuilder({
       } as any);
 
       canvas.add(storageGroup);
-    });
-
-    // Render zones
-    zones.forEach((zone) => {
-      const zoneX = (zone.grid_x || 0) * CELL_SIZE;
-      const zoneY = (zone.grid_y || 0) * CELL_SIZE;
-      const zoneWidth = (zone.grid_width || 6) * CELL_SIZE;
-      const zoneHeight = (zone.grid_height || 6) * CELL_SIZE;
-      const opacity = editMode === 'zone' ? 1 : 0.2;
-
-      const zoneRect = new Rect({
-        left: 0,
-        top: 0,
-        width: zoneWidth,
-        height: zoneHeight,
-        fill: zone.color || COLORS.zones.fill,
-        stroke: COLORS.zones.stroke,
-        strokeWidth: COLORS.zones.strokeWidth,
-        opacity,
-        rx: 4,
-        ry: 4,
-      });
-
-      const zoneText = new FabricText(zone.name, {
-        left: zoneWidth / 2 - 25,
-        top: zoneHeight / 2 - 8,
-        fontSize: 12,
-        fill: COLORS.zones.text,
-        fontWeight: 'bold',
-      });
-
-      const zoneGroup = new Group([zoneRect, zoneText], {
-        left: zoneX,
-        top: zoneY,
-        selectable: editMode === 'zone',
-        hasControls: editMode === 'zone',
-        lockRotation: true,
-        evented: editMode === 'zone',
-        cornerStyle: 'circle',
-        borderColor: COLORS.selected.stroke,
-        cornerColor: COLORS.selected.stroke,
-        hoverCursor: editMode === 'zone' ? 'move' : 'default',
-        moveCursor: 'move',
-        data: { type: 'zone', id: zone.id, originalData: zone },
-      } as any);
-
-      canvas.add(zoneGroup);
     });
 
     canvas.renderAll();

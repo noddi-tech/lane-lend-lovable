@@ -10,8 +10,17 @@ import { useStorageLocations, useUpdateStorageLocation, useDeleteStorageLocation
 import { useZones, useUpdateZone, useDeleteZone } from '@/hooks/admin/useZones';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { ArrowLeft, Plus } from 'lucide-react';
 import { UnifiedGridBuilder, type EditMode } from '@/components/facility/UnifiedGridBuilder';
+import { LibraryPalette } from '@/components/facility/LibraryPalette';
+import { CreateGateDialog } from '@/components/facility/dialogs/CreateGateDialog';
+import { CreateLaneDialog } from '@/components/facility/dialogs/CreateLaneDialog';
+import { CreateStationDialog } from '@/components/facility/dialogs/CreateStationDialog';
+import { CreateRoomDialog } from '@/components/facility/dialogs/CreateRoomDialog';
+import { CreateOutsideAreaDialog } from '@/components/facility/dialogs/CreateOutsideAreaDialog';
+import { CreateStorageLocationDialog } from '@/components/facility/dialogs/CreateStorageLocationDialog';
+import { CreateZoneDialog } from '@/components/facility/dialogs/CreateZoneDialog';
 import { toast } from 'sonner';
 
 export default function FacilityLayoutBuilderPageUnified() {
@@ -19,6 +28,15 @@ export default function FacilityLayoutBuilderPageUnified() {
   const navigate = useNavigate();
   const [editMode, setEditMode] = useState<EditMode>('room');
   const [selectedElement, setSelectedElement] = useState<{ type: string; id: string; data: any } | null>(null);
+  
+  // Dialog states for creating new elements
+  const [showCreateGateDialog, setShowCreateGateDialog] = useState(false);
+  const [showCreateLaneDialog, setShowCreateLaneDialog] = useState(false);
+  const [showCreateStationDialog, setShowCreateStationDialog] = useState(false);
+  const [showCreateRoomDialog, setShowCreateRoomDialog] = useState(false);
+  const [showCreateOutsideDialog, setShowCreateOutsideDialog] = useState(false);
+  const [showCreateStorageDialog, setShowCreateStorageDialog] = useState(false);
+  const [showCreateZoneDialog, setShowCreateZoneDialog] = useState(false);
 
   const { data: facilities, isLoading: loadingFacilities } = useFacilities();
   const { data: allDrivingGates } = useDrivingGates();
@@ -95,7 +113,7 @@ export default function FacilityLayoutBuilderPageUnified() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {(['gate', 'lane', 'station', 'room', 'outside', 'storage', 'zone'] as EditMode[]).map(mode => (
               <Button
                 key={mode}
@@ -106,13 +124,49 @@ export default function FacilityLayoutBuilderPageUnified() {
                 {mode.charAt(0).toUpperCase() + mode.slice(1)}
               </Button>
             ))}
+            
+            {editMode !== 'view' && editMode !== 'facility' && (
+              <>
+                <Separator orientation="vertical" className="h-6" />
+                <Button 
+                  size="sm" 
+                  onClick={() => {
+                    if (editMode === 'gate') setShowCreateGateDialog(true);
+                    else if (editMode === 'lane') setShowCreateLaneDialog(true);
+                    else if (editMode === 'station') setShowCreateStationDialog(true);
+                    else if (editMode === 'room') setShowCreateRoomDialog(true);
+                    else if (editMode === 'outside') setShowCreateOutsideDialog(true);
+                    else if (editMode === 'storage') setShowCreateStorageDialog(true);
+                    else if (editMode === 'zone') setShowCreateZoneDialog(true);
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add {editMode.charAt(0).toUpperCase() + editMode.slice(1)}
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </header>
 
       {/* Canvas */}
-      <div className="flex-1 overflow-auto p-6">
-        <UnifiedGridBuilder
+      <div className="flex-1 flex gap-6 overflow-auto p-6">
+        {/* Library Palette Sidebar */}
+        <div className="flex-shrink-0 w-80">
+          <LibraryPalette 
+            editMode={editMode}
+            onItemDragStart={(item, type) => {
+              console.log('Drag started:', item, type);
+            }}
+            onItemDragEnd={() => {
+              console.log('Drag ended');
+            }}
+          />
+        </div>
+        
+        {/* Canvas */}
+        <div className="flex-1">
+          <UnifiedGridBuilder
           gridWidth={facility.grid_width}
           gridHeight={facility.grid_height}
           gates={drivingGates.map(g => ({
@@ -193,7 +247,8 @@ export default function FacilityLayoutBuilderPageUnified() {
           onStorageLocationResize={(id, w, h) => updateStorageLocation.mutateAsync({ id, grid_width: w, grid_height: h } as any)}
           onZoneResize={(id, w, h) => updateZone.mutateAsync({ id, grid_width: w, grid_height: h } as any)}
           onElementSelect={setSelectedElement}
-        />
+          />
+        </div>
       </div>
 
       {/* Selected Element Info */}
@@ -212,6 +267,42 @@ export default function FacilityLayoutBuilderPageUnified() {
           </div>
         </div>
       )}
+      
+      {/* Creation Dialogs */}
+      <CreateGateDialog
+        open={showCreateGateDialog}
+        onOpenChange={setShowCreateGateDialog}
+        facilityId={facilityId!}
+      />
+      <CreateLaneDialog
+        open={showCreateLaneDialog}
+        onOpenChange={setShowCreateLaneDialog}
+        facilityId={facilityId!}
+      />
+      <CreateStationDialog
+        open={showCreateStationDialog}
+        onOpenChange={setShowCreateStationDialog}
+        lanes={facilityLanes.map(l => ({ id: l.id, name: l.name || `Lane ${l.position_order}` }))}
+      />
+      <CreateRoomDialog
+        open={showCreateRoomDialog}
+        onOpenChange={setShowCreateRoomDialog}
+        facilityId={facilityId!}
+      />
+      <CreateOutsideAreaDialog
+        open={showCreateOutsideDialog}
+        onOpenChange={setShowCreateOutsideDialog}
+        facilityId={facilityId!}
+      />
+      <CreateStorageLocationDialog
+        open={showCreateStorageDialog}
+        onOpenChange={setShowCreateStorageDialog}
+      />
+      <CreateZoneDialog
+        open={showCreateZoneDialog}
+        onOpenChange={setShowCreateZoneDialog}
+        facilityId={facilityId}
+      />
     </div>
   );
 }
