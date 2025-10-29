@@ -505,6 +505,16 @@ export function UnifiedGridBuilder({
       }
       
       const obj = e.selected?.[0];
+      console.log('🎯 SELECTION CREATED:', {
+        hasObject: !!obj,
+        objectType: obj?.data?.type,
+        objectId: obj?.data?.id,
+        selectable: obj?.selectable,
+        evented: obj?.evented,
+        currentEditMode: editMode,
+        activeObject: (canvas.getActiveObject() as any)?.data,
+      });
+      
       if (obj?.data) {
         callbacksRef.current.onElementSelect?.(obj.data);
       }
@@ -530,6 +540,18 @@ export function UnifiedGridBuilder({
     if (!canvas) return;
 
     const handleMouseDown = (e: any) => {
+      console.log('🖱️ MOUSE DOWN:', {
+        hasTarget: !!e.target,
+        targetType: e.target?.data?.type,
+        targetId: e.target?.data?.id,
+        targetSelectable: e.target?.selectable,
+        targetEvented: e.target?.evented,
+        altKey: e.e.altKey,
+        button: e.e.button,
+        currentEditMode: editMode,
+        canvasSelection: canvas.selection,
+      });
+      
       // Only pan with Alt/middle-click AND when clicking empty space (not an object)
       if ((e.e.altKey || e.e.button === 1) && !e.target) {
         e.e.preventDefault();
@@ -715,6 +737,14 @@ export function UnifiedGridBuilder({
         moveCursor: 'move',
         data: { type: 'room', id: room.id, originalData: room },
       } as any);
+
+      console.log(`🏠 Created room "${room.name}":`, {
+        id: room.id,
+        selectable: editMode === 'room',
+        evented: editMode === 'room',
+        hasControls: editMode === 'room',
+        currentEditMode: editMode,
+      });
 
       canvas.add(roomGroup);
     });
@@ -959,6 +989,13 @@ export function UnifiedGridBuilder({
     if (!canvas) return;
     
     const activeObject = canvas.getActiveObject() as any;
+    console.log('🔀 EDIT MODE CHANGED:', {
+      newEditMode: editMode,
+      hasActiveObject: !!activeObject,
+      activeObjectType: activeObject?.data?.type,
+      willClear: activeObject?.data?.type && activeObject.data.type !== editMode && editMode !== 'view',
+    });
+    
     if (activeObject?.data?.type && activeObject.data?.type !== editMode && editMode !== 'view') {
       canvas.discardActiveObject();
       canvas.renderAll();
