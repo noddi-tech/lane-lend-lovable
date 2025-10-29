@@ -3,7 +3,7 @@ import { Canvas as FabricCanvas, Rect, Text, Group } from 'fabric';
 import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, Maximize2, Grid3x3 } from 'lucide-react';
 
-export type EditMode = 'view' | 'facility' | 'gate' | 'lane' | 'station' | 'room' | 'outside' | 'storage';
+export type EditMode = 'view' | 'facility' | 'gate' | 'lane' | 'station' | 'room' | 'outside' | 'storage' | 'zone';
 
 export interface ViewContext {
   type: 'facility' | 'room';
@@ -15,7 +15,7 @@ export interface ViewContext {
 
 export interface LayoutBlock {
   id: string;
-  type: 'facility' | 'gate' | 'lane' | 'station' | 'room' | 'outside' | 'storage';
+  type: 'facility' | 'gate' | 'lane' | 'station' | 'room' | 'outside' | 'storage' | 'zone';
   name: string;
   grid_x: number;
   grid_y: number;
@@ -38,6 +38,7 @@ interface BlockGridBuilderProps {
   rooms?: LayoutBlock[];
   outsideAreas?: LayoutBlock[];
   storageLocations?: LayoutBlock[];
+  zones?: LayoutBlock[];
   editMode: EditMode;
   viewContext: ViewContext;
   onBlockMove: (blockId: string, gridX: number, gridY: number) => void;
@@ -47,6 +48,7 @@ interface BlockGridBuilderProps {
   onDelete?: (block: LayoutBlock) => void;
   onReturnToLibrary?: (block: LayoutBlock) => void;
   onEnterRoom?: (roomId: string) => void;
+  onEnterZone?: (zoneId: string) => void;
 }
 
 // Dynamic cell size calculation - allow much smaller cells for large grids
@@ -118,6 +120,14 @@ const COLORS = {
     text: '#3730a3',
     opacity: 1
   },
+  zone: {
+    fill: 'rgba(139, 92, 246, 0.08)',
+    stroke: '#8b5cf6',
+    strokeWidth: 2,
+    strokeDashArray: [8, 4],
+    text: '#6d28d9',
+    opacity: 0.8,
+  },
 };
 
 export function BlockGridBuilder({
@@ -128,6 +138,7 @@ export function BlockGridBuilder({
   rooms = [],
   outsideAreas = [],
   storageLocations = [],
+  zones = [],
   editMode,
   viewContext,
   onBlockMove,
@@ -136,6 +147,8 @@ export function BlockGridBuilder({
   onDrop,
   onDelete,
   onReturnToLibrary,
+  onEnterRoom,
+  onEnterZone,
 }: BlockGridBuilderProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -158,20 +171,20 @@ export function BlockGridBuilder({
 
     const resizeObserver = new ResizeObserver((entries) => {
       const { width, height } = entries[0].contentRect;
+      const padding = 40;
       
-      // Calculate optimal cell size based on available width
-      const optimalCellSize = calculateCellSize(width - 40, facility.grid_width);
-      setCellSize(optimalCellSize);
+      setCanvasDimensions({ 
+        width: width - padding, 
+        height: height - padding 
+      });
       
-      // Calculate canvas dimensions based on cell size and grid dimensions
-      const canvasWidth = facility.grid_width * optimalCellSize;
-      const canvasHeight = facility.grid_height * optimalCellSize;
-      
-      // Limit canvas to container size
-      const finalWidth = Math.min(canvasWidth, width - 40);
-      const finalHeight = Math.min(canvasHeight, height - 40);
-      
-      setCanvasDimensions({ width: finalWidth, height: finalHeight });
+      // Use a default grid size for infinite canvas (200x200 cells)
+      const defaultGridCells = 200;
+      const optimalCellSize = Math.min(
+        (width - padding) / defaultGridCells,
+        (height - padding) / defaultGridCells
+      );
+      setCellSize(Math.max(10, Math.min(40, Math.floor(optimalCellSize))));
     });
 
     resizeObserver.observe(containerRef.current);
@@ -279,7 +292,7 @@ export function BlockGridBuilder({
     // Clear only static elements (grid, facility boundary)
     const interactiveObjects = canvas.getObjects().filter(obj => {
       const block = (obj as any).data as LayoutBlock | undefined;
-      return block && (block.type === 'gate' || block.type === 'lane' || block.type === 'station' || block.type === 'room' || block.type === 'outside' || block.type === 'storage');
+      return block && (block.type === 'gate' || block.type === 'lane' || block.type === 'station' || block.type === 'room' || block.type === 'outside' || block.type === 'storage' || block.type === 'zone');
     });
     
     canvas.getObjects().forEach(obj => {
@@ -291,14 +304,18 @@ export function BlockGridBuilder({
     // Redraw static elements
     canvas.backgroundColor = 'hsl(222, 47%, 11%)';
     
-    // Draw grid lines
+    // Draw grid lines - fill entire canvas
     if (showGrid) {
-      for (let i = 0; i <= facility.grid_width; i++) {
+      const gridCellsX = Math.floor(canvasDimensions.width / cellSize);
+      const gridCellsY = Math.floor(canvasDimensions.height / cellSize);
+      
+      // Vertical lines
+      for (let i = 0; i <= gridCellsX; i++) {
         const line = new Rect({
           left: i * cellSize,
           top: 0,
           width: 1,
-          height: facility.grid_height * cellSize,
+          height: canvasDimensions.height,
           fill: 'rgba(255, 255, 255, 0.05)',
           selectable: false,
           evented: false,
@@ -306,11 +323,12 @@ export function BlockGridBuilder({
         canvas.add(line);
       }
 
-      for (let j = 0; j <= facility.grid_height; j++) {
+      // Horizontal lines
+      for (let j = 0; j <= gridCellsY; j++) {
         const line = new Rect({
           left: 0,
           top: j * cellSize,
-          width: facility.grid_width * cellSize,
+          width: canvasDimensions.width,
           height: 1,
           fill: 'rgba(255, 255, 255, 0.05)',
           selectable: false,
@@ -320,7 +338,7 @@ export function BlockGridBuilder({
       }
     }
 
-    // Facility boundary removed - grid provides sufficient visual reference
+    // Facility boundary removed - infinite grid
 
     // Helper to create new block
     const createBlock = (block: LayoutBlock) => {
@@ -382,8 +400,8 @@ export function BlockGridBuilder({
       return group;
     };
 
-    // Process blocks: Update existing or create new (maintain Z-order: outside (background), rooms, lanes, gates, stations, storage)
-    const allBlocks = [...outsideAreas, ...rooms, ...lanes, ...gates, ...stations, ...storageLocations];
+    // Process blocks: Update existing or create new (maintain Z-order: outside (background), zones, rooms, lanes, gates, stations, storage)
+    const allBlocks = [...outsideAreas, ...zones, ...rooms, ...lanes, ...gates, ...stations, ...storageLocations];
     const currentBlockIds = new Set(allBlocks.map(b => b.id));
     
     // Remove deleted blocks
@@ -447,7 +465,7 @@ export function BlockGridBuilder({
     }
   });
   canvas.requestRenderAll();
-  }, [canvas, facility, gates, lanes, stations, rooms, outsideAreas, storageLocations, showGrid, editMode, cellSize]);
+  }, [canvas, facility, gates, lanes, stations, rooms, outsideAreas, storageLocations, zones, showGrid, editMode, cellSize]);
 
   // Handle object interactions
   useEffect(() => {
@@ -849,6 +867,18 @@ export function BlockGridBuilder({
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded border-2" style={{ borderColor: COLORS.room.stroke, backgroundColor: COLORS.room.fill }} />
               <span>Room</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div 
+                className="w-4 h-4 rounded border" 
+                style={{ 
+                  borderColor: COLORS.zone.stroke, 
+                  backgroundColor: COLORS.zone.fill,
+                  borderStyle: 'dashed',
+                  opacity: COLORS.zone.opacity
+                }} 
+              />
+              <span>Zone</span>
             </div>
             <div className="flex items-center gap-2">
               <div 

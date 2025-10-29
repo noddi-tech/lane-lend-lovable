@@ -53,12 +53,14 @@ export function BlockProperties({ block, onClose }: BlockPropertiesProps) {
           grid_height: gridHeight,
         } as any);
       } else if (block.type === 'lane') {
-        await updateLane.mutateAsync({
-          id: block.id,
-          name,
-          grid_position_y: gridY,
-          grid_height: gridHeight,
-        } as any);
+      await updateLane.mutateAsync({
+        id: block.id,
+        name,
+        grid_position_x: gridX,
+        grid_position_y: gridY,
+        grid_width: gridWidth,
+        grid_height: gridHeight,
+      } as any);
       } else if (block.type === 'station') {
         await updateStation.mutateAsync({
           id: block.id,
@@ -121,7 +123,6 @@ export function BlockProperties({ block, onClose }: BlockPropertiesProps) {
               type="number"
               value={gridX}
               onChange={(e) => setGridX(Number(e.target.value))}
-              disabled={block.type === 'lane'}
             />
           </div>
           <div>
@@ -143,7 +144,6 @@ export function BlockProperties({ block, onClose }: BlockPropertiesProps) {
               type="number"
               value={gridWidth}
               onChange={(e) => setGridWidth(Number(e.target.value))}
-              disabled={block.type === 'lane'}
             />
           </div>
           <div>

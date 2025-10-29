@@ -1215,6 +1215,69 @@ export type Database = {
           },
         ]
       }
+      zones: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          description: string | null
+          facility_id: string | null
+          grid_height: number
+          grid_position_x: number
+          grid_position_y: number
+          grid_width: number
+          id: string
+          name: string
+          room_id: string | null
+          updated_at: string | null
+          zone_type: string | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          facility_id?: string | null
+          grid_height?: number
+          grid_position_x?: number
+          grid_position_y?: number
+          grid_width?: number
+          id?: string
+          name: string
+          room_id?: string | null
+          updated_at?: string | null
+          zone_type?: string | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          facility_id?: string | null
+          grid_height?: number
+          grid_position_x?: number
+          grid_position_y?: number
+          grid_width?: number
+          id?: string
+          name?: string
+          room_id?: string | null
+          updated_at?: string | null
+          zone_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zones_facility_id_fkey"
+            columns: ["facility_id"]
+            isOneToOne: false
+            referencedRelation: "facilities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zones_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

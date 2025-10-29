@@ -15,8 +15,8 @@ import { useLibraryStorageLocations } from '@/hooks/admin/useStorageLocations';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface LibraryPaletteProps {
-  editMode: 'gate' | 'lane' | 'station' | 'room' | 'view' | 'facility' | 'outside' | 'storage';
-  onItemDragStart?: (item: LibraryItem, type: 'gate' | 'lane' | 'station' | 'room' | 'outside' | 'storage') => void;
+  editMode: 'gate' | 'lane' | 'station' | 'room' | 'zone' | 'view' | 'facility' | 'outside' | 'storage';
+  onItemDragStart?: (item: LibraryItem, type: 'gate' | 'lane' | 'station' | 'room' | 'zone' | 'outside' | 'storage') => void;
 }
 
 export interface LibraryItem {
@@ -36,6 +36,7 @@ export function LibraryPalette({ editMode, onItemDragStart }: LibraryPaletteProp
   const { data: rooms, isLoading: loadingRooms } = useLibraryRooms();
   const { data: outsideAreas, isLoading: loadingOutside } = useLibraryOutsideAreas();
   const { data: storageLocations, isLoading: loadingStorage } = useLibraryStorageLocations();
+  const { data: zones, isLoading: loadingZones } = useLibraryZones();
 
   const filterItems = <T extends LibraryItem>(items: T[] | undefined): T[] => {
     if (!items) return [];
@@ -53,8 +54,9 @@ export function LibraryPalette({ editMode, onItemDragStart }: LibraryPaletteProp
   const filteredRooms = filterItems(rooms);
   const filteredOutsideAreas = filterItems(outsideAreas);
   const filteredStorageLocations = filterItems(storageLocations);
+  const filteredZones = filterItems(zones);
 
-  const handleDragStart = (e: React.DragEvent, item: LibraryItem, type: 'gate' | 'lane' | 'station' | 'room' | 'outside' | 'storage') => {
+  const handleDragStart = (e: React.DragEvent, item: LibraryItem, type: 'gate' | 'lane' | 'station' | 'room' | 'zone' | 'outside' | 'storage') => {
     e.dataTransfer.effectAllowed = 'copy';
     e.dataTransfer.setData('application/json', JSON.stringify({ item, type }));
     onItemDragStart?.(item, type);
@@ -62,7 +64,7 @@ export function LibraryPalette({ editMode, onItemDragStart }: LibraryPaletteProp
 
   const renderLibraryItem = (
     item: LibraryItem,
-    type: 'gate' | 'lane' | 'station' | 'room' | 'outside' | 'storage',
+    type: 'gate' | 'lane' | 'station' | 'room' | 'zone' | 'outside' | 'storage',
     Icon: React.ElementType
   ) => (
     <TooltipProvider key={item.id}>
@@ -158,32 +160,29 @@ export function LibraryPalette({ editMode, onItemDragStart }: LibraryPaletteProp
           editMode === 'storage' ? 'storage' :
           'gates'
         }>
-          <TabsList className="w-full grid grid-cols-6 mx-4 mb-2" style={{ width: 'calc(100% - 2rem)' }}>
-            <TabsTrigger value="gates" className="text-xs">
-              <DoorOpen className="h-3 w-3 mr-1" />
-              Gates
-            </TabsTrigger>
-            <TabsTrigger value="lanes" className="text-xs">
-              <Layers className="h-3 w-3 mr-1" />
-              Lanes
-            </TabsTrigger>
-            <TabsTrigger value="stations" className="text-xs">
-              <Box className="h-3 w-3 mr-1" />
-              Stations
-            </TabsTrigger>
-            <TabsTrigger value="rooms" className="text-xs">
-              <Home className="h-3 w-3 mr-1" />
-              Rooms
-            </TabsTrigger>
-            <TabsTrigger value="outside" className="text-xs">
-              <Map className="h-3 w-3 mr-1" />
-              Outside
-            </TabsTrigger>
-            <TabsTrigger value="storage" className="text-xs">
-              <Archive className="h-3 w-3 mr-1" />
-              Storage
-            </TabsTrigger>
-          </TabsList>
+        <TabsList className="w-full grid grid-cols-7 mx-4 mb-2" style={{ width: 'calc(100% - 2rem)' }}>
+          <TabsTrigger value="gates" className="text-xs px-2">
+            <DoorOpen className="h-3 w-3" />
+          </TabsTrigger>
+          <TabsTrigger value="lanes" className="text-xs px-2">
+            <Layers className="h-3 w-3" />
+          </TabsTrigger>
+          <TabsTrigger value="stations" className="text-xs px-2">
+            <Box className="h-3 w-3" />
+          </TabsTrigger>
+          <TabsTrigger value="rooms" className="text-xs px-2">
+            <Home className="h-3 w-3" />
+          </TabsTrigger>
+          <TabsTrigger value="zones" className="text-xs px-2">
+            <Square className="h-3 w-3" />
+          </TabsTrigger>
+          <TabsTrigger value="outside" className="text-xs px-2">
+            <Map className="h-3 w-3" />
+          </TabsTrigger>
+          <TabsTrigger value="storage" className="text-xs px-2">
+            <Archive className="h-3 w-3" />
+          </TabsTrigger>
+        </TabsList>
 
           <ScrollArea className="h-[500px]">
             <TabsContent value="gates" className="mt-0 px-4 pb-4 space-y-2">
@@ -247,6 +246,22 @@ export function LibraryPalette({ editMode, onItemDragStart }: LibraryPaletteProp
                 </div>
               ) : (
                 filteredRooms.map(room => renderLibraryItem(room, 'room', Home))
+              )}
+            </TabsContent>
+
+            <TabsContent value="zones" className="mt-0 px-4 pb-4 space-y-2">
+              {loadingZones ? (
+                <>
+                  <Skeleton className="h-20" />
+                  <Skeleton className="h-20" />
+                  <Skeleton className="h-20" />
+                </>
+              ) : filteredZones.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  {searchQuery ? 'No zones found' : 'No zones in library'}
+                </div>
+              ) : (
+                filteredZones.map(zone => renderLibraryItem(zone, 'zone', Square))
               )}
             </TabsContent>
 
