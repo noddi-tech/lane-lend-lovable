@@ -11,9 +11,10 @@ import { useZones, useUpdateZone, useDeleteZone } from '@/hooks/admin/useZones';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, MapPin, Layers, Box, Home, Plus, ChevronLeft, ChevronRight, LayoutGrid, Map, Archive, Square } from 'lucide-react';
-import { BlockGridBuilder, type EditMode, type LayoutBlock } from '@/components/facility/BlockGridBuilder';
+import { BlockGridBuilder, type EditMode, type LayoutBlock, ELEMENT_TO_GROUP } from '@/components/facility/BlockGridBuilder';
 import { BlockProperties } from '@/components/facility/BlockProperties';
 import { LibraryPalette, type LibraryItem } from '@/components/facility/LibraryPalette';
+import { EditModeSelector } from '@/components/facility/EditModeSelector';
 import { CreateGateDialog } from '@/components/facility/dialogs/CreateGateDialog';
 import { CreateLaneDialog } from '@/components/facility/dialogs/CreateLaneDialog';
 import { CreateStationDialog } from '@/components/facility/dialogs/CreateStationDialog';
@@ -31,7 +32,7 @@ export default function FacilityLayoutBuilderPage() {
   const { facilityId } = useParams<{ facilityId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [editMode, setEditMode] = useState<EditMode>('gate');
+  const [editMode, setEditMode] = useState<EditMode>('room');
   const [showCreateGateDialog, setShowCreateGateDialog] = useState(false);
   const [showCreateLaneDialog, setShowCreateLaneDialog] = useState(false);
   const [showCreateStationDialog, setShowCreateStationDialog] = useState(false);
@@ -563,6 +564,32 @@ export default function FacilityLayoutBuilderPage() {
     }
   };
 
+  const handleShowCreateDialog = (type: EditMode) => {
+    switch (type) {
+      case 'gate':
+        setShowCreateGateDialog(true);
+        break;
+      case 'lane':
+        setShowCreateLaneDialog(true);
+        break;
+      case 'station':
+        setShowCreateStationDialog(true);
+        break;
+      case 'room':
+        setShowCreateRoomDialog(true);
+        break;
+      case 'outside':
+        setShowCreateOutsideDialog(true);
+        break;
+      case 'storage':
+        setShowCreateStorageDialog(true);
+        break;
+      case 'zone':
+        setShowCreateZoneDialog(true);
+        break;
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col bg-background">
       {/* Header */}
@@ -596,121 +623,28 @@ export default function FacilityLayoutBuilderPage() {
               <LayoutGrid className="h-4 w-4 mr-2" />
               Define Boundary
             </Button>
-            <Badge variant="outline">
-              {editMode.charAt(0).toUpperCase() + editMode.slice(1)} Mode
+            <Badge variant="outline" className="flex items-center gap-2">
+              {ELEMENT_TO_GROUP[editMode] && (
+                <>
+                  <span className="text-muted-foreground">
+                    {ELEMENT_TO_GROUP[editMode]!.charAt(0).toUpperCase() + ELEMENT_TO_GROUP[editMode]!.slice(1)}
+                  </span>
+                  <span>→</span>
+                </>
+              )}
+              <span>{editMode.charAt(0).toUpperCase() + editMode.slice(1)}</span>
             </Badge>
           </div>
         </div>
       </header>
 
-      {/* Toolbar */}
-      <div className="flex-shrink-0 border-b bg-muted/30 px-6 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-muted-foreground">Edit Mode:</span>
-            <Button
-              variant={editMode === 'gate' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setEditMode('gate')}
-            >
-              <MapPin className="h-4 w-4 mr-2" />
-              Gates
-            </Button>
-            <Button
-              variant={editMode === 'lane' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setEditMode('lane')}
-            >
-              <Layers className="h-4 w-4 mr-2" />
-              Lanes
-            </Button>
-            <Button
-              variant={editMode === 'station' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setEditMode('station')}
-            >
-              <Box className="h-4 w-4 mr-2" />
-              Stations
-            </Button>
-            <Button
-              variant={editMode === 'room' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setEditMode('room')}
-            >
-              <Home className="h-4 w-4 mr-2" />
-              Rooms
-            </Button>
-            <Button
-              variant={editMode === 'outside' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setEditMode('outside')}
-            >
-              <Map className="h-4 w-4 mr-2" />
-              Outside
-            </Button>
-            <Button
-              variant={editMode === 'storage' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setEditMode('storage')}
-            >
-              <Archive className="h-4 w-4 mr-2" />
-              Storage
-            </Button>
-            <Button
-              variant={editMode === 'zone' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setEditMode('zone')}
-            >
-              <Square className="h-4 w-4 mr-2" />
-              Zones
-            </Button>
-          </div>
-
-          <div className="flex gap-2">
-            {editMode === 'gate' && (
-              <Button onClick={() => setShowCreateGateDialog(true)} size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Gate
-              </Button>
-            )}
-            {editMode === 'lane' && (
-              <Button onClick={() => setShowCreateLaneDialog(true)} size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Lane
-              </Button>
-            )}
-            {editMode === 'station' && (
-              <Button onClick={() => setShowCreateStationDialog(true)} size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Station
-              </Button>
-            )}
-            {editMode === 'room' && (
-              <Button onClick={() => setShowCreateRoomDialog(true)} size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Room
-              </Button>
-            )}
-            {editMode === 'outside' && (
-              <Button onClick={() => setShowCreateOutsideDialog(true)} size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Outside Area
-              </Button>
-            )}
-            {editMode === 'storage' && (
-              <Button onClick={() => setShowCreateStorageDialog(true)} size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Storage
-              </Button>
-            )}
-            {editMode === 'zone' && (
-              <Button onClick={() => setShowCreateZoneDialog(true)} size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Zone
-              </Button>
-            )}
-          </div>
-        </div>
+      {/* Toolbar - Tabbed Groups */}
+      <div className="flex-shrink-0 border-b bg-muted/30 px-6 py-4">
+        <EditModeSelector
+          currentMode={editMode}
+          onModeChange={setEditMode}
+          onShowCreateDialog={handleShowCreateDialog}
+        />
       </div>
 
       {/* Main Content Area */}

@@ -4,7 +4,31 @@ import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, Maximize2, Grid3x3, Eye, EyeOff } from 'lucide-react';
 import { calculateOptimalBoundary } from '@/utils/facilityBoundaryCalculator';
 
+// Individual element types
 export type EditMode = 'view' | 'facility' | 'gate' | 'lane' | 'station' | 'room' | 'outside' | 'storage' | 'zone';
+
+// Grouped mode type
+export type GroupMode = 'spaces' | 'workflow' | 'storage';
+
+// Mapping of groups to element types
+export const GROUP_TO_ELEMENTS: Record<GroupMode, EditMode[]> = {
+  spaces: ['room', 'outside', 'zone'],
+  workflow: ['gate', 'lane', 'station'],
+  storage: ['storage'],
+};
+
+// Reverse mapping: element to group
+export const ELEMENT_TO_GROUP: Record<EditMode, GroupMode | null> = {
+  view: null,
+  facility: null,
+  room: 'spaces',
+  outside: 'spaces',
+  zone: 'spaces',
+  gate: 'workflow',
+  lane: 'workflow',
+  station: 'workflow',
+  storage: 'storage',
+};
 
 export interface ViewContext {
   type: 'facility' | 'room';
