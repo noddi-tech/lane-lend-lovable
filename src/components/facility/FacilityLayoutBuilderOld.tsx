@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import type { FacilityWithGates } from '@/hooks/admin/useFacilities';
 import type { DrivingGateWithLanes } from '@/hooks/admin/useDrivingGates';
 
-type EditMode = 'facility' | 'gates' | 'lanes' | 'stations';
+type EditMode = 'facility' | 'gate' | 'lane' | 'station';
 
 interface FacilityLayoutBuilderProps {
   facility: FacilityWithGates;
@@ -152,39 +152,39 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
               Facility Grid
             </Button>
             <Button
-              variant={editMode === 'gates' ? 'default' : 'outline'}
-              onClick={() => setEditMode('gates')}
+              variant={editMode === 'gate' ? 'default' : 'outline'}
+              onClick={() => setEditMode('gate')}
             >
               Driving Gates <Badge variant="secondary" className="ml-2">{drivingGates.length}</Badge>
             </Button>
             <Button
-              variant={editMode === 'lanes' ? 'default' : 'outline'}
-              onClick={() => setEditMode('lanes')}
+              variant={editMode === 'lane' ? 'default' : 'outline'}
+              onClick={() => setEditMode('lane')}
             >
               Lanes <Badge variant="secondary" className="ml-2">{lanes?.length || 0}</Badge>
             </Button>
             <Button
-              variant={editMode === 'stations' ? 'default' : 'outline'}
-              onClick={() => setEditMode('stations')}
+              variant={editMode === 'station' ? 'default' : 'outline'}
+              onClick={() => setEditMode('station')}
             >
               Stations <Badge variant="secondary" className="ml-2">{stations?.length || 0}</Badge>
             </Button>
           </div>
 
           <div className="flex gap-2">
-            {editMode === 'gates' && (
+            {editMode === 'gate' && (
               <Button onClick={() => setShowCreateGateDialog(true)} size="sm">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Gate
               </Button>
             )}
-            {editMode === 'lanes' && (
+            {editMode === 'lane' && (
               <Button onClick={() => setShowCreateLaneDialog(true)} size="sm">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Lane
               </Button>
             )}
-            {editMode === 'stations' && (
+            {editMode === 'station' && (
               <Button onClick={() => setShowCreateStationDialog(true)} size="sm">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Station

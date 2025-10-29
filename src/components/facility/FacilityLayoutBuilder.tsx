@@ -404,25 +404,22 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
           {/* Canvas */}
           <div className="flex-1 animate-fade-in" style={{ animationDelay: '100ms' }}>
             <BlockGridBuilder
-              facility={facilityBlock}
+              gridWidth={facility.grid_width}
+              gridHeight={facility.grid_height}
               gates={gateBlocks}
               lanes={laneBlocks}
               stations={stationBlocks}
               rooms={roomBlocks}
               editMode={editMode}
-              viewContext={{
-                type: 'facility',
-                id: facility.id,
-                name: facility.name,
-                gridWidth: facility.grid_width,
-                gridHeight: facility.grid_height,
-              }}
-              onBlockMove={handleBlockMove}
-              onBlockResize={handleBlockResize}
-              onBlockSelect={setSelectedBlock}
-              onDrop={handleCanvasDrop}
-              onDelete={handleDeleteBlock}
-              onReturnToLibrary={handleReturnToLibrary}
+              onGateMove={(id, x, y) => handleBlockMove({ id, type: 'gate' } as any, x, y)}
+              onLaneMove={(id, x, y) => handleBlockMove({ id, type: 'lane' } as any, x, y)}
+              onStationMove={(id, x, y) => handleBlockMove({ id, type: 'station' } as any, x, y)}
+              onRoomMove={(id, x, y) => handleBlockMove({ id, type: 'room' } as any, x, y)}
+              onGateResize={(id, w, h) => handleBlockResize({ id, type: 'gate' } as any, w, h)}
+              onLaneResize={(id, h) => handleBlockResize({ id, type: 'lane' } as any, 0, h)}
+              onStationResize={(id, w, h) => handleBlockResize({ id, type: 'station' } as any, w, h)}
+              onRoomResize={(id, w, h) => handleBlockResize({ id, type: 'room' } as any, w, h)}
+              onElementSelect={(el) => setSelectedBlock(el?.data?.originalData || null)}
             />
           </div>
 
