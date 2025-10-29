@@ -43,7 +43,9 @@ export default function FacilityLayoutBuilderPage() {
   const [showBoundaryDialog, setShowBoundaryDialog] = useState(false);
   const [selectedBlock, setSelectedBlock] = useState<LayoutBlock | null>(null);
   const [showLibrary, setShowLibrary] = useState(true);
-  const [showProperties, setShowProperties] = useState(true);
+  const [showProperties, setShowProperties] = useState(false); // Auto-hide by default
+  const [isDraggingFromLibrary, setIsDraggingFromLibrary] = useState(false);
+  const [propertiesPinned, setPropertiesPinned] = useState(false);
   const { data: facilities, isLoading: loadingFacilities } = useFacilities();
   const { data: allDrivingGates } = useDrivingGates();
   const { data: allLanes } = useLanes();
@@ -83,6 +85,47 @@ export default function FacilityLayoutBuilderPage() {
     gridWidth: facility?.grid_width || 1000,
     gridHeight: facility?.grid_height || 1000,
   });
+
+  // Auto-show properties when block selected, auto-hide when deselected
+  useEffect(() => {
+    if (selectedBlock && !propertiesPinned) {
+      setShowProperties(true);
+    } else if (!selectedBlock && !propertiesPinned) {
+      const timer = setTimeout(() => setShowProperties(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedBlock, propertiesPinned]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // L - Toggle Library
+      if (e.key === 'l' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const target = e.target as HTMLElement;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          setShowLibrary(prev => !prev);
+        }
+      }
+      // P - Toggle Properties
+      if (e.key === 'p' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const target = e.target as HTMLElement;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          setShowProperties(prev => !prev);
+          if (!showProperties) setPropertiesPinned(true);
+        }
+      }
+      // Esc - Deselect and close panels
+      if (e.key === 'Escape') {
+        setSelectedBlock(null);
+        setPropertiesPinned(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showProperties]);
 
   useEffect(() => {
     console.log('🎯 FacilityLayoutBuilderPage editMode changed to:', editMode);
@@ -650,8 +693,12 @@ export default function FacilityLayoutBuilderPage() {
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden">
         {/* Library Panel */}
-        {showLibrary && (
-          <div className="flex-shrink-0 w-80 border-r bg-card overflow-y-auto">
+        <div
+          className={`flex-shrink-0 border-r bg-card overflow-y-auto transition-all duration-300 ease-in-out ${
+            showLibrary ? 'w-60 opacity-100' : 'w-0 opacity-0'
+          } ${isDraggingFromLibrary ? 'opacity-40' : ''}`}
+        >
+          {showLibrary && (
             <div className="p-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold">Library</h3>
@@ -659,24 +706,31 @@ export default function FacilityLayoutBuilderPage() {
                   variant="ghost"
                   size="icon"
                   onClick={() => setShowLibrary(false)}
+                  title="Close Library (L)"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
               </div>
-              <LibraryPalette editMode={editMode} />
+              <LibraryPalette
+                editMode={editMode}
+                onItemDragStart={() => setIsDraggingFromLibrary(true)}
+                onItemDragEnd={() => setIsDraggingFromLibrary(false)}
+              />
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Toggle Library Button */}
         {!showLibrary && (
           <Button
             variant="outline"
-            size="icon"
-            className="absolute left-4 top-32 z-10"
+            size="sm"
+            className="absolute left-4 top-32 z-10 shadow-lg"
             onClick={() => setShowLibrary(true)}
+            title="Open Library (L)"
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-4 w-4 mr-1" />
+            Library
           </Button>
         )}
 
@@ -715,23 +769,47 @@ export default function FacilityLayoutBuilderPage() {
         </div>
 
         {/* Properties Panel */}
-        {showProperties && (
-          <div className="flex-shrink-0 w-80 border-l bg-card overflow-y-auto">
+        <div
+          className={`flex-shrink-0 border-l bg-card overflow-y-auto transition-all duration-300 ease-in-out ${
+            showProperties ? 'w-60 opacity-100' : 'w-0 opacity-0'
+          }`}
+        >
+          {showProperties && (
             <div className="p-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold">Properties</h3>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowProperties(false)}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setPropertiesPinned(!propertiesPinned);
+                      toast.success(propertiesPinned ? 'Properties unpinned' : 'Properties pinned');
+                    }}
+                    title={propertiesPinned ? 'Unpin (Auto-hide)' : 'Pin (Always visible)'}
+                  >
+                    <MapPin className={`h-4 w-4 ${propertiesPinned ? 'fill-current' : ''}`} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setShowProperties(false);
+                      setPropertiesPinned(false);
+                    }}
+                    title="Close Properties (P)"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
               {selectedBlock ? (
                 <BlockProperties
                   block={selectedBlock}
-                  onClose={() => setSelectedBlock(null)}
+                  onClose={() => {
+                    setSelectedBlock(null);
+                    setPropertiesPinned(false);
+                  }}
                 />
               ) : (
                 <div className="text-center py-8">
@@ -740,23 +818,28 @@ export default function FacilityLayoutBuilderPage() {
                     Select a block to view properties
                   </p>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Right-click for quick actions
+                    Press P to close • Esc to deselect
                   </p>
                 </div>
               )}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Toggle Properties Button */}
-        {!showProperties && (
+        {!showProperties && selectedBlock && (
           <Button
             variant="outline"
-            size="icon"
-            className="absolute right-4 top-32 z-10"
-            onClick={() => setShowProperties(true)}
+            size="sm"
+            className="absolute right-4 top-32 z-10 shadow-lg"
+            onClick={() => {
+              setShowProperties(true);
+              setPropertiesPinned(true);
+            }}
+            title="Open Properties (P)"
           >
-            <ChevronLeft className="h-4 w-4" />
+            Properties
+            <ChevronLeft className="h-4 w-4 ml-1" />
           </Button>
         )}
       </div>

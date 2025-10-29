@@ -18,6 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 interface LibraryPaletteProps {
   editMode: 'gate' | 'lane' | 'station' | 'room' | 'zone' | 'view' | 'facility' | 'outside' | 'storage';
   onItemDragStart?: (item: LibraryItem, type: 'gate' | 'lane' | 'station' | 'room' | 'zone' | 'outside' | 'storage') => void;
+  onItemDragEnd?: () => void;
 }
 
 export interface LibraryItem {
@@ -29,7 +30,7 @@ export interface LibraryItem {
   [key: string]: any;
 }
 
-export function LibraryPalette({ editMode, onItemDragStart }: LibraryPaletteProps) {
+export function LibraryPalette({ editMode, onItemDragStart, onItemDragEnd }: LibraryPaletteProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const { data: gates, isLoading: loadingGates } = useLibraryGates();
   const { data: lanes, isLoading: loadingLanes } = useLibraryLanes();
@@ -63,6 +64,10 @@ export function LibraryPalette({ editMode, onItemDragStart }: LibraryPaletteProp
     onItemDragStart?.(item, type);
   };
 
+  const handleDragEnd = () => {
+    onItemDragEnd?.();
+  };
+
   const renderLibraryItem = (
     item: LibraryItem,
     type: 'gate' | 'lane' | 'station' | 'room' | 'zone' | 'outside' | 'storage',
@@ -74,6 +79,7 @@ export function LibraryPalette({ editMode, onItemDragStart }: LibraryPaletteProp
           <div
             draggable
             onDragStart={(e) => handleDragStart(e, item, type)}
+            onDragEnd={handleDragEnd}
             className="p-3 border rounded-lg hover:bg-accent hover:border-primary cursor-move transition-all duration-200 group hover:shadow-md animate-fade-in"
           >
             <div className="flex items-start gap-2">
@@ -122,7 +128,7 @@ export function LibraryPalette({ editMode, onItemDragStart }: LibraryPaletteProp
   }
 
   return (
-    <Card className="w-80 shadow-lg">
+    <Card className="shadow-lg">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg">Library Palette</CardTitle>
