@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useFacilities } from '@/hooks/admin/useFacilities';
 import { useDrivingGates, useUpdateDrivingGate, useAssignGateToFacility, useUnassignGateFromFacility, useDeleteDrivingGate } from '@/hooks/admin/useDrivingGates';
@@ -31,6 +31,7 @@ import { toast } from 'sonner';
 import { useDebouncedCallback } from '@/hooks/useDebouncedMutation';
 import { useQueryClient } from '@tanstack/react-query';
 import { calculateOptimalBoundary } from '@/utils/facilityBoundaryCalculator';
+import { useKeyboardShortcuts, createShortcut } from '@/hooks/useKeyboardShortcuts';
 
 export default function FacilityLayoutBuilderPage() {
   const { facilityId } = useParams<{ facilityId: string }>();
@@ -113,44 +114,45 @@ export default function FacilityLayoutBuilderPage() {
     }
   }, [selectedBlock, propertiesPinned]);
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // L - Toggle Library
-      if (e.key === 'l' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        const target = e.target as HTMLElement;
-        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
-          e.preventDefault();
-          setShowLibrary(prev => !prev);
-        }
-      }
-      // P - Toggle Properties
-      if (e.key === 'p' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        const target = e.target as HTMLElement;
-        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
-          e.preventDefault();
-          setShowProperties(prev => !prev);
-          if (!showProperties) setPropertiesPinned(true);
-        }
-      }
-      // ? - Show shortcuts
-      if (e.key === '?' || (e.shiftKey && e.key === '/')) {
-        const target = e.target as HTMLElement;
-        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
-          e.preventDefault();
-          setShowShortcuts(true);
-        }
-      }
-      // Esc - Deselect and close panels
-      if (e.key === 'Escape') {
+  // Keyboard shortcuts using custom hook
+  const handleDeleteSelected = useCallback(() => {
+    if (selectedBlock) {
+      handleDeleteBlock(selectedBlock);
+    }
+  }, [selectedBlock]);
+
+  const handleDuplicateSelected = useCallback(() => {
+    if (selectedBlock) {
+      toast.info('Duplicate functionality coming soon');
+      // TODO: Implement duplication logic
+    }
+  }, [selectedBlock]);
+
+  useKeyboardShortcuts({
+    shortcuts: [
+      // Panel toggles
+      createShortcut('l', () => setShowLibrary(prev => !prev), 'Toggle Library'),
+      createShortcut('p', () => {
+        setShowProperties(prev => !prev);
+        if (!showProperties) setPropertiesPinned(true);
+      }, 'Toggle Properties'),
+      
+      // Navigation & view
+      createShortcut('Escape', () => {
         setSelectedBlock(null);
         setPropertiesPinned(false);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showProperties]);
+      }, 'Deselect / Close panels'),
+      createShortcut('?', () => setShowShortcuts(true), 'Show keyboard shortcuts', { shift: true }),
+      
+      // Editing
+      createShortcut('Delete', handleDeleteSelected, 'Delete selected element'),
+      createShortcut('Backspace', handleDeleteSelected, 'Delete selected element'),
+      createShortcut('d', handleDuplicateSelected, 'Duplicate selected element', { ctrl: true }),
+      
+      // Zoom shortcuts are handled by BlockGridBuilder
+    ],
+    enabled: true,
+  });
 
   useEffect(() => {
     console.log('🎯 FacilityLayoutBuilderPage editMode changed to:', editMode);
