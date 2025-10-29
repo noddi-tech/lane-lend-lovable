@@ -333,11 +333,7 @@ export function UnifiedGridBuilder({
     canvas.renderAll();
   }, [canvas, canvasDimensions]);
 
-  // Update selection mode when editMode changes
-  useEffect(() => {
-    if (!canvas) return;
-    canvas.selection = editMode === 'facility';
-  }, [canvas, editMode]);
+  // Removed: canvas.selection toggle - always keep false to disable multi-select box
 
   // Canvas-level event handlers for element interaction
   useEffect(() => {
@@ -503,14 +499,17 @@ export function UnifiedGridBuilder({
     if (!canvas) return;
 
     const handleMouseDown = (e: any) => {
-      if (e.target && e.target !== canvas) return;
-      
+      // Only pan with Alt key or middle-click
       if (e.e.altKey || e.e.button === 1) {
         setIsPanning(true);
         setLastPanPoint({ x: e.e.clientX, y: e.e.clientY });
-        canvas.selection = false;
-        canvas.defaultCursor = 'grab';
+        canvas.defaultCursor = 'grabbing';
+        
+        // Prevent object selection during pan
+        canvas.discardActiveObject();
+        canvas.renderAll();
       }
+      // Otherwise, allow normal object interaction (selection/dragging)
     };
 
     const handleMouseMove = (e: any) => {
@@ -528,7 +527,6 @@ export function UnifiedGridBuilder({
     const handleMouseUp = () => {
       setIsPanning(false);
       setLastPanPoint(null);
-      canvas.selection = editMode === 'facility';
       canvas.defaultCursor = 'default';
     };
 
