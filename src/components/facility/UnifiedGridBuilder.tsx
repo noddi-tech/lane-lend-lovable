@@ -29,7 +29,50 @@ interface Station {
   grid_height?: number;
 }
 
-type EditMode = 'facility' | 'gates' | 'lanes' | 'stations';
+interface Room {
+  id: string;
+  name: string;
+  grid_x?: number;
+  grid_y?: number;
+  grid_width?: number;
+  grid_height?: number;
+  color?: string;
+}
+
+interface OutsideArea {
+  id: string;
+  name: string;
+  grid_x?: number;
+  grid_y?: number;
+  grid_width?: number;
+  grid_height?: number;
+  color?: string;
+  area_type?: string;
+}
+
+interface StorageLocation {
+  id: string;
+  name: string;
+  grid_x?: number;
+  grid_y?: number;
+  grid_width?: number;
+  grid_height?: number;
+  storage_type?: string;
+  status?: string;
+}
+
+interface Zone {
+  id: string;
+  name: string;
+  grid_x?: number;
+  grid_y?: number;
+  grid_width?: number;
+  grid_height?: number;
+  color?: string;
+  zone_type?: string;
+}
+
+export type EditMode = 'facility' | 'gate' | 'lane' | 'station' | 'room' | 'outside' | 'storage' | 'zone' | 'view';
 
 interface UnifiedGridBuilderProps {
   gridWidth: number;
@@ -37,14 +80,26 @@ interface UnifiedGridBuilderProps {
   gates: Gate[];
   lanes?: Lane[];
   stations?: Station[];
+  rooms?: Room[];
+  outsideAreas?: OutsideArea[];
+  storageLocations?: StorageLocation[];
+  zones?: Zone[];
   editMode: EditMode;
   onGateMove?: (gateId: string, gridX: number, gridY: number) => void;
   onLaneMove?: (laneId: string, gridX: number, gridY: number) => void;
   onStationMove?: (stationId: string, gridX: number, gridY: number) => void;
+  onRoomMove?: (roomId: string, gridX: number, gridY: number) => void;
+  onOutsideAreaMove?: (areaId: string, gridX: number, gridY: number) => void;
+  onStorageLocationMove?: (storageId: string, gridX: number, gridY: number) => void;
+  onZoneMove?: (zoneId: string, gridX: number, gridY: number) => void;
   onFacilityResize?: (gridWidth: number, gridHeight: number) => void;
   onGateResize?: (gateId: string, gridWidth: number, gridHeight: number) => void;
   onLaneResize?: (laneId: string, gridHeight: number) => void;
   onStationResize?: (stationId: string, gridWidth: number, gridHeight: number) => void;
+  onRoomResize?: (roomId: string, gridWidth: number, gridHeight: number) => void;
+  onOutsideAreaResize?: (areaId: string, gridWidth: number, gridHeight: number) => void;
+  onStorageLocationResize?: (storageId: string, gridWidth: number, gridHeight: number) => void;
+  onZoneResize?: (zoneId: string, gridWidth: number, gridHeight: number) => void;
   onElementSelect?: (element: { type: string; id: string; data: any }) => void;
 }
 
@@ -75,6 +130,30 @@ const COLORS = {
     text: 'rgb(255, 255, 255)',
     strokeWidth: 3,
   },
+  rooms: {
+    fill: 'rgba(96, 165, 250, 0.3)',
+    stroke: 'rgb(37, 99, 235)',
+    text: 'rgb(30, 58, 138)',
+    strokeWidth: 2,
+  },
+  outside: {
+    fill: 'rgba(134, 239, 172, 0.3)',
+    stroke: 'rgb(22, 163, 74)',
+    text: 'rgb(20, 83, 45)',
+    strokeWidth: 2,
+  },
+  storage: {
+    fill: 'rgba(253, 224, 71, 0.4)',
+    stroke: 'rgb(202, 138, 4)',
+    text: 'rgb(113, 63, 18)',
+    strokeWidth: 2,
+  },
+  zones: {
+    fill: 'rgba(244, 114, 182, 0.3)',
+    stroke: 'rgb(219, 39, 119)',
+    text: 'rgb(131, 24, 67)',
+    strokeWidth: 2,
+  },
   selected: {
     stroke: 'rgb(59, 130, 246)',
     strokeWidth: 4,
@@ -87,14 +166,26 @@ export function UnifiedGridBuilder({
   gates,
   lanes = [],
   stations = [],
+  rooms = [],
+  outsideAreas = [],
+  storageLocations = [],
+  zones = [],
   editMode,
   onGateMove,
   onLaneMove,
   onStationMove,
+  onRoomMove,
+  onOutsideAreaMove,
+  onStorageLocationMove,
+  onZoneMove,
   onFacilityResize,
   onGateResize,
   onLaneResize,
   onStationResize,
+  onRoomResize,
+  onOutsideAreaResize,
+  onStorageLocationResize,
+  onZoneResize,
   onElementSelect,
 }: UnifiedGridBuilderProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -110,10 +201,18 @@ export function UnifiedGridBuilder({
     onGateMove,
     onLaneMove,
     onStationMove,
+    onRoomMove,
+    onOutsideAreaMove,
+    onStorageLocationMove,
+    onZoneMove,
     onFacilityResize,
     onGateResize,
     onLaneResize,
     onStationResize,
+    onRoomResize,
+    onOutsideAreaResize,
+    onStorageLocationResize,
+    onZoneResize,
     onElementSelect,
   });
 
@@ -123,10 +222,18 @@ export function UnifiedGridBuilder({
       onGateMove,
       onLaneMove,
       onStationMove,
+      onRoomMove,
+      onOutsideAreaMove,
+      onStorageLocationMove,
+      onZoneMove,
       onFacilityResize,
       onGateResize,
       onLaneResize,
       onStationResize,
+      onRoomResize,
+      onOutsideAreaResize,
+      onStorageLocationResize,
+      onZoneResize,
       onElementSelect,
     };
   });
@@ -253,6 +360,18 @@ export function UnifiedGridBuilder({
       } else if (type === 'station') {
         callbacksRef.current.onStationMove?.(id, gridX, gridY);
         callbacksRef.current.onStationResize?.(id, gridWidth, gridHeight);
+      } else if (type === 'room') {
+        callbacksRef.current.onRoomMove?.(id, gridX, gridY);
+        callbacksRef.current.onRoomResize?.(id, gridWidth, gridHeight);
+      } else if (type === 'outside') {
+        callbacksRef.current.onOutsideAreaMove?.(id, gridX, gridY);
+        callbacksRef.current.onOutsideAreaResize?.(id, gridWidth, gridHeight);
+      } else if (type === 'storage') {
+        callbacksRef.current.onStorageLocationMove?.(id, gridX, gridY);
+        callbacksRef.current.onStorageLocationResize?.(id, gridWidth, gridHeight);
+      } else if (type === 'zone') {
+        callbacksRef.current.onZoneMove?.(id, gridX, gridY);
+        callbacksRef.current.onZoneResize?.(id, gridWidth, gridHeight);
       }
     };
 
@@ -372,7 +491,7 @@ export function UnifiedGridBuilder({
     lanes.forEach((lane) => {
       const laneY = (lane.grid_y || 0) * CELL_SIZE;
       const laneHeight = (lane.grid_height || 5) * CELL_SIZE;
-      const opacity = editMode === 'lanes' ? 1 : 0.3;
+      const opacity = editMode === 'lane' ? 1 : 0.3;
 
       const laneRect = new Rect({
         left: 0,
@@ -396,16 +515,16 @@ export function UnifiedGridBuilder({
       const laneGroup = new Group([laneRect, laneText], {
         left: 0,
         top: laneY,
-        selectable: editMode === 'lanes',
-        hasControls: editMode === 'lanes',
+        selectable: editMode === 'lane',
+        hasControls: editMode === 'lane',
         lockRotation: true,
         lockScalingX: true,
         lockMovementX: true,
-        evented: editMode === 'lanes',
+        evented: editMode === 'lane',
         cornerStyle: 'circle',
         borderColor: COLORS.selected.stroke,
         cornerColor: COLORS.selected.stroke,
-        hoverCursor: editMode === 'lanes' ? 'move' : 'default',
+        hoverCursor: editMode === 'lane' ? 'move' : 'default',
         moveCursor: 'ns-resize',
         data: { type: 'lane', id: lane.id, originalData: lane },
       } as any);
@@ -419,7 +538,7 @@ export function UnifiedGridBuilder({
       const gateY = (gate.grid_y || 0) * CELL_SIZE;
       const gateWidth = (gate.grid_width || 3) * CELL_SIZE;
       const gateHeight = (gate.grid_height || 10) * CELL_SIZE;
-      const opacity = editMode === 'gates' ? 1 : 0.3;
+      const opacity = editMode === 'gate' ? 1 : 0.3;
 
       const gateRect = new Rect({
         left: 0,
@@ -444,14 +563,14 @@ export function UnifiedGridBuilder({
       const gateGroup = new Group([gateRect, gateText], {
         left: gateX,
         top: gateY,
-        selectable: editMode === 'gates',
-        hasControls: editMode === 'gates',
+        selectable: editMode === 'gate',
+        hasControls: editMode === 'gate',
         lockRotation: true,
-        evented: editMode === 'gates',
+        evented: editMode === 'gate',
         cornerStyle: 'circle',
         borderColor: COLORS.selected.stroke,
         cornerColor: COLORS.selected.stroke,
-        hoverCursor: editMode === 'gates' ? 'move' : 'default',
+        hoverCursor: editMode === 'gate' ? 'move' : 'default',
         moveCursor: 'move',
         data: { type: 'gate', id: gate.id, originalData: gate },
       } as any);
@@ -465,7 +584,7 @@ export function UnifiedGridBuilder({
       const stationY = (station.grid_y || 0) * CELL_SIZE;
       const stationWidth = (station.grid_width || 4) * CELL_SIZE;
       const stationHeight = (station.grid_height || 3) * CELL_SIZE;
-      const opacity = editMode === 'stations' ? 1 : 0.3;
+      const opacity = editMode === 'station' ? 1 : 0.3;
 
       const stationRect = new Rect({
         left: 0,
@@ -491,14 +610,14 @@ export function UnifiedGridBuilder({
       const stationGroup = new Group([stationRect, stationText], {
         left: stationX,
         top: stationY,
-        selectable: editMode === 'stations',
-        hasControls: editMode === 'stations',
+        selectable: editMode === 'station',
+        hasControls: editMode === 'station',
         lockRotation: true,
-        evented: editMode === 'stations',
+        evented: editMode === 'station',
         cornerStyle: 'circle',
         borderColor: COLORS.selected.stroke,
         cornerColor: COLORS.selected.stroke,
-        hoverCursor: editMode === 'stations' ? 'move' : 'default',
+        hoverCursor: editMode === 'station' ? 'move' : 'default',
         moveCursor: 'move',
         data: { type: 'station', id: station.id, originalData: station },
       } as any);
@@ -506,8 +625,196 @@ export function UnifiedGridBuilder({
       canvas.add(stationGroup);
     });
 
+    // Render rooms
+    rooms.forEach((room) => {
+      const roomX = (room.grid_x || 0) * CELL_SIZE;
+      const roomY = (room.grid_y || 0) * CELL_SIZE;
+      const roomWidth = (room.grid_width || 10) * CELL_SIZE;
+      const roomHeight = (room.grid_height || 10) * CELL_SIZE;
+      const opacity = editMode === 'room' ? 1 : 0.2;
+
+      const roomRect = new Rect({
+        left: 0,
+        top: 0,
+        width: roomWidth,
+        height: roomHeight,
+        fill: room.color || COLORS.rooms.fill,
+        stroke: COLORS.rooms.stroke,
+        strokeWidth: COLORS.rooms.strokeWidth,
+        opacity,
+        rx: 4,
+        ry: 4,
+      });
+
+      const roomText = new FabricText(room.name, {
+        left: roomWidth / 2 - 30,
+        top: roomHeight / 2 - 8,
+        fontSize: 14,
+        fill: COLORS.rooms.text,
+        fontWeight: 'bold',
+      });
+
+      const roomGroup = new Group([roomRect, roomText], {
+        left: roomX,
+        top: roomY,
+        selectable: editMode === 'room',
+        hasControls: editMode === 'room',
+        lockRotation: true,
+        evented: editMode === 'room',
+        cornerStyle: 'circle',
+        borderColor: COLORS.selected.stroke,
+        cornerColor: COLORS.selected.stroke,
+        hoverCursor: editMode === 'room' ? 'move' : 'default',
+        moveCursor: 'move',
+        data: { type: 'room', id: room.id, originalData: room },
+      } as any);
+
+      canvas.add(roomGroup);
+    });
+
+    // Render outside areas
+    outsideAreas.forEach((area) => {
+      const areaX = (area.grid_x || 0) * CELL_SIZE;
+      const areaY = (area.grid_y || 0) * CELL_SIZE;
+      const areaWidth = (area.grid_width || 8) * CELL_SIZE;
+      const areaHeight = (area.grid_height || 8) * CELL_SIZE;
+      const opacity = editMode === 'outside' ? 1 : 0.2;
+
+      const areaRect = new Rect({
+        left: 0,
+        top: 0,
+        width: areaWidth,
+        height: areaHeight,
+        fill: area.color || COLORS.outside.fill,
+        stroke: COLORS.outside.stroke,
+        strokeWidth: COLORS.outside.strokeWidth,
+        opacity,
+        rx: 2,
+        ry: 2,
+      });
+
+      const areaText = new FabricText(area.name, {
+        left: areaWidth / 2 - 30,
+        top: areaHeight / 2 - 8,
+        fontSize: 13,
+        fill: COLORS.outside.text,
+        fontWeight: 'bold',
+      });
+
+      const areaGroup = new Group([areaRect, areaText], {
+        left: areaX,
+        top: areaY,
+        selectable: editMode === 'outside',
+        hasControls: editMode === 'outside',
+        lockRotation: true,
+        evented: editMode === 'outside',
+        cornerStyle: 'circle',
+        borderColor: COLORS.selected.stroke,
+        cornerColor: COLORS.selected.stroke,
+        hoverCursor: editMode === 'outside' ? 'move' : 'default',
+        moveCursor: 'move',
+        data: { type: 'outside', id: area.id, originalData: area },
+      } as any);
+
+      canvas.add(areaGroup);
+    });
+
+    // Render storage locations
+    storageLocations.forEach((storage) => {
+      const storageX = (storage.grid_x || 0) * CELL_SIZE;
+      const storageY = (storage.grid_y || 0) * CELL_SIZE;
+      const storageWidth = (storage.grid_width || 3) * CELL_SIZE;
+      const storageHeight = (storage.grid_height || 3) * CELL_SIZE;
+      const opacity = editMode === 'storage' ? 1 : 0.3;
+
+      const storageRect = new Rect({
+        left: 0,
+        top: 0,
+        width: storageWidth,
+        height: storageHeight,
+        fill: COLORS.storage.fill,
+        stroke: COLORS.storage.stroke,
+        strokeWidth: COLORS.storage.strokeWidth,
+        opacity,
+        rx: 2,
+        ry: 2,
+      });
+
+      const storageText = new FabricText(storage.name, {
+        left: storageWidth / 2 - 20,
+        top: storageHeight / 2 - 8,
+        fontSize: 11,
+        fill: COLORS.storage.text,
+        fontWeight: 'bold',
+      });
+
+      const storageGroup = new Group([storageRect, storageText], {
+        left: storageX,
+        top: storageY,
+        selectable: editMode === 'storage',
+        hasControls: editMode === 'storage',
+        lockRotation: true,
+        evented: editMode === 'storage',
+        cornerStyle: 'circle',
+        borderColor: COLORS.selected.stroke,
+        cornerColor: COLORS.selected.stroke,
+        hoverCursor: editMode === 'storage' ? 'move' : 'default',
+        moveCursor: 'move',
+        data: { type: 'storage', id: storage.id, originalData: storage },
+      } as any);
+
+      canvas.add(storageGroup);
+    });
+
+    // Render zones
+    zones.forEach((zone) => {
+      const zoneX = (zone.grid_x || 0) * CELL_SIZE;
+      const zoneY = (zone.grid_y || 0) * CELL_SIZE;
+      const zoneWidth = (zone.grid_width || 6) * CELL_SIZE;
+      const zoneHeight = (zone.grid_height || 6) * CELL_SIZE;
+      const opacity = editMode === 'zone' ? 1 : 0.2;
+
+      const zoneRect = new Rect({
+        left: 0,
+        top: 0,
+        width: zoneWidth,
+        height: zoneHeight,
+        fill: zone.color || COLORS.zones.fill,
+        stroke: COLORS.zones.stroke,
+        strokeWidth: COLORS.zones.strokeWidth,
+        opacity,
+        rx: 4,
+        ry: 4,
+      });
+
+      const zoneText = new FabricText(zone.name, {
+        left: zoneWidth / 2 - 25,
+        top: zoneHeight / 2 - 8,
+        fontSize: 12,
+        fill: COLORS.zones.text,
+        fontWeight: 'bold',
+      });
+
+      const zoneGroup = new Group([zoneRect, zoneText], {
+        left: zoneX,
+        top: zoneY,
+        selectable: editMode === 'zone',
+        hasControls: editMode === 'zone',
+        lockRotation: true,
+        evented: editMode === 'zone',
+        cornerStyle: 'circle',
+        borderColor: COLORS.selected.stroke,
+        cornerColor: COLORS.selected.stroke,
+        hoverCursor: editMode === 'zone' ? 'move' : 'default',
+        moveCursor: 'move',
+        data: { type: 'zone', id: zone.id, originalData: zone },
+      } as any);
+
+      canvas.add(zoneGroup);
+    });
+
     canvas.renderAll();
-  }, [canvas, gridWidth, gridHeight, gates, lanes, stations, editMode]);
+  }, [canvas, gridWidth, gridHeight, gates, lanes, stations, rooms, outsideAreas, storageLocations, zones, editMode]);
 
   // Update element properties when editMode changes
   useEffect(() => {
@@ -518,35 +825,82 @@ export function UnifiedGridBuilder({
         const { type } = obj.data;
         
         if (type === 'gate') {
+          const isActive = editMode === 'gate';
           obj.set({
-            selectable: editMode === 'gates',
-            evented: editMode === 'gates',
-            hasControls: editMode === 'gates',
-            opacity: editMode === 'gates' ? 1 : 0.3,
-            hoverCursor: editMode === 'gates' ? 'move' : 'default',
+            selectable: isActive,
+            evented: isActive,
+            hasControls: isActive,
+            opacity: isActive ? 1 : 0.3,
+            hoverCursor: isActive ? 'move' : 'default',
           });
           const rect = obj._objects?.[0];
-          if (rect) rect.set({ opacity: editMode === 'gates' ? 1 : 0.3 });
+          if (rect) rect.set({ opacity: isActive ? 1 : 0.3 });
         } else if (type === 'lane') {
+          const isActive = editMode === 'lane';
           obj.set({
-            selectable: editMode === 'lanes',
-            evented: editMode === 'lanes',
-            hasControls: editMode === 'lanes',
-            opacity: editMode === 'lanes' ? 1 : 0.3,
-            hoverCursor: editMode === 'lanes' ? 'move' : 'default',
+            selectable: isActive,
+            evented: isActive,
+            hasControls: isActive,
+            opacity: isActive ? 1 : 0.3,
+            hoverCursor: isActive ? 'move' : 'default',
           });
           const rect = obj._objects?.[0];
-          if (rect) rect.set({ opacity: editMode === 'lanes' ? 1 : 0.3 });
+          if (rect) rect.set({ opacity: isActive ? 1 : 0.3 });
         } else if (type === 'station') {
+          const isActive = editMode === 'station';
           obj.set({
-            selectable: editMode === 'stations',
-            evented: editMode === 'stations',
-            hasControls: editMode === 'stations',
-            opacity: editMode === 'stations' ? 1 : 0.3,
-            hoverCursor: editMode === 'stations' ? 'move' : 'default',
+            selectable: isActive,
+            evented: isActive,
+            hasControls: isActive,
+            opacity: isActive ? 1 : 0.3,
+            hoverCursor: isActive ? 'move' : 'default',
           });
           const rect = obj._objects?.[0];
-          if (rect) rect.set({ opacity: editMode === 'stations' ? 1 : 0.3 });
+          if (rect) rect.set({ opacity: isActive ? 1 : 0.3 });
+        } else if (type === 'room') {
+          const isActive = editMode === 'room';
+          obj.set({
+            selectable: isActive,
+            evented: isActive,
+            hasControls: isActive,
+            opacity: isActive ? 1 : 0.2,
+            hoverCursor: isActive ? 'move' : 'default',
+          });
+          const rect = obj._objects?.[0];
+          if (rect) rect.set({ opacity: isActive ? 1 : 0.2 });
+        } else if (type === 'outside') {
+          const isActive = editMode === 'outside';
+          obj.set({
+            selectable: isActive,
+            evented: isActive,
+            hasControls: isActive,
+            opacity: isActive ? 1 : 0.2,
+            hoverCursor: isActive ? 'move' : 'default',
+          });
+          const rect = obj._objects?.[0];
+          if (rect) rect.set({ opacity: isActive ? 1 : 0.2 });
+        } else if (type === 'storage') {
+          const isActive = editMode === 'storage';
+          obj.set({
+            selectable: isActive,
+            evented: isActive,
+            hasControls: isActive,
+            opacity: isActive ? 1 : 0.3,
+            hoverCursor: isActive ? 'move' : 'default',
+          });
+          const rect = obj._objects?.[0];
+          if (rect) rect.set({ opacity: isActive ? 1 : 0.3 });
+        } else if (type === 'zone') {
+          const isActive = editMode === 'zone';
+          obj.set({
+            selectable: isActive,
+            evented: isActive,
+            hasControls: isActive,
+            opacity: isActive ? 1 : 0.2,
+            hoverCursor: isActive ? 'move' : 'default',
+          });
+          const rect = obj._objects?.[0];
+          if (rect) rect.set({ opacity: isActive ? 1 : 0.2 });
         }
       }
     });
