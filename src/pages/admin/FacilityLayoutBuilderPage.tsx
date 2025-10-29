@@ -16,6 +16,9 @@ import { BlockProperties } from '@/components/facility/BlockProperties';
 import { LibraryPalette, type LibraryItem } from '@/components/facility/LibraryPalette';
 import { EditModeSelector } from '@/components/facility/EditModeSelector';
 import { LayoutToolbar } from '@/components/facility/LayoutToolbar';
+import { StatusBar } from '@/components/facility/StatusBar';
+import { Minimap } from '@/components/facility/Minimap';
+import { KeyboardShortcutsDialog } from '@/components/facility/KeyboardShortcutsDialog';
 import { CreateGateDialog } from '@/components/facility/dialogs/CreateGateDialog';
 import { CreateLaneDialog } from '@/components/facility/dialogs/CreateLaneDialog';
 import { CreateStationDialog } from '@/components/facility/dialogs/CreateStationDialog';
@@ -47,6 +50,19 @@ export default function FacilityLayoutBuilderPage() {
   const [showProperties, setShowProperties] = useState(false); // Auto-hide by default
   const [isDraggingFromLibrary, setIsDraggingFromLibrary] = useState(false);
   const [propertiesPinned, setPropertiesPinned] = useState(false);
+  const [showMinimap, setShowMinimap] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [canvasState, setCanvasState] = useState<{
+    zoom: number;
+    workingArea: { minX: number; minY: number; width: number; height: number };
+    viewportTransform: number[] | null;
+    containerSize: { width: number; height: number };
+  }>({
+    zoom: 1,
+    workingArea: { minX: 0, minY: 0, width: 1000, height: 1000 },
+    viewportTransform: null,
+    containerSize: { width: 1000, height: 700 },
+  });
   const { data: facilities, isLoading: loadingFacilities } = useFacilities();
   const { data: allDrivingGates } = useDrivingGates();
   const { data: allLanes } = useLanes();
@@ -115,6 +131,14 @@ export default function FacilityLayoutBuilderPage() {
           e.preventDefault();
           setShowProperties(prev => !prev);
           if (!showProperties) setPropertiesPinned(true);
+        }
+      }
+      // ? - Show shortcuts
+      if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+        const target = e.target as HTMLElement;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          setShowShortcuts(true);
         }
       }
       // Esc - Deselect and close panels
@@ -764,6 +788,7 @@ export default function FacilityLayoutBuilderPage() {
             onDrop={handleCanvasDrop}
             onDelete={handleDeleteBlock}
             onReturnToLibrary={handleReturnToLibrary}
+            onCanvasStateChange={setCanvasState}
             onEnterRoom={(roomId) => {
               const room = allRooms?.find(r => r.id === roomId);
               if (room) {
@@ -777,6 +802,23 @@ export default function FacilityLayoutBuilderPage() {
               }
             }}
           />
+
+          {/* Minimap */}
+          {showMinimap && (
+            <Minimap
+              workingArea={canvasState.workingArea}
+              blocks={[...gateBlocks, ...laneBlocks, ...stationBlocks, ...roomBlocks, ...outsideBlocks, ...storageBlocks, ...zoneBlocks]}
+              viewportTransform={canvasState.viewportTransform}
+              containerSize={canvasState.containerSize}
+              cellSize={30}
+              zoom={canvasState.zoom}
+              onNavigate={(x, y) => {
+                // This will be handled by BlockGridBuilder via ref
+                console.log('Navigate to:', x, y);
+              }}
+              onClose={() => setShowMinimap(false)}
+            />
+          )}
         </div>
 
         {/* Properties Panel */}
@@ -902,6 +944,24 @@ export default function FacilityLayoutBuilderPage() {
         onOpenChange={setShowBoundaryDialog}
         facilityId={facility.id}
         blocks={[...gateBlocks, ...laneBlocks, ...stationBlocks, ...roomBlocks, ...outsideBlocks, ...storageBlocks, ...zoneBlocks]}
+      />
+
+      {/* Status Bar */}
+      <StatusBar
+        gridWidth={viewContext.gridWidth}
+        gridHeight={viewContext.gridHeight}
+        zoom={canvasState.zoom}
+        elementCount={[...gateBlocks, ...laneBlocks, ...stationBlocks, ...roomBlocks, ...outsideBlocks, ...storageBlocks, ...zoneBlocks].length}
+        selectedElementName={selectedBlock?.name}
+        minimapVisible={showMinimap}
+        onToggleMinimap={() => setShowMinimap(prev => !prev)}
+        onShowShortcuts={() => setShowShortcuts(true)}
+      />
+
+      {/* Keyboard Shortcuts Dialog */}
+      <KeyboardShortcutsDialog
+        open={showShortcuts}
+        onOpenChange={setShowShortcuts}
       />
     </div>
   );

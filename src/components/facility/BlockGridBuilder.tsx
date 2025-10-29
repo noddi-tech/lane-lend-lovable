@@ -74,6 +74,12 @@ interface BlockGridBuilderProps {
   onReturnToLibrary?: (block: LayoutBlock) => void;
   onEnterRoom?: (roomId: string) => void;
   onEnterZone?: (zoneId: string) => void;
+  onCanvasStateChange?: (state: {
+    zoom: number;
+    workingArea: { minX: number; minY: number; width: number; height: number };
+    viewportTransform: number[] | null;
+    containerSize: { width: number; height: number };
+  }) => void;
 }
 
 // Dynamic cell size calculation - allow much smaller cells for large grids
@@ -212,6 +218,7 @@ export function BlockGridBuilder({
   onReturnToLibrary,
   onEnterRoom,
   onEnterZone,
+  onCanvasStateChange,
 }: BlockGridBuilderProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -248,6 +255,21 @@ export function BlockGridBuilder({
   useEffect(() => {
     zoomRef.current = zoom;
   }, [zoom]);
+
+  // Notify parent of canvas state changes
+  useEffect(() => {
+    if (canvas && containerRef.current) {
+      onCanvasStateChange?.({
+        zoom,
+        workingArea,
+        viewportTransform: canvas.viewportTransform,
+        containerSize: {
+          width: containerRef.current.clientWidth,
+          height: containerRef.current.clientHeight,
+        },
+      });
+    }
+  }, [zoom, workingArea, canvas, onCanvasStateChange]);
 
   // Recalculate working area when elements change
   useEffect(() => {
