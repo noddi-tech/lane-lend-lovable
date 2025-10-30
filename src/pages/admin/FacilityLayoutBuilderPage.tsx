@@ -81,6 +81,97 @@ export default function FacilityLayoutBuilderPageUnified() {
     [allStations, facilityLaneIds]
   );
 
+  // Memoize all array props to prevent infinite render loops
+  const gatesData = useMemo(
+    () => drivingGates.map(g => ({
+      id: g.id,
+      name: g.name,
+      grid_x: g.grid_position_x,
+      grid_y: g.grid_position_y,
+      grid_width: g.grid_width,
+      grid_height: g.grid_height,
+    })),
+    [drivingGates]
+  );
+
+  const lanesData = useMemo(
+    () => facilityLanes.map(l => ({
+      id: l.id,
+      name: l.name,
+      position_order: l.position_order,
+      grid_y: l.grid_position_y,
+      grid_height: l.grid_height,
+    })),
+    [facilityLanes]
+  );
+
+  const stationsData = useMemo(
+    () => facilityStations.map(s => ({
+      id: s.id,
+      name: s.name,
+      grid_x: s.grid_position_x,
+      grid_y: s.grid_position_y,
+      grid_width: s.grid_width,
+      grid_height: s.grid_height,
+    })),
+    [facilityStations]
+  );
+
+  const roomsData = useMemo(
+    () => allRooms?.map(r => ({
+      id: r.id,
+      name: r.name,
+      grid_x: r.grid_position_x,
+      grid_y: r.grid_position_y,
+      grid_width: r.grid_width,
+      grid_height: r.grid_height,
+      color: r.color,
+    })) || [],
+    [allRooms]
+  );
+
+  const outsideAreasData = useMemo(
+    () => allOutsideAreas?.map(a => ({
+      id: a.id,
+      name: a.name,
+      grid_x: a.grid_position_x,
+      grid_y: a.grid_position_y,
+      grid_width: a.grid_width,
+      grid_height: a.grid_height,
+      color: a.color,
+      area_type: a.area_type,
+    })) || [],
+    [allOutsideAreas]
+  );
+
+  const storageLocationsData = useMemo(
+    () => allStorageLocations?.filter(s => s.lane_id && facilityLaneIds.includes(s.lane_id)).map(s => ({
+      id: s.id,
+      name: s.name,
+      grid_x: s.grid_position_x,
+      grid_y: s.grid_position_y,
+      grid_width: s.grid_width,
+      grid_height: s.grid_height,
+      storage_type: s.storage_type,
+      status: s.status,
+    })) || [],
+    [allStorageLocations, facilityLaneIds]
+  );
+
+  const zonesData = useMemo(
+    () => allZones?.map(z => ({
+      id: z.id,
+      name: z.name,
+      grid_x: z.grid_position_x,
+      grid_y: z.grid_position_y,
+      grid_width: z.grid_width,
+      grid_height: z.grid_height,
+      color: z.color,
+      zone_type: z.zone_type,
+    })) || [],
+    [allZones]
+  );
+
   if (loadingFacilities) {
     return <div className="flex items-center justify-center h-screen">Loading facility...</div>;
   }
@@ -173,68 +264,13 @@ export default function FacilityLayoutBuilderPageUnified() {
           <UnifiedGridBuilder
           gridWidth={facility.grid_width}
           gridHeight={facility.grid_height}
-          gates={drivingGates.map(g => ({
-            id: g.id,
-            name: g.name,
-            grid_x: g.grid_position_x,
-            grid_y: g.grid_position_y,
-            grid_width: g.grid_width,
-            grid_height: g.grid_height,
-          }))}
-          lanes={facilityLanes.map(l => ({
-            id: l.id,
-            name: l.name,
-            position_order: l.position_order,
-            grid_y: l.grid_position_y,
-            grid_height: l.grid_height,
-          }))}
-          stations={facilityStations.map(s => ({
-            id: s.id,
-            name: s.name,
-            grid_x: s.grid_position_x,
-            grid_y: s.grid_position_y,
-            grid_width: s.grid_width,
-            grid_height: s.grid_height,
-          }))}
-          rooms={allRooms?.map(r => ({
-            id: r.id,
-            name: r.name,
-            grid_x: r.grid_position_x,
-            grid_y: r.grid_position_y,
-            grid_width: r.grid_width,
-            grid_height: r.grid_height,
-            color: r.color,
-          }))}
-          outsideAreas={allOutsideAreas?.map(a => ({
-            id: a.id,
-            name: a.name,
-            grid_x: a.grid_position_x,
-            grid_y: a.grid_position_y,
-            grid_width: a.grid_width,
-            grid_height: a.grid_height,
-            color: a.color,
-            area_type: a.area_type,
-          }))}
-          storageLocations={allStorageLocations?.filter(s => s.lane_id && facilityLaneIds.includes(s.lane_id)).map(s => ({
-            id: s.id,
-            name: s.name,
-            grid_x: s.grid_position_x,
-            grid_y: s.grid_position_y,
-            grid_width: s.grid_width,
-            grid_height: s.grid_height,
-            storage_type: s.storage_type,
-            status: s.status,
-          }))}
-          zones={allZones?.map(z => ({
-            id: z.id,
-            name: z.name,
-            grid_x: z.grid_position_x,
-            grid_y: z.grid_position_y,
-            grid_width: z.grid_width,
-            grid_height: z.grid_height,
-            color: z.color,
-            zone_type: z.zone_type,
-          }))}
+          gates={gatesData}
+          lanes={lanesData}
+          stations={stationsData}
+          rooms={roomsData}
+          outsideAreas={outsideAreasData}
+          storageLocations={storageLocationsData}
+          zones={zonesData}
           editMode={editMode}
           onGateMove={(id, x, y) => updateGate.mutateAsync({ id, grid_position_x: x, grid_position_y: y } as any)}
           onLaneMove={(id, x, y) => updateLane.mutateAsync({ id, grid_position_x: x, grid_position_y: y } as any)}
