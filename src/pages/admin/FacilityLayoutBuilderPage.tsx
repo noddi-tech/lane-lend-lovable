@@ -158,8 +158,12 @@ export default function FacilityLayoutBuilderPageUnified() {
   );
 
   const facilityStations = useMemo(
-    () => allStations?.filter(station => facilityLaneIds.includes(station.lane_id)) || [],
-    [allStations, facilityLaneIds]
+    () => allStations?.filter(station => 
+      facilityLaneIds.includes(station.lane_id) ||
+      (station as any).room_id && allRooms?.some(r => r.id === (station as any).room_id) ||
+      (station as any).zone_id && allZones?.some(z => z.id === (station as any).zone_id)
+    ) || [],
+    [allStations, facilityLaneIds, allRooms, allZones]
   );
 
   // Memoize all array props to prevent infinite render loops
@@ -180,7 +184,9 @@ export default function FacilityLayoutBuilderPageUnified() {
       id: l.id,
       name: l.name,
       position_order: l.position_order,
+      grid_x: l.grid_position_x,
       grid_y: l.grid_position_y,
+      grid_width: l.grid_width,
       grid_height: l.grid_height,
     })),
     [facilityLanes]
@@ -226,7 +232,11 @@ export default function FacilityLayoutBuilderPageUnified() {
   );
 
   const storageLocationsData = useMemo(
-    () => allStorageLocations?.filter(s => s.lane_id && facilityLaneIds.includes(s.lane_id)).map(s => ({
+    () => allStorageLocations?.filter(s => 
+      (s.lane_id && facilityLaneIds.includes(s.lane_id)) ||
+      ((s as any).room_id && allRooms?.some(r => r.id === (s as any).room_id)) ||
+      ((s as any).zone_id && allZones?.some(z => z.id === (s as any).zone_id))
+    ).map(s => ({
       id: s.id,
       name: s.name,
       grid_x: s.grid_position_x,
@@ -236,7 +246,7 @@ export default function FacilityLayoutBuilderPageUnified() {
       storage_type: s.storage_type,
       status: s.status,
     })) || [],
-    [allStorageLocations, facilityLaneIds]
+    [allStorageLocations, facilityLaneIds, allRooms, allZones]
   );
 
   const zonesData = useMemo(
@@ -760,6 +770,161 @@ export default function FacilityLayoutBuilderPageUnified() {
                             </CollapsibleContent>
                           </div>
                         </Collapsible>
+                      );
+                    })
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+
+          {/* Lanes */}
+          {editMode === 'lane' && (
+            <div className="border rounded-lg overflow-hidden">
+              <div className="p-4 border-b bg-muted/50">
+                <h3 className="font-semibold text-sm">Lanes in Facility</h3>
+                <p className="text-xs text-muted-foreground mt-1">Hierarchical view with nested elements</p>
+              </div>
+              <ScrollArea className="h-[calc(100vh-300px)]">
+                <div className="p-2 space-y-1">
+                  {lanesData.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">No lanes yet</p>
+                  ) : (
+                    lanesData.map((lane) => {
+                      const laneOriginal = allLanes?.find(l => l.id === lane.id);
+                      const isExpanded = expandedLanes.has(lane.id);
+                      const childStations = getChildStations(lane.id, 'lane');
+                      const childStorage = getChildStorage(lane.id, 'lane');
+                      const hasChildren = childStations.length + childStorage.length > 0;
+                      
+                      return (
+                        <Collapsible
+                          key={lane.id}
+                          open={isExpanded}
+                          onOpenChange={() => toggleExpanded(lane.id, 'lane')}
+                        >
+                          <div className="relative group">
+                            <div className="flex items-stretch">
+                              {hasChildren && (
+                                <CollapsibleTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-auto w-6 rounded-none flex-shrink-0">
+                                    {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                                  </Button>
+                                </CollapsibleTrigger>
+                              )}
+                              
+                              <Button
+                                variant={selectedElement?.id === lane.id ? 'secondary' : 'ghost'}
+                                size="sm"
+                                className={`flex-1 justify-start gap-2 h-auto py-2 ${!hasChildren ? 'ml-6' : ''}`}
+                                onClick={() => handleElementSelect({ id: lane.id, type: 'lane', data: { originalData: laneOriginal } })}
+                              >
+                                🛣️
+                                <div className="flex-1 text-left">
+                                  <div className="font-medium text-sm">{lane.name}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {lane.grid_width} × {lane.grid_height}
+                                    {hasChildren && <span className="ml-2 text-primary">• {childStations.length + childStorage.length} items</span>}
+                                  </div>
+                                </div>
+                              </Button>
+                              
+                              <div className="absolute right-1 top-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
+                                <Button size="icon" variant="ghost" className="h-7 w-7 bg-background/95"
+                                  onClick={(e) => { e.stopPropagation(); setEditingLane(laneOriginal); }}>
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive bg-background/95"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirm(`Delete lane "${lane.name}"? This will also delete all nested elements.`)) {
+                                      deleteLane.mutate(lane.id, {
+                                        onSuccess: () => { toast.success(`Lane "${lane.name}" deleted`); setSelectedElement(null); }
+                                      });
+                                    }
+                                  }}>
+                                  <Trash className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+                            
+                            <CollapsibleContent>
+                              <div className="ml-6 mt-1 space-y-1 border-l-2 border-muted pl-2">
+                                {childStations.map(station => (
+                                  <Button key={station.id} variant="ghost" size="sm"
+                                    className="w-full justify-start gap-2 h-auto py-1.5 text-xs"
+                                    onClick={() => handleElementSelect({ id: station.id, type: 'station', data: { originalData: station } })}>
+                                    🔧 <span>{station.name}</span>
+                                  </Button>
+                                ))}
+                                {childStorage.map(storage => (
+                                  <Button key={storage.id} variant="ghost" size="sm"
+                                    className="w-full justify-start gap-2 h-auto py-1.5 text-xs"
+                                    onClick={() => handleElementSelect({ id: storage.id, type: 'storage', data: { originalData: storage } })}>
+                                    📦 <span>{storage.name}</span>
+                                  </Button>
+                                ))}
+                              </div>
+                            </CollapsibleContent>
+                          </div>
+                        </Collapsible>
+                      );
+                    })
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+
+          {/* Outside Areas */}
+          {editMode === 'outside' && (
+            <div className="border rounded-lg overflow-hidden">
+              <div className="p-4 border-b bg-muted/50">
+                <h3 className="font-semibold text-sm">Outside Areas in Facility</h3>
+                <p className="text-xs text-muted-foreground mt-1">Click to select</p>
+              </div>
+              <ScrollArea className="h-[calc(100vh-300px)]">
+                <div className="p-2 space-y-1">
+                  {outsideAreasData.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">No outside areas yet</p>
+                  ) : (
+                    outsideAreasData.map((area) => {
+                      const areaOriginal = allOutsideAreas?.find(a => a.id === area.id);
+                      return (
+                        <div key={area.id} className="relative group">
+                          <Button
+                            variant={selectedElement?.id === area.id ? 'secondary' : 'ghost'}
+                            size="sm"
+                            className="w-full justify-start gap-2 h-auto py-2"
+                            onClick={() => handleElementSelect({ id: area.id, type: 'outside', data: { originalData: areaOriginal } })}
+                          >
+                            🌳
+                            <div className="flex-1 text-left">
+                              <div className="font-medium text-sm">{area.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {area.grid_width} × {area.grid_height}
+                              </div>
+                            </div>
+                          </Button>
+                          
+                          <div className="absolute right-1 top-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
+                            <Button size="icon" variant="ghost" className="h-7 w-7 bg-background/95"
+                              onClick={(e) => { e.stopPropagation(); setEditingOutside(areaOriginal); }}>
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive bg-background/95"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm(`Delete outside area "${area.name}"?`)) {
+                                  deleteOutside.mutate(area.id, {
+                                    onSuccess: () => { toast.success(`Outside area "${area.name}" deleted`); setSelectedElement(null); }
+                                  });
+                                }
+                              }}>
+                              <Trash className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
                       );
                     })
                   )}

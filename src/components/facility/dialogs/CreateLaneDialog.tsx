@@ -19,7 +19,7 @@ export function CreateLaneDialog({ open, onOpenChange, facilityId }: CreateLaneD
   const [name, setName] = useState("");
   const [gridX, setGridX] = useState(0);
   const [gridY, setGridY] = useState(5);
-  const [gridWidth, setGridWidth] = useState(50);
+  const [gridWidth, setGridWidth] = useState(20);
   const [gridHeight, setGridHeight] = useState(2);
   const [parentType, setParentType] = useState<'room' | 'zone' | 'outside' | 'none'>('none');
   const [parentId, setParentId] = useState<string>("");
@@ -51,7 +51,7 @@ export function CreateLaneDialog({ open, onOpenChange, facilityId }: CreateLaneD
     setName("");
     setGridX(0);
     setGridY(5);
-    setGridWidth(50);
+    setGridWidth(20);
     setGridHeight(2);
     setParentType('none');
     setParentId("");
