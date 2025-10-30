@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { useCreateStation } from "@/hooks/admin/useStations";
 import { useRooms } from "@/hooks/admin/useRooms";
 import { useZones } from "@/hooks/admin/useZones";
 import { useOutsideAreas } from "@/hooks/admin/useOutsideAreas";
+import { useLanes } from "@/hooks/admin/useLanes";
 
 interface CreateStationDialogProps {
   open: boolean;
@@ -29,11 +30,34 @@ export function CreateStationDialog({ open, onOpenChange, lanes, facilityId }: C
   const { data: rooms } = useRooms(facilityId);
   const { data: zones } = useZones(facilityId);
   const { data: outsideAreas } = useOutsideAreas(facilityId);
+  const { data: allLanes } = useLanes();
+  const facilityLanes = allLanes?.filter(l => l.facility_id === facilityId) || [];
 
-  const availableParents = parentType === 'lane' ? lanes :
+  const availableParents = parentType === 'lane' ? facilityLanes :
                            parentType === 'room' ? (rooms || []) :
                            parentType === 'zone' ? (zones || []) :
                            parentType === 'outside' ? (outsideAreas || []) : [];
+
+  // Auto-calculate position when parent is selected
+  useEffect(() => {
+    if (!parentId || availableParents.length === 0) return;
+    
+    const parent = availableParents.find((p: any) => p.id === parentId);
+    if (!parent) return;
+    
+    // Calculate center of parent
+    const parentX = parent.grid_position_x || 0;
+    const parentY = parent.grid_position_y || 0;
+    const parentWidth = parent.grid_width || 10;
+    const parentHeight = parent.grid_height || 10;
+    
+    // Position in center of parent
+    const centerX = parentX + Math.floor((parentWidth - gridWidth) / 2);
+    const centerY = parentY + Math.floor((parentHeight - gridHeight) / 2);
+    
+    setGridX(Math.max(parentX, centerX));
+    setGridY(Math.max(parentY, centerY));
+  }, [parentId, availableParents, gridWidth, gridHeight]);
 
   const handleSubmit = async () => {
     if (!parentId) return;

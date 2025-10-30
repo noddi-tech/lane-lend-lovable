@@ -945,23 +945,45 @@ export default function FacilityLayoutBuilderPageUnified() {
                   {stationsData.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">No stations yet</p>
                   ) : (
-                    stationsData.map((station) => (
-                      <Button
-                        key={station.id}
-                        variant={selectedElement?.id === station.id ? 'secondary' : 'ghost'}
-                        size="sm"
-                        className="w-full justify-start gap-2 h-auto py-2"
-                        onClick={() => handleElementSelect({ id: station.id, type: 'station', data: { originalData: station } })}
-                      >
-                        🔧
-                        <div className="flex-1 text-left">
-                          <div className="font-medium text-sm">{station.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {station.grid_width} × {station.grid_height}
+                    stationsData.map((station) => {
+                      const stationOriginal = allStations?.find(s => s.id === station.id);
+                      return (
+                        <div key={station.id} className="relative group">
+                          <Button
+                            variant={selectedElement?.id === station.id ? 'secondary' : 'ghost'}
+                            size="sm"
+                            className="w-full justify-start gap-2 h-auto py-2"
+                            onClick={() => handleElementSelect({ id: station.id, type: 'station', data: { originalData: stationOriginal } })}
+                          >
+                            🔧
+                            <div className="flex-1 text-left">
+                              <div className="font-medium text-sm">{station.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {station.grid_width} × {station.grid_height}
+                              </div>
+                            </div>
+                          </Button>
+                          
+                          <div className="absolute right-1 top-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
+                            <Button size="icon" variant="ghost" className="h-7 w-7 bg-background/95"
+                              onClick={(e) => { e.stopPropagation(); setEditingStation(stationOriginal); }}>
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive bg-background/95"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm(`Delete station "${station.name}"?`)) {
+                                  deleteStation.mutate(station.id, {
+                                    onSuccess: () => { toast.success(`Station "${station.name}" deleted`); setSelectedElement(null); }
+                                  });
+                                }
+                              }}>
+                              <Trash className="h-3 w-3" />
+                            </Button>
                           </div>
                         </div>
-                      </Button>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </ScrollArea>
@@ -980,23 +1002,45 @@ export default function FacilityLayoutBuilderPageUnified() {
                   {storageLocationsData.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">No storage locations yet</p>
                   ) : (
-                    storageLocationsData.map((storage) => (
-                      <Button
-                        key={storage.id}
-                        variant={selectedElement?.id === storage.id ? 'secondary' : 'ghost'}
-                        size="sm"
-                        className="w-full justify-start gap-2 h-auto py-2"
-                        onClick={() => handleElementSelect({ id: storage.id, type: 'storage', data: { originalData: storage } })}
-                      >
-                        📦
-                        <div className="flex-1 text-left">
-                          <div className="font-medium text-sm">{storage.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {storage.grid_width} × {storage.grid_height}
+                    storageLocationsData.map((storage) => {
+                      const storageOriginal = allStorageLocations?.find(s => s.id === storage.id);
+                      return (
+                        <div key={storage.id} className="relative group">
+                          <Button
+                            variant={selectedElement?.id === storage.id ? 'secondary' : 'ghost'}
+                            size="sm"
+                            className="w-full justify-start gap-2 h-auto py-2"
+                            onClick={() => handleElementSelect({ id: storage.id, type: 'storage', data: { originalData: storageOriginal } })}
+                          >
+                            📦
+                            <div className="flex-1 text-left">
+                              <div className="font-medium text-sm">{storage.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {storage.grid_width} × {storage.grid_height}
+                              </div>
+                            </div>
+                          </Button>
+                          
+                          <div className="absolute right-1 top-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
+                            <Button size="icon" variant="ghost" className="h-7 w-7 bg-background/95"
+                              onClick={(e) => { e.stopPropagation(); setEditingStorage(storageOriginal); }}>
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive bg-background/95"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm(`Delete storage "${storage.name}"?`)) {
+                                  deleteStorage.mutate(storage.id, {
+                                    onSuccess: () => { toast.success(`Storage "${storage.name}" deleted`); setSelectedElement(null); }
+                                  });
+                                }
+                              }}>
+                              <Trash className="h-3 w-3" />
+                            </Button>
                           </div>
                         </div>
-                      </Button>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </ScrollArea>

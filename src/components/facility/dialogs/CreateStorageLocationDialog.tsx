@@ -8,7 +8,8 @@ import { useCreateStorageLocation } from '@/hooks/admin/useStorageLocations';
 import { useRooms } from '@/hooks/admin/useRooms';
 import { useZones } from '@/hooks/admin/useZones';
 import { useOutsideAreas } from '@/hooks/admin/useOutsideAreas';
-import { useState } from 'react';
+import { useLanes } from '@/hooks/admin/useLanes';
+import { useState, useEffect } from 'react';
 
 interface CreateStorageLocationDialogProps {
   open: boolean;
@@ -24,15 +25,40 @@ export function CreateStorageLocationDialog({ open, onOpenChange, lanes, facilit
   const [storageType, setStorageType] = useState<'general' | 'parts' | 'tools' | 'hazmat' | 'other'>('general');
   const [parentType, setParentType] = useState<'lane' | 'room' | 'zone' | 'outside'>('lane');
   const [parentId, setParentId] = useState<string>("");
+  const [gridX, setGridX] = useState(0);
+  const [gridY, setGridY] = useState(0);
 
   const { data: rooms } = useRooms(facilityId);
   const { data: zones } = useZones(facilityId);
   const { data: outsideAreas } = useOutsideAreas(facilityId);
+  const { data: allLanes } = useLanes();
+  const facilityLanes = allLanes?.filter(l => l.facility_id === facilityId) || [];
 
-  const availableParents = parentType === 'lane' ? (lanes || []) :
+  const availableParents = parentType === 'lane' ? facilityLanes :
                            parentType === 'room' ? (rooms || []) :
                            parentType === 'zone' ? (zones || []) :
                            parentType === 'outside' ? (outsideAreas || []) : [];
+
+  // Auto-calculate position when parent is selected
+  useEffect(() => {
+    if (!parentId || availableParents.length === 0) return;
+    
+    const parent = availableParents.find((p: any) => p.id === parentId);
+    if (!parent) return;
+    
+    // Calculate center of parent
+    const parentX = parent.grid_position_x || 0;
+    const parentY = parent.grid_position_y || 0;
+    const parentWidth = parent.grid_width || 10;
+    const parentHeight = parent.grid_height || 10;
+    
+    // Position in center of parent (1x1 storage)
+    const centerX = parentX + Math.floor((parentWidth - 1) / 2);
+    const centerY = parentY + Math.floor((parentHeight - 1) / 2);
+    
+    setGridX(Math.max(parentX, centerX));
+    setGridY(Math.max(parentY, centerY));
+  }, [parentId, availableParents]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,11 +66,12 @@ export function CreateStorageLocationDialog({ open, onOpenChange, lanes, facilit
     await createStorageLocation.mutateAsync({
       lane_id: parentType === 'lane' ? parentId : null,
       room_id: parentType === 'room' ? parentId : null,
+      zone_id: parentType === 'zone' ? parentId : null,
       name,
       description: description || null,
       storage_type: storageType,
-      grid_position_x: 0,
-      grid_position_y: 0,
+      grid_position_x: gridX,
+      grid_position_y: gridY,
       grid_width: 1,
       grid_height: 1,
       status: 'available',
@@ -55,6 +82,8 @@ export function CreateStorageLocationDialog({ open, onOpenChange, lanes, facilit
     setStorageType('general');
     setParentType('lane');
     setParentId("");
+    setGridX(0);
+    setGridY(0);
     onOpenChange(false);
   };
 
