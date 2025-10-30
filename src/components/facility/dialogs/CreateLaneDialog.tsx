@@ -150,7 +150,7 @@ export function CreateLaneDialog({ open, onOpenChange, facilityId }: CreateLaneD
                 value={gridHeight}
                 onChange={(e) => setGridHeight(Number(e.target.value))}
                 min={2}
-                max={15}
+                max={100}
               />
             </div>
           </div>

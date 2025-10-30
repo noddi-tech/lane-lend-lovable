@@ -120,7 +120,7 @@ export function EditOutsideAreaDialog({ open, onOpenChange, facilityId, elementD
                 id="width"
                 type="number"
                 min="5"
-                max="100"
+                max="500"
                 value={formData.grid_width}
                 onChange={(e) => setFormData({ ...formData, grid_width: parseInt(e.target.value) })}
                 required
@@ -132,7 +132,7 @@ export function EditOutsideAreaDialog({ open, onOpenChange, facilityId, elementD
                 id="height"
                 type="number"
                 min="5"
-                max="100"
+                max="500"
                 value={formData.grid_height}
                 onChange={(e) => setFormData({ ...formData, grid_height: parseInt(e.target.value) })}
                 required

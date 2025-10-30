@@ -76,7 +76,7 @@ export function EditLaneDialog({ open, onOpenChange, facilityId, elementData }: 
                 value={gridHeight}
                 onChange={(e) => setGridHeight(Number(e.target.value))}
                 min={1}
-                max={10}
+                max={100}
               />
             </div>
           </div>

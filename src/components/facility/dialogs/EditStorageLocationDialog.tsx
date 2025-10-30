@@ -190,7 +190,7 @@ export function EditStorageLocationDialog({ open, onOpenChange, facilityId, elem
                 value={gridWidth}
                 onChange={(e) => setGridWidth(Number(e.target.value))}
                 min={1}
-                max={5}
+                max={50}
               />
             </div>
             <div>
@@ -201,7 +201,7 @@ export function EditStorageLocationDialog({ open, onOpenChange, facilityId, elem
                 value={gridHeight}
                 onChange={(e) => setGridHeight(Number(e.target.value))}
                 min={1}
-                max={5}
+                max={50}
               />
             </div>
           </div>

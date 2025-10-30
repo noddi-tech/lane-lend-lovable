@@ -93,7 +93,7 @@ export function EditGateDialog({ open, onOpenChange, facilityId, elementData }: 
                 value={gridWidth}
                 onChange={(e) => setGridWidth(Number(e.target.value))}
                 min={2}
-                max={5}
+                max={100}
               />
             </div>
             <div>
@@ -104,7 +104,7 @@ export function EditGateDialog({ open, onOpenChange, facilityId, elementData }: 
                 value={gridHeight}
                 onChange={(e) => setGridHeight(Number(e.target.value))}
                 min={5}
-                max={20}
+                max={100}
               />
             </div>
           </div>

@@ -162,7 +162,7 @@ export function EditStationDialog({ open, onOpenChange, facilityId, elementData 
                 value={gridWidth}
                 onChange={(e) => setGridWidth(Number(e.target.value))}
                 min={2}
-                max={10}
+                max={50}
               />
             </div>
             <div>
@@ -173,7 +173,7 @@ export function EditStationDialog({ open, onOpenChange, facilityId, elementData 
                 value={gridHeight}
                 onChange={(e) => setGridHeight(Number(e.target.value))}
                 min={2}
-                max={8}
+                max={50}
               />
             </div>
           </div>
