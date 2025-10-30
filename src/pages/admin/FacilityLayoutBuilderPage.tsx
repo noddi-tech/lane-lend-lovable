@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Plus, X, MapPin, Package, Box, Layers, Pencil, Trash, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Plus, X, Pencil, Trash, ChevronDown, ChevronRight } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { UnifiedGridBuilder, type EditMode } from '@/components/facility/UnifiedGridBuilder';
 import { LibraryPalette } from '@/components/facility/LibraryPalette';
@@ -23,6 +23,13 @@ import { CreateRoomDialog } from '@/components/facility/dialogs/CreateRoomDialog
 import { CreateOutsideAreaDialog } from '@/components/facility/dialogs/CreateOutsideAreaDialog';
 import { CreateStorageLocationDialog } from '@/components/facility/dialogs/CreateStorageLocationDialog';
 import { CreateZoneDialog } from '@/components/facility/dialogs/CreateZoneDialog';
+import { EditRoomDialog } from '@/components/facility/dialogs/EditRoomDialog';
+import { EditZoneDialog } from '@/components/facility/dialogs/EditZoneDialog';
+import { EditGateDialog } from '@/components/facility/dialogs/EditGateDialog';
+import { EditLaneDialog } from '@/components/facility/dialogs/EditLaneDialog';
+import { EditStationDialog } from '@/components/facility/dialogs/EditStationDialog';
+import { EditStorageLocationDialog } from '@/components/facility/dialogs/EditStorageLocationDialog';
+import { EditOutsideAreaDialog } from '@/components/facility/dialogs/EditOutsideAreaDialog';
 import { toast } from 'sonner';
 
 export default function FacilityLayoutBuilderPageUnified() {
@@ -99,6 +106,15 @@ export default function FacilityLayoutBuilderPageUnified() {
   const [showCreateStorageDialog, setShowCreateStorageDialog] = useState(false);
   const [showCreateZoneDialog, setShowCreateZoneDialog] = useState(false);
 
+  // Dialog states for editing elements
+  const [editingRoom, setEditingRoom] = useState<any | null>(null);
+  const [editingZone, setEditingZone] = useState<any | null>(null);
+  const [editingGate, setEditingGate] = useState<any | null>(null);
+  const [editingLane, setEditingLane] = useState<any | null>(null);
+  const [editingStation, setEditingStation] = useState<any | null>(null);
+  const [editingStorage, setEditingStorage] = useState<any | null>(null);
+  const [editingOutside, setEditingOutside] = useState<any | null>(null);
+
   const { data: facilities, isLoading: loadingFacilities } = useFacilities();
   const { data: allDrivingGates } = useDrivingGates();
   const { data: allLanes } = useLanes();
@@ -115,6 +131,14 @@ export default function FacilityLayoutBuilderPageUnified() {
   const updateOutsideArea = useUpdateOutsideArea();
   const updateStorageLocation = useUpdateStorageLocation();
   const updateZone = useUpdateZone();
+
+  const deleteGate = useDeleteDrivingGate();
+  const deleteLane = useDeleteLane();
+  const deleteStation = useDeleteStation();
+  const deleteRoom = useDeleteRoom();
+  const deleteOutside = useDeleteOutsideArea();
+  const deleteStorage = useDeleteStorageLocation();
+  const deleteZone = useDeleteZone();
 
   const facility = facilities?.find(f => f.id === facilityId);
 
@@ -428,7 +452,7 @@ export default function FacilityLayoutBuilderPageUnified() {
                                   className="h-7 w-7 bg-background/95"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    toast.info('Edit dialog coming soon');
+                                    setEditingRoom(roomOriginal);
                                   }}
                                 >
                                   <Pencil className="h-3 w-3" />
@@ -439,8 +463,13 @@ export default function FacilityLayoutBuilderPageUnified() {
                                   className="h-7 w-7 text-destructive bg-background/95"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (confirm(`Delete room "${room.name}"?`)) {
-                                      toast.info('Delete functionality coming soon');
+                                    if (confirm(`Delete room "${room.name}"? This will also delete all nested elements.`)) {
+                                      deleteRoom.mutate(room.id, {
+                                        onSuccess: () => {
+                                          toast.success(`Room "${room.name}" deleted`);
+                                          setSelectedElement(null);
+                                        }
+                                      });
                                     }
                                   }}
                                 >
@@ -459,8 +488,7 @@ export default function FacilityLayoutBuilderPageUnified() {
                                     className="w-full justify-start gap-2 h-auto py-1.5 text-xs"
                                     onClick={() => handleElementSelect({ id: gate.id, type: 'gate', data: { originalData: gate } })}
                                   >
-                                    <MapPin className="h-3 w-3" />
-                                    <span>{gate.name}</span>
+                                    🚪 <span>{gate.name}</span>
                                   </Button>
                                 ))}
                                 
@@ -484,8 +512,7 @@ export default function FacilityLayoutBuilderPageUnified() {
                                     className="w-full justify-start gap-2 h-auto py-1.5 text-xs"
                                     onClick={() => handleElementSelect({ id: station.id, type: 'station', data: { originalData: station } })}
                                   >
-                                    <Box className="h-3 w-3" />
-                                    <span>{station.name}</span>
+                                    🔧 <span>{station.name}</span>
                                   </Button>
                                 ))}
                                 
@@ -497,8 +524,7 @@ export default function FacilityLayoutBuilderPageUnified() {
                                     className="w-full justify-start gap-2 h-auto py-1.5 text-xs"
                                     onClick={() => handleElementSelect({ id: storage.id, type: 'storage', data: { originalData: storage } })}
                                   >
-                                    <Package className="h-3 w-3" />
-                                    <span>{storage.name}</span>
+                                    📦 <span>{storage.name}</span>
                                   </Button>
                                 ))}
                               </div>
@@ -525,23 +551,58 @@ export default function FacilityLayoutBuilderPageUnified() {
                   {gatesData.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">No gates yet</p>
                   ) : (
-                    gatesData.map((gate) => (
-                      <Button
-                        key={gate.id}
-                        variant={selectedElement?.id === gate.id ? 'secondary' : 'ghost'}
-                        size="sm"
-                        className="w-full justify-start gap-2 h-auto py-2"
-                        onClick={() => handleElementSelect({ id: gate.id, type: 'gate', data: { originalData: gate } })}
-                      >
-                        <MapPin className="w-4 h-4" />
-                        <div className="flex-1 text-left">
-                          <div className="font-medium text-sm">{gate.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {gate.grid_width} × {gate.grid_height}
+                    gatesData.map((gate) => {
+                      const gateOriginal = allDrivingGates?.find(g => g.id === gate.id);
+                      return (
+                        <div key={gate.id} className="relative group">
+                          <Button
+                            variant={selectedElement?.id === gate.id ? 'secondary' : 'ghost'}
+                            size="sm"
+                            className="w-full justify-start gap-2 h-auto py-2"
+                            onClick={() => handleElementSelect({ id: gate.id, type: 'gate', data: { originalData: gateOriginal } })}
+                          >
+                            🚪 
+                            <div className="flex-1 text-left">
+                              <div className="font-medium text-sm">{gate.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {gate.grid_width} × {gate.grid_height}
+                              </div>
+                            </div>
+                          </Button>
+                          <div className="absolute right-1 top-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-7 w-7 bg-background/95"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingGate(gateOriginal);
+                              }}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-7 w-7 text-destructive bg-background/95"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm(`Delete gate "${gate.name}"?`)) {
+                                  deleteGate.mutate(gate.id, {
+                                    onSuccess: () => {
+                                      toast.success(`Gate "${gate.name}" deleted`);
+                                      setSelectedElement(null);
+                                    }
+                                  });
+                                }
+                              }}
+                            >
+                              <Trash className="h-3 w-3" />
+                            </Button>
                           </div>
                         </div>
-                      </Button>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </ScrollArea>
@@ -599,7 +660,7 @@ export default function FacilityLayoutBuilderPageUnified() {
                                 className={`flex-1 justify-start gap-2 h-auto py-2 ${!hasChildren ? 'ml-6' : ''}`}
                                 onClick={() => handleElementSelect({ id: zone.id, type: 'zone', data: { originalData: zoneOriginal } })}
                               >
-                                <Layers className="w-4 h-4" />
+                                📍
                                 <div className="flex-1 text-left">
                                   <div className="font-medium text-sm">{zone.name}</div>
                                   <div className="text-xs text-muted-foreground">
@@ -620,7 +681,7 @@ export default function FacilityLayoutBuilderPageUnified() {
                                   className="h-7 w-7 bg-background/95"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    toast.info('Edit dialog coming soon');
+                                    setEditingZone(zoneOriginal);
                                   }}
                                 >
                                   <Pencil className="h-3 w-3" />
@@ -631,8 +692,13 @@ export default function FacilityLayoutBuilderPageUnified() {
                                   className="h-7 w-7 text-destructive bg-background/95"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (confirm(`Delete zone "${zone.name}"?`)) {
-                                      toast.info('Delete functionality coming soon');
+                                    if (confirm(`Delete zone "${zone.name}"? This will also delete all nested elements.`)) {
+                                      deleteZone.mutate(zone.id, {
+                                        onSuccess: () => {
+                                          toast.success(`Zone "${zone.name}" deleted`);
+                                          setSelectedElement(null);
+                                        }
+                                      });
                                     }
                                   }}
                                 >
@@ -651,8 +717,7 @@ export default function FacilityLayoutBuilderPageUnified() {
                                     className="w-full justify-start gap-2 h-auto py-1.5 text-xs"
                                     onClick={() => handleElementSelect({ id: gate.id, type: 'gate', data: { originalData: gate } })}
                                   >
-                                    <MapPin className="h-3 w-3" />
-                                    <span>{gate.name}</span>
+                                    🚪 <span>{gate.name}</span>
                                   </Button>
                                 ))}
                                 
@@ -676,8 +741,7 @@ export default function FacilityLayoutBuilderPageUnified() {
                                     className="w-full justify-start gap-2 h-auto py-1.5 text-xs"
                                     onClick={() => handleElementSelect({ id: station.id, type: 'station', data: { originalData: station } })}
                                   >
-                                    <Box className="h-3 w-3" />
-                                    <span>{station.name}</span>
+                                    🔧 <span>{station.name}</span>
                                   </Button>
                                 ))}
                                 
@@ -689,8 +753,7 @@ export default function FacilityLayoutBuilderPageUnified() {
                                     className="w-full justify-start gap-2 h-auto py-1.5 text-xs"
                                     onClick={() => handleElementSelect({ id: storage.id, type: 'storage', data: { originalData: storage } })}
                                   >
-                                    <Package className="h-3 w-3" />
-                                    <span>{storage.name}</span>
+                                    📦 <span>{storage.name}</span>
                                   </Button>
                                 ))}
                               </div>
@@ -725,7 +788,7 @@ export default function FacilityLayoutBuilderPageUnified() {
                         className="w-full justify-start gap-2 h-auto py-2"
                         onClick={() => handleElementSelect({ id: station.id, type: 'station', data: { originalData: station } })}
                       >
-                        <Box className="w-4 h-4" />
+                        🔧
                         <div className="flex-1 text-left">
                           <div className="font-medium text-sm">{station.name}</div>
                           <div className="text-xs text-muted-foreground">
@@ -760,7 +823,7 @@ export default function FacilityLayoutBuilderPageUnified() {
                         className="w-full justify-start gap-2 h-auto py-2"
                         onClick={() => handleElementSelect({ id: storage.id, type: 'storage', data: { originalData: storage } })}
                       >
-                        <Package className="w-4 h-4" />
+                        📦
                         <div className="flex-1 text-left">
                           <div className="font-medium text-sm">{storage.name}</div>
                           <div className="text-xs text-muted-foreground">
@@ -994,6 +1057,64 @@ export default function FacilityLayoutBuilderPageUnified() {
         onOpenChange={setShowCreateZoneDialog}
         facilityId={facilityId}
       />
+
+      {/* Edit Dialogs */}
+      {editingRoom && (
+        <EditRoomDialog
+          open={!!editingRoom}
+          onOpenChange={(open) => !open && setEditingRoom(null)}
+          facilityId={facilityId!}
+          elementData={editingRoom}
+        />
+      )}
+      {editingZone && (
+        <EditZoneDialog
+          open={!!editingZone}
+          onOpenChange={(open) => !open && setEditingZone(null)}
+          facilityId={facilityId!}
+          elementData={editingZone}
+        />
+      )}
+      {editingGate && (
+        <EditGateDialog
+          open={!!editingGate}
+          onOpenChange={(open) => !open && setEditingGate(null)}
+          facilityId={facilityId!}
+          elementData={editingGate}
+        />
+      )}
+      {editingLane && (
+        <EditLaneDialog
+          open={!!editingLane}
+          onOpenChange={(open) => !open && setEditingLane(null)}
+          facilityId={facilityId!}
+          elementData={editingLane}
+        />
+      )}
+      {editingStation && (
+        <EditStationDialog
+          open={!!editingStation}
+          onOpenChange={(open) => !open && setEditingStation(null)}
+          facilityId={facilityId!}
+          elementData={editingStation}
+        />
+      )}
+      {editingStorage && (
+        <EditStorageLocationDialog
+          open={!!editingStorage}
+          onOpenChange={(open) => !open && setEditingStorage(null)}
+          facilityId={facilityId!}
+          elementData={editingStorage}
+        />
+      )}
+      {editingOutside && (
+        <EditOutsideAreaDialog
+          open={!!editingOutside}
+          onOpenChange={(open) => !open && setEditingOutside(null)}
+          facilityId={facilityId!}
+          elementData={editingOutside}
+        />
+      )}
     </div>
   );
 }
