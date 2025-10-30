@@ -29,7 +29,7 @@ export function CreateStorageLocationDialog({ open, onOpenChange, lanes, facilit
   const { data: zones } = useZones(facilityId);
   const { data: outsideAreas } = useOutsideAreas(facilityId);
 
-  const availableParents = parentType === 'lane' ? lanes :
+  const availableParents = parentType === 'lane' ? (lanes || []) :
                            parentType === 'room' ? (rooms || []) :
                            parentType === 'zone' ? (zones || []) :
                            parentType === 'outside' ? (outsideAreas || []) : [];
