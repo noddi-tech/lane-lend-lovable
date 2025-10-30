@@ -191,7 +191,7 @@ export function UnifiedGridBuilder({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [canvas, setCanvas] = useState<FabricCanvas | null>(null);
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(0.67); // Start at 67% for better overview
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 1200, height: 800 });
   
   // Use refs for panning state to avoid stale closures
@@ -247,7 +247,7 @@ export function UnifiedGridBuilder({
     
     const scaleX = containerWidth / boundsWidth;
     const scaleY = containerHeight / boundsHeight;
-    const newZoom = Math.min(scaleX, scaleY, 2); // Max 200% zoom
+    const newZoom = Math.min(scaleX, scaleY, 1.5); // Max 150% zoom
     
     const centerX = (bounds.minX + bounds.maxX) / 2 * CELL_SIZE;
     const centerY = (bounds.minY + bounds.maxY) / 2 * CELL_SIZE;
@@ -1128,7 +1128,7 @@ export function UnifiedGridBuilder({
 
   const handleZoomIn = () => {
     if (canvas) {
-      const newZoom = Math.min(zoom + 0.2, 3);
+      const newZoom = Math.min(zoom + 0.1, 1.5); // Max 150%
       canvas.setZoom(newZoom);
       setZoom(newZoom);
       canvas.renderAll();
@@ -1137,7 +1137,7 @@ export function UnifiedGridBuilder({
 
   const handleZoomOut = () => {
     if (canvas) {
-      const newZoom = Math.max(zoom - 0.2, 0.5);
+      const newZoom = Math.max(zoom - 0.1, 0.1); // Min 10%
       canvas.setZoom(newZoom);
       setZoom(newZoom);
       canvas.renderAll();
@@ -1146,9 +1146,9 @@ export function UnifiedGridBuilder({
 
   const handleResetZoom = () => {
     if (canvas) {
-      canvas.setZoom(1);
+      canvas.setZoom(1.0); // Reset to 100%
       canvas.viewportTransform = [1, 0, 0, 1, 100, 100];
-      setZoom(1);
+      setZoom(1.0);
       canvas.renderAll();
     }
   };
