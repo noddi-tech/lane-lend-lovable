@@ -29,6 +29,10 @@ export default function FacilityLayoutBuilderPageUnified() {
   const [editMode, setEditMode] = useState<EditMode>('room');
   const [selectedElement, setSelectedElement] = useState<{ type: string; id: string; data: any } | null>(null);
   
+  const handleElementSelect = useCallback((element: { type: string; id: string; data: any } | null) => {
+    setSelectedElement(element);
+  }, []);
+  
   // Dialog states for creating new elements
   const [showCreateGateDialog, setShowCreateGateDialog] = useState(false);
   const [showCreateLaneDialog, setShowCreateLaneDialog] = useState(false);
@@ -246,7 +250,7 @@ export default function FacilityLayoutBuilderPageUnified() {
           onOutsideAreaResize={(id, w, h) => updateOutsideArea.mutateAsync({ id, grid_width: w, grid_height: h } as any)}
           onStorageLocationResize={(id, w, h) => updateStorageLocation.mutateAsync({ id, grid_width: w, grid_height: h } as any)}
           onZoneResize={(id, w, h) => updateZone.mutateAsync({ id, grid_width: w, grid_height: h } as any)}
-          onElementSelect={setSelectedElement}
+          onElementSelect={handleElementSelect}
           />
         </div>
       </div>
