@@ -411,14 +411,22 @@ export function UnifiedGridBuilder({
 
       const scaleX = obj.scaleX || 1;
       const scaleY = obj.scaleY || 1;
-      const baseWidth = rect.width || 0;
-      const baseHeight = rect.height || 0;
+      
+      // Use base grid dimensions to prevent exponential growth
+      const baseGridWidth = obj.data.baseGridWidth || 10;
+      const baseGridHeight = obj.data.baseGridHeight || 10;
+      const baseWidth = baseGridWidth * CELL_SIZE;
+      const baseHeight = baseGridHeight * CELL_SIZE;
 
       const newWidth = Math.round((baseWidth * scaleX) / CELL_SIZE) * CELL_SIZE;
       const newHeight = Math.round((baseHeight * scaleY) / CELL_SIZE) * CELL_SIZE;
 
       rect.set({ width: newWidth, height: newHeight });
       obj.set({ scaleX: 1, scaleY: 1 });
+      
+      // Update base grid dimensions for next resize
+      obj.data.baseGridWidth = Math.round(newWidth / CELL_SIZE);
+      obj.data.baseGridHeight = Math.round(newHeight / CELL_SIZE);
 
       if (text && obj.data.type === 'lane') {
         text.set({ top: newHeight / 2 - 7 });
@@ -426,6 +434,14 @@ export function UnifiedGridBuilder({
         text.set({ left: newWidth / 2 - 6 });
       } else if (text && obj.data.type === 'station') {
         text.set({ left: newWidth / 2 - 20, top: newHeight / 2 - 8 });
+      } else if (text && obj.data.type === 'room') {
+        text.set({ left: newWidth / 2 - 30, top: newHeight / 2 - 8 });
+      } else if (text && obj.data.type === 'outside') {
+        text.set({ left: newWidth / 2 - 30, top: newHeight / 2 - 8 });
+      } else if (text && obj.data.type === 'storage') {
+        text.set({ left: newWidth / 2 - 20, top: newHeight / 2 - 8 });
+      } else if (text && obj.data.type === 'zone') {
+        text.set({ left: newWidth / 2 - 30, top: newHeight / 2 - 8 });
       }
 
       canvas.renderAll();
@@ -442,6 +458,10 @@ export function UnifiedGridBuilder({
       const rect = obj._objects?.[0];
       const gridWidth = Math.round((rect?.width || 0) / CELL_SIZE);
       const gridHeight = Math.round((rect?.height || 0) / CELL_SIZE);
+      
+      // Sync base grid dimensions
+      obj.data.baseGridWidth = gridWidth;
+      obj.data.baseGridHeight = gridHeight;
 
       // Validate placement for containment rules
       const validation = validatePlacement(type, gridX, gridY, gridWidth, gridHeight);
@@ -735,7 +755,13 @@ export function UnifiedGridBuilder({
         cornerColor: COLORS.selected.stroke,
         hoverCursor: editMode === 'room' ? 'move' : 'default',
         moveCursor: 'move',
-        data: { type: 'room', id: room.id, originalData: room },
+        data: { 
+          type: 'room', 
+          id: room.id, 
+          originalData: room,
+          baseGridWidth: room.grid_width || 10,
+          baseGridHeight: room.grid_height || 10,
+        },
       } as any);
 
       console.log(`🏠 Created room "${room.name}":`, {
@@ -790,7 +816,13 @@ export function UnifiedGridBuilder({
         cornerColor: COLORS.selected.stroke,
         hoverCursor: editMode === 'outside' ? 'move' : 'default',
         moveCursor: 'move',
-        data: { type: 'outside', id: area.id, originalData: area },
+        data: { 
+          type: 'outside', 
+          id: area.id, 
+          originalData: area,
+          baseGridWidth: area.grid_width || 8,
+          baseGridHeight: area.grid_height || 8,
+        },
       } as any);
 
       canvas.add(areaGroup);
@@ -835,7 +867,13 @@ export function UnifiedGridBuilder({
         cornerColor: COLORS.selected.stroke,
         hoverCursor: editMode === 'lane' ? 'move' : 'default',
         moveCursor: 'ns-resize',
-        data: { type: 'lane', id: lane.id, originalData: lane },
+        data: { 
+          type: 'lane', 
+          id: lane.id, 
+          originalData: lane,
+          baseGridWidth: gridWidth,
+          baseGridHeight: lane.grid_height || 5,
+        },
       } as any);
 
       canvas.add(laneGroup);
@@ -881,7 +919,13 @@ export function UnifiedGridBuilder({
         cornerColor: COLORS.selected.stroke,
         hoverCursor: editMode === 'gate' ? 'move' : 'default',
         moveCursor: 'move',
-        data: { type: 'gate', id: gate.id, originalData: gate },
+        data: { 
+          type: 'gate', 
+          id: gate.id, 
+          originalData: gate,
+          baseGridWidth: gate.grid_width || 3,
+          baseGridHeight: gate.grid_height || 10,
+        },
       } as any);
 
       canvas.add(gateGroup);
@@ -928,7 +972,13 @@ export function UnifiedGridBuilder({
         cornerColor: COLORS.selected.stroke,
         hoverCursor: editMode === 'station' ? 'move' : 'default',
         moveCursor: 'move',
-        data: { type: 'station', id: station.id, originalData: station },
+        data: { 
+          type: 'station', 
+          id: station.id, 
+          originalData: station,
+          baseGridWidth: station.grid_width || 4,
+          baseGridHeight: station.grid_height || 3,
+        },
       } as any);
 
       canvas.add(stationGroup);
@@ -975,7 +1025,13 @@ export function UnifiedGridBuilder({
         cornerColor: COLORS.selected.stroke,
         hoverCursor: editMode === 'storage' ? 'move' : 'default',
         moveCursor: 'move',
-        data: { type: 'storage', id: storage.id, originalData: storage },
+        data: { 
+          type: 'storage', 
+          id: storage.id, 
+          originalData: storage,
+          baseGridWidth: storage.grid_width || 3,
+          baseGridHeight: storage.grid_height || 3,
+        },
       } as any);
 
       canvas.add(storageGroup);

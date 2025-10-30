@@ -11,7 +11,7 @@ import { useZones, useUpdateZone, useDeleteZone } from '@/hooks/admin/useZones';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Plus } from 'lucide-react';
+import { ArrowLeft, Plus, X } from 'lucide-react';
 import { UnifiedGridBuilder, type EditMode } from '@/components/facility/UnifiedGridBuilder';
 import { LibraryPalette } from '@/components/facility/LibraryPalette';
 import { CreateGateDialog } from '@/components/facility/dialogs/CreateGateDialog';
@@ -293,17 +293,108 @@ export default function FacilityLayoutBuilderPageUnified() {
 
       {/* Selected Element Info */}
       {selectedElement && (
-        <div className="border-t bg-card p-4">
-          <div className="flex items-center justify-between">
+        <div className="border-t bg-card">
+          <div className="flex items-center justify-between px-6 py-3 border-b">
+            <div className="flex items-center gap-3">
+              <Badge variant="outline">{selectedElement.type}</Badge>
+              <div>
+                <p className="font-semibold text-lg">
+                  {selectedElement.data?.originalData?.name || 'Unnamed'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  ID: {selectedElement.id}
+                </p>
+              </div>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setSelectedElement(null)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          <div className="grid grid-cols-4 gap-4 px-6 py-4">
+            {/* Position */}
             <div>
-              <p className="font-medium">{selectedElement.data?.originalData?.name || selectedElement.type}</p>
-              <p className="text-sm text-muted-foreground">
-                {selectedElement.type} • ID: {selectedElement.id.slice(0, 8)}...
+              <p className="text-xs text-muted-foreground mb-1">Position</p>
+              <p className="font-mono text-sm">
+                X: {selectedElement.data?.originalData?.grid_x || selectedElement.data?.originalData?.grid_position_x || 0}
+                {', '}
+                Y: {selectedElement.data?.originalData?.grid_y || selectedElement.data?.originalData?.grid_position_y || 0}
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => setSelectedElement(null)}>
-              Close
-            </Button>
+            
+            {/* Dimensions */}
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Size</p>
+              <p className="font-mono text-sm">
+                {selectedElement.data?.originalData?.grid_width || 0}
+                {' × '}
+                {selectedElement.data?.originalData?.grid_height || 0}
+              </p>
+            </div>
+            
+            {/* Type-specific properties */}
+            {selectedElement.type === 'room' && selectedElement.data?.originalData?.color && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Color</p>
+                <div className="flex items-center gap-2">
+                  <div 
+                    className="w-4 h-4 rounded border" 
+                    style={{ backgroundColor: selectedElement.data.originalData.color }}
+                  />
+                  <p className="font-mono text-sm">
+                    {selectedElement.data.originalData.color}
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            {selectedElement.type === 'outside' && selectedElement.data?.originalData?.area_type && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Area Type</p>
+                <Badge>{selectedElement.data.originalData.area_type}</Badge>
+              </div>
+            )}
+            
+            {selectedElement.type === 'storage' && (
+              <>
+                {selectedElement.data?.originalData?.storage_type && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Storage Type</p>
+                    <Badge>{selectedElement.data.originalData.storage_type}</Badge>
+                  </div>
+                )}
+                {selectedElement.data?.originalData?.status && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Status</p>
+                    <Badge variant={
+                      selectedElement.data.originalData.status === 'available' ? 'default' : 'secondary'
+                    }>
+                      {selectedElement.data.originalData.status}
+                    </Badge>
+                  </div>
+                )}
+              </>
+            )}
+            
+            {selectedElement.type === 'zone' && selectedElement.data?.originalData?.zone_type && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Zone Type</p>
+                <Badge>{selectedElement.data.originalData.zone_type}</Badge>
+              </div>
+            )}
+            
+            {selectedElement.type === 'lane' && selectedElement.data?.originalData?.position_order !== undefined && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Lane Order</p>
+                <p className="font-mono text-sm">
+                  #{selectedElement.data.originalData.position_order}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
