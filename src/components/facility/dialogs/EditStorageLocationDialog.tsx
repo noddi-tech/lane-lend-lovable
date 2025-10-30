@@ -5,6 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useUpdateStorageLocation } from "@/hooks/admin/useStorageLocations";
+import { useRooms } from "@/hooks/admin/useRooms";
+import { useZones } from "@/hooks/admin/useZones";
+import { useLanes } from "@/hooks/admin/useLanes";
 import { toast } from "sonner";
 
 interface EditStorageLocationDialogProps {
@@ -22,8 +25,18 @@ export function EditStorageLocationDialog({ open, onOpenChange, facilityId, elem
   const [gridY, setGridY] = useState(10);
   const [gridWidth, setGridWidth] = useState(2);
   const [gridHeight, setGridHeight] = useState(2);
+  const [parentType, setParentType] = useState<'lane' | 'room' | 'zone' | null>(null);
+  const [parentId, setParentId] = useState<string>("");
 
   const updateStorage = useUpdateStorageLocation();
+  const { data: rooms } = useRooms(facilityId);
+  const { data: zones } = useZones(facilityId);
+  const { data: allLanes } = useLanes();
+  const facilityLanes = allLanes?.filter(l => (l as any).facility_id === facilityId) || [];
+  
+  const availableParents = parentType === 'lane' ? facilityLanes :
+                           parentType === 'room' ? (rooms || []) :
+                           parentType === 'zone' ? (zones || []) : [];
 
   useEffect(() => {
     if (elementData) {
@@ -34,20 +47,37 @@ export function EditStorageLocationDialog({ open, onOpenChange, facilityId, elem
       setGridY(elementData.grid_position_y || 10);
       setGridWidth(elementData.grid_width || 2);
       setGridHeight(elementData.grid_height || 2);
+      
+      // Determine current parent type and ID
+      if (elementData.lane_id) {
+        setParentType('lane');
+        setParentId(elementData.lane_id);
+      } else if (elementData.room_id) {
+        setParentType('room');
+        setParentId(elementData.room_id);
+      } else if (elementData.zone_id) {
+        setParentType('zone');
+        setParentId(elementData.zone_id);
+      }
     }
   }, [elementData]);
 
   const handleSubmit = async () => {
+    if (!parentId || !parentType) return;
+    
     await updateStorage.mutateAsync({
       id: elementData.id,
       name,
       storage_type: storageType,
       status,
+      lane_id: parentType === 'lane' ? parentId : null,
+      room_id: parentType === 'room' ? parentId : null,
+      zone_id: parentType === 'zone' ? parentId : null,
       grid_position_x: gridX,
       grid_position_y: gridY,
       grid_width: gridWidth,
       grid_height: gridHeight,
-    });
+    } as any);
     toast.success(`Storage "${name}" updated successfully`);
     onOpenChange(false);
   };
@@ -71,6 +101,37 @@ export function EditStorageLocationDialog({ open, onOpenChange, facilityId, elem
               placeholder="e.g., Parts Shelf A"
             />
           </div>
+          <div>
+            <Label>Place Inside</Label>
+            <Select value={parentType || ''} onValueChange={(v: any) => {
+              setParentType(v);
+              setParentId("");
+            }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select location type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="lane">🛣️ On a Lane</SelectItem>
+                <SelectItem value="room">🏠 Inside a Room</SelectItem>
+                <SelectItem value="zone">📍 Inside a Zone</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {parentType && availableParents.length > 0 && (
+            <div>
+              <Label>Select {parentType === 'lane' ? 'Lane' : parentType === 'room' ? 'Room' : 'Zone'}</Label>
+              <Select value={parentId} onValueChange={setParentId}>
+                <SelectTrigger>
+                  <SelectValue placeholder={`Choose a ${parentType}`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableParents.map((p: any) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="storage-type">Storage Type</Label>
@@ -149,7 +210,7 @@ export function EditStorageLocationDialog({ open, onOpenChange, facilityId, elem
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={!name}>
+          <Button onClick={handleSubmit} disabled={!name || !parentId || !parentType}>
             Update Storage
           </Button>
         </DialogFooter>

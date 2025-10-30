@@ -206,6 +206,7 @@ export function UnifiedGridBuilder({
     lanes,
     rooms,
     outsideAreas,
+    zones,
     stations,
     storageLocations,
   });
@@ -315,6 +316,7 @@ export function UnifiedGridBuilder({
       lanes,
       rooms,
       outsideAreas,
+      zones,
       stations,
       storageLocations,
     };
@@ -328,19 +330,75 @@ export function UnifiedGridBuilder({
     gridWidth: number,
     gridHeight: number
   ): { valid: boolean; reason?: string; parentLaneId?: string } => {
-    // Stations must be inside a lane
+    // Stations can be inside a lane, room, zone, or outside area
     if (type === 'station') {
+      // Check if in lane
       const containingLane = dataRef.current.lanes?.find(lane => {
         const laneY = lane.grid_y || 0;
         const laneHeight = lane.grid_height || 5;
         return gridY >= laneY && gridY + gridHeight <= laneY + laneHeight;
       });
       
-      if (!containingLane) {
-        return { valid: false, reason: 'Stations must be placed within a lane' };
+      if (containingLane) {
+        return { valid: true, parentLaneId: containingLane.id };
       }
       
-      return { valid: true, parentLaneId: containingLane.id };
+      // Check if in room
+      const containingRoom = dataRef.current.rooms?.find(room => {
+        const roomX = room.grid_x || 0;
+        const roomY = room.grid_y || 0;
+        const roomWidth = room.grid_width || 10;
+        const roomHeight = room.grid_height || 10;
+        return (
+          gridX >= roomX && 
+          gridX + gridWidth <= roomX + roomWidth &&
+          gridY >= roomY && 
+          gridY + gridHeight <= roomY + roomHeight
+        );
+      });
+      
+      if (containingRoom) {
+        return { valid: true };
+      }
+      
+      // Check if in zone
+      const containingZone = dataRef.current.zones?.find(zone => {
+        const zoneX = zone.grid_x || 0;
+        const zoneY = zone.grid_y || 0;
+        const zoneWidth = zone.grid_width || 10;
+        const zoneHeight = zone.grid_height || 10;
+        return (
+          gridX >= zoneX && 
+          gridX + gridWidth <= zoneX + zoneWidth &&
+          gridY >= zoneY && 
+          gridY + gridHeight <= zoneY + zoneHeight
+        );
+      });
+      
+      if (containingZone) {
+        return { valid: true };
+      }
+      
+      // Check if in outside area
+      const containingOutside = dataRef.current.outsideAreas?.find(area => {
+        const areaX = area.grid_x || 0;
+        const areaY = area.grid_y || 0;
+        const areaWidth = area.grid_width || 10;
+        const areaHeight = area.grid_height || 10;
+        return (
+          gridX >= areaX && 
+          gridX + gridWidth <= areaX + areaWidth &&
+          gridY >= areaY && 
+          gridY + gridHeight <= areaY + areaHeight
+        );
+      });
+      
+      if (containingOutside) {
+        return { valid: true };
+      }
+      
+      // Not in any valid container
+      return { valid: false, reason: 'Stations must be placed inside a lane, room, zone, or outside area' };
     }
     
     // Storage must be inside a lane or room
