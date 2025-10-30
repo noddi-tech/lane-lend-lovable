@@ -12,7 +12,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Plus, X, MapPin, Package, Box, Layers } from 'lucide-react';
+import { ArrowLeft, Plus, X, MapPin, Package, Box, Layers, Pencil, Trash, ChevronDown, ChevronRight } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { UnifiedGridBuilder, type EditMode } from '@/components/facility/UnifiedGridBuilder';
 import { LibraryPalette } from '@/components/facility/LibraryPalette';
 import { CreateGateDialog } from '@/components/facility/dialogs/CreateGateDialog';
@@ -29,6 +30,61 @@ export default function FacilityLayoutBuilderPageUnified() {
   const navigate = useNavigate();
   const [editMode, setEditMode] = useState<EditMode>('room');
   const [selectedElement, setSelectedElement] = useState<{ type: string; id: string; data: any } | null>(null);
+  
+  // Collapsible state for hierarchical view
+  const [expandedRooms, setExpandedRooms] = useState<Set<string>>(new Set());
+  const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set());
+  const [expandedOutside, setExpandedOutside] = useState<Set<string>>(new Set());
+  const [expandedLanes, setExpandedLanes] = useState<Set<string>>(new Set());
+
+  const toggleExpanded = (id: string, type: 'room' | 'zone' | 'outside' | 'lane') => {
+    const stateMap = {
+      room: [expandedRooms, setExpandedRooms],
+      zone: [expandedZones, setExpandedZones],
+      outside: [expandedOutside, setExpandedOutside],
+      lane: [expandedLanes, setExpandedLanes],
+    } as const;
+    
+    const [currentSet, setter] = stateMap[type];
+    const newSet = new Set(currentSet);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    (setter as any)(newSet);
+  };
+
+  // Helper functions to get child elements
+  const getChildGates = (parentId: string, parentType: 'room' | 'zone' | 'outside') => {
+    return allDrivingGates?.filter(g => 
+      (parentType === 'room' && (g as any).room_id === parentId) ||
+      (parentType === 'zone' && (g as any).zone_id === parentId)
+    ) || [];
+  };
+
+  const getChildLanes = (parentId: string, parentType: 'room' | 'zone' | 'outside') => {
+    return allLanes?.filter(l => 
+      (parentType === 'room' && (l as any).room_id === parentId) ||
+      (parentType === 'zone' && (l as any).zone_id === parentId)
+    ) || [];
+  };
+
+  const getChildStations = (parentId: string, parentType: 'room' | 'zone' | 'outside' | 'lane') => {
+    return allStations?.filter(s => 
+      (parentType === 'room' && (s as any).room_id === parentId) ||
+      (parentType === 'zone' && (s as any).zone_id === parentId) ||
+      (parentType === 'lane' && s.lane_id === parentId)
+    ) || [];
+  };
+
+  const getChildStorage = (parentId: string, parentType: 'room' | 'zone' | 'outside' | 'lane') => {
+    return allStorageLocations?.filter(s => 
+      (parentType === 'room' && (s as any).room_id === parentId) ||
+      (parentType === 'zone' && (s as any).zone_id === parentId) ||
+      (parentType === 'lane' && s.lane_id === parentId)
+    ) || [];
+  };
   
   const handleElementSelect = useCallback((element: { type: string; id: string; data: any } | null) => {
     setSelectedElement(element);
@@ -209,21 +265,72 @@ export default function FacilityLayoutBuilderPageUnified() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {(['gate', 'lane', 'station', 'room', 'outside', 'storage', 'zone'] as EditMode[]).map(mode => (
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* CONTAINERS GROUP */}
+            <div className="flex items-center gap-1 p-1.5 rounded-lg bg-muted/50 border">
+              <span className="text-xs font-semibold px-2 text-muted-foreground">CONTAINERS</span>
               <Button
-                key={mode}
-                variant={editMode === mode ? 'default' : 'outline'}
+                variant={editMode === 'room' ? 'default' : 'ghost'}
                 size="sm"
-                onClick={() => setEditMode(mode)}
+                onClick={() => setEditMode('room')}
               >
-                {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                🏠 Room
               </Button>
-            ))}
-            
+              <Button
+                variant={editMode === 'outside' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setEditMode('outside')}
+              >
+                🌳 Outside
+              </Button>
+              <Button
+                variant={editMode === 'zone' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setEditMode('zone')}
+              >
+                📍 Zone
+              </Button>
+            </div>
+
+            <Separator orientation="vertical" className="h-8" />
+
+            {/* OPERATIONS GROUP */}
+            <div className="flex items-center gap-1 p-1.5 rounded-lg bg-muted/50 border">
+              <span className="text-xs font-semibold px-2 text-muted-foreground">OPERATIONS</span>
+              <Button
+                variant={editMode === 'gate' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setEditMode('gate')}
+              >
+                🚪 Gate
+              </Button>
+              <Button
+                variant={editMode === 'lane' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setEditMode('lane')}
+              >
+                🛣️ Lane
+              </Button>
+              <Button
+                variant={editMode === 'station' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setEditMode('station')}
+              >
+                🔧 Station
+              </Button>
+              <Button
+                variant={editMode === 'storage' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setEditMode('storage')}
+              >
+                📦 Storage
+              </Button>
+            </div>
+
+            {/* ADD BUTTON */}
             {editMode !== 'view' && editMode !== 'facility' && (
               <>
-                <Separator orientation="vertical" className="h-6" />
+                <Separator orientation="vertical" className="h-8" />
                 <Button 
                   size="sm" 
                   onClick={() => {
@@ -254,30 +361,152 @@ export default function FacilityLayoutBuilderPageUnified() {
             <div className="border rounded-lg overflow-hidden">
               <div className="p-4 border-b bg-muted/50">
                 <h3 className="font-semibold text-sm">Rooms in Facility</h3>
-                <p className="text-xs text-muted-foreground mt-1">Click to select</p>
+                <p className="text-xs text-muted-foreground mt-1">Hierarchical view with nested elements</p>
               </div>
-              <ScrollArea className="h-64">
+              <ScrollArea className="h-[calc(100vh-300px)]">
                 <div className="p-2 space-y-1">
                   {roomsData.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">No rooms yet</p>
                   ) : (
-                    roomsData.map((room) => (
-                      <Button
-                        key={room.id}
-                        variant={selectedElement?.id === room.id ? 'secondary' : 'ghost'}
-                        size="sm"
-                        className="w-full justify-start gap-2 h-auto py-2"
-                        onClick={() => handleElementSelect({ id: room.id, type: 'room', data: { originalData: room } })}
-                      >
-                        <div className="w-4 h-4 rounded border" style={{ backgroundColor: room.color }} />
-                        <div className="flex-1 text-left">
-                          <div className="font-medium text-sm">{room.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {room.grid_width} × {room.grid_height} at ({room.grid_x}, {room.grid_y})
+                    roomsData.map((room) => {
+                      const roomOriginal = allRooms?.find(r => r.id === room.id);
+                      const isExpanded = expandedRooms.has(room.id);
+                      const childGates = getChildGates(room.id, 'room');
+                      const childLanes = getChildLanes(room.id, 'room');
+                      const childStations = getChildStations(room.id, 'room');
+                      const childStorage = getChildStorage(room.id, 'room');
+                      const hasChildren = childGates.length + childLanes.length + childStations.length + childStorage.length > 0;
+                      
+                      return (
+                        <Collapsible
+                          key={room.id}
+                          open={isExpanded}
+                          onOpenChange={() => toggleExpanded(room.id, 'room')}
+                        >
+                          <div className="relative group">
+                            <div className="flex items-stretch">
+                              {hasChildren && (
+                                <CollapsibleTrigger asChild>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-auto w-6 rounded-none flex-shrink-0"
+                                  >
+                                    {isExpanded ? (
+                                      <ChevronDown className="h-3 w-3" />
+                                    ) : (
+                                      <ChevronRight className="h-3 w-3" />
+                                    )}
+                                  </Button>
+                                </CollapsibleTrigger>
+                              )}
+                              
+                              <Button
+                                variant={selectedElement?.id === room.id ? 'secondary' : 'ghost'}
+                                size="sm"
+                                className={`flex-1 justify-start gap-2 h-auto py-2 ${!hasChildren ? 'ml-6' : ''}`}
+                                onClick={() => handleElementSelect({ id: room.id, type: 'room', data: { originalData: roomOriginal } })}
+                              >
+                                <div className="w-4 h-4 rounded border" style={{ backgroundColor: room.color }} />
+                                <div className="flex-1 text-left">
+                                  <div className="font-medium text-sm">{room.name}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {room.grid_width} × {room.grid_height}
+                                    {hasChildren && (
+                                      <span className="ml-2 text-primary">
+                                        • {childGates.length + childLanes.length + childStations.length + childStorage.length} items
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </Button>
+                              
+                              <div className="absolute right-1 top-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  className="h-7 w-7 bg-background/95"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toast.info('Edit dialog coming soon');
+                                  }}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  className="h-7 w-7 text-destructive bg-background/95"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirm(`Delete room "${room.name}"?`)) {
+                                      toast.info('Delete functionality coming soon');
+                                    }
+                                  }}
+                                >
+                                  <Trash className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+                            
+                            <CollapsibleContent>
+                              <div className="ml-6 mt-1 space-y-1 border-l-2 border-muted pl-2">
+                                {childGates.map(gate => (
+                                  <Button
+                                    key={gate.id}
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full justify-start gap-2 h-auto py-1.5 text-xs"
+                                    onClick={() => handleElementSelect({ id: gate.id, type: 'gate', data: { originalData: gate } })}
+                                  >
+                                    <MapPin className="h-3 w-3" />
+                                    <span>{gate.name}</span>
+                                  </Button>
+                                ))}
+                                
+                                {childLanes.map(lane => (
+                                  <Button
+                                    key={lane.id}
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full justify-start gap-2 h-auto py-1.5 text-xs"
+                                    onClick={() => handleElementSelect({ id: lane.id, type: 'lane', data: { originalData: lane } })}
+                                  >
+                                    🛣️ <span>{lane.name}</span>
+                                  </Button>
+                                ))}
+                                
+                                {childStations.map(station => (
+                                  <Button
+                                    key={station.id}
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full justify-start gap-2 h-auto py-1.5 text-xs"
+                                    onClick={() => handleElementSelect({ id: station.id, type: 'station', data: { originalData: station } })}
+                                  >
+                                    <Box className="h-3 w-3" />
+                                    <span>{station.name}</span>
+                                  </Button>
+                                ))}
+                                
+                                {childStorage.map(storage => (
+                                  <Button
+                                    key={storage.id}
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full justify-start gap-2 h-auto py-1.5 text-xs"
+                                    onClick={() => handleElementSelect({ id: storage.id, type: 'storage', data: { originalData: storage } })}
+                                  >
+                                    <Package className="h-3 w-3" />
+                                    <span>{storage.name}</span>
+                                  </Button>
+                                ))}
+                              </div>
+                            </CollapsibleContent>
                           </div>
-                        </div>
-                      </Button>
-                    ))
+                        </Collapsible>
+                      );
+                    })
                   )}
                 </div>
               </ScrollArea>
@@ -324,30 +553,152 @@ export default function FacilityLayoutBuilderPageUnified() {
             <div className="border rounded-lg overflow-hidden">
               <div className="p-4 border-b bg-muted/50">
                 <h3 className="font-semibold text-sm">Zones in Facility</h3>
-                <p className="text-xs text-muted-foreground mt-1">Click to select</p>
+                <p className="text-xs text-muted-foreground mt-1">Hierarchical view with nested elements</p>
               </div>
-              <ScrollArea className="h-64">
+              <ScrollArea className="h-[calc(100vh-300px)]">
                 <div className="p-2 space-y-1">
                   {zonesData.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">No zones yet</p>
                   ) : (
-                    zonesData.map((zone) => (
-                      <Button
-                        key={zone.id}
-                        variant={selectedElement?.id === zone.id ? 'secondary' : 'ghost'}
-                        size="sm"
-                        className="w-full justify-start gap-2 h-auto py-2"
-                        onClick={() => handleElementSelect({ id: zone.id, type: 'zone', data: { originalData: zone } })}
-                      >
-                        <Layers className="w-4 h-4" />
-                        <div className="flex-1 text-left">
-                          <div className="font-medium text-sm">{zone.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {zone.grid_width} × {zone.grid_height}
+                    zonesData.map((zone) => {
+                      const zoneOriginal = allZones?.find(z => z.id === zone.id);
+                      const isExpanded = expandedZones.has(zone.id);
+                      const childGates = getChildGates(zone.id, 'zone');
+                      const childLanes = getChildLanes(zone.id, 'zone');
+                      const childStations = getChildStations(zone.id, 'zone');
+                      const childStorage = getChildStorage(zone.id, 'zone');
+                      const hasChildren = childGates.length + childLanes.length + childStations.length + childStorage.length > 0;
+                      
+                      return (
+                        <Collapsible
+                          key={zone.id}
+                          open={isExpanded}
+                          onOpenChange={() => toggleExpanded(zone.id, 'zone')}
+                        >
+                          <div className="relative group">
+                            <div className="flex items-stretch">
+                              {hasChildren && (
+                                <CollapsibleTrigger asChild>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-auto w-6 rounded-none flex-shrink-0"
+                                  >
+                                    {isExpanded ? (
+                                      <ChevronDown className="h-3 w-3" />
+                                    ) : (
+                                      <ChevronRight className="h-3 w-3" />
+                                    )}
+                                  </Button>
+                                </CollapsibleTrigger>
+                              )}
+                              
+                              <Button
+                                variant={selectedElement?.id === zone.id ? 'secondary' : 'ghost'}
+                                size="sm"
+                                className={`flex-1 justify-start gap-2 h-auto py-2 ${!hasChildren ? 'ml-6' : ''}`}
+                                onClick={() => handleElementSelect({ id: zone.id, type: 'zone', data: { originalData: zoneOriginal } })}
+                              >
+                                <Layers className="w-4 h-4" />
+                                <div className="flex-1 text-left">
+                                  <div className="font-medium text-sm">{zone.name}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {zone.grid_width} × {zone.grid_height}
+                                    {hasChildren && (
+                                      <span className="ml-2 text-primary">
+                                        • {childGates.length + childLanes.length + childStations.length + childStorage.length} items
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </Button>
+                              
+                              <div className="absolute right-1 top-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  className="h-7 w-7 bg-background/95"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toast.info('Edit dialog coming soon');
+                                  }}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  className="h-7 w-7 text-destructive bg-background/95"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirm(`Delete zone "${zone.name}"?`)) {
+                                      toast.info('Delete functionality coming soon');
+                                    }
+                                  }}
+                                >
+                                  <Trash className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+                            
+                            <CollapsibleContent>
+                              <div className="ml-6 mt-1 space-y-1 border-l-2 border-muted pl-2">
+                                {childGates.map(gate => (
+                                  <Button
+                                    key={gate.id}
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full justify-start gap-2 h-auto py-1.5 text-xs"
+                                    onClick={() => handleElementSelect({ id: gate.id, type: 'gate', data: { originalData: gate } })}
+                                  >
+                                    <MapPin className="h-3 w-3" />
+                                    <span>{gate.name}</span>
+                                  </Button>
+                                ))}
+                                
+                                {childLanes.map(lane => (
+                                  <Button
+                                    key={lane.id}
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full justify-start gap-2 h-auto py-1.5 text-xs"
+                                    onClick={() => handleElementSelect({ id: lane.id, type: 'lane', data: { originalData: lane } })}
+                                  >
+                                    🛣️ <span>{lane.name}</span>
+                                  </Button>
+                                ))}
+                                
+                                {childStations.map(station => (
+                                  <Button
+                                    key={station.id}
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full justify-start gap-2 h-auto py-1.5 text-xs"
+                                    onClick={() => handleElementSelect({ id: station.id, type: 'station', data: { originalData: station } })}
+                                  >
+                                    <Box className="h-3 w-3" />
+                                    <span>{station.name}</span>
+                                  </Button>
+                                ))}
+                                
+                                {childStorage.map(storage => (
+                                  <Button
+                                    key={storage.id}
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full justify-start gap-2 h-auto py-1.5 text-xs"
+                                    onClick={() => handleElementSelect({ id: storage.id, type: 'storage', data: { originalData: storage } })}
+                                  >
+                                    <Package className="h-3 w-3" />
+                                    <span>{storage.name}</span>
+                                  </Button>
+                                ))}
+                              </div>
+                            </CollapsibleContent>
                           </div>
-                        </div>
-                      </Button>
-                    ))
+                        </Collapsible>
+                      );
+                    })
                   )}
                 </div>
               </ScrollArea>
@@ -561,6 +912,46 @@ export default function FacilityLayoutBuilderPageUnified() {
                 </p>
               </div>
             )}
+
+            {/* Parent Relationships */}
+            <div className="col-span-4 border-t pt-3 mt-2">
+              <p className="text-xs text-muted-foreground mb-2 font-semibold">LOCATION HIERARCHY</p>
+              <div className="flex flex-wrap gap-2">
+                {selectedElement.data?.originalData?.room_id && (() => {
+                  const parentRoom = allRooms?.find(r => r.id === selectedElement.data.originalData.room_id);
+                  return parentRoom && (
+                    <Badge variant="outline" className="gap-1.5">
+                      <div className="w-2 h-2 rounded" style={{ backgroundColor: parentRoom.color }} />
+                      Located in Room: {parentRoom.name}
+                    </Badge>
+                  );
+                })()}
+                
+                {selectedElement.data?.originalData?.zone_id && (() => {
+                  const parentZone = allZones?.find(z => z.id === selectedElement.data.originalData.zone_id);
+                  return parentZone && (
+                    <Badge variant="outline" className="gap-1.5">
+                      📍 Located in Zone: {parentZone.name}
+                    </Badge>
+                  );
+                })()}
+                
+                {selectedElement.data?.originalData?.lane_id && (() => {
+                  const parentLane = allLanes?.find(l => l.id === selectedElement.data.originalData.lane_id);
+                  return parentLane && (
+                    <Badge variant="outline" className="gap-1.5">
+                      🛣️ On Lane: {parentLane.name}
+                    </Badge>
+                  );
+                })()}
+                
+                {!selectedElement.data?.originalData?.room_id && 
+                 !selectedElement.data?.originalData?.zone_id && 
+                 !selectedElement.data?.originalData?.lane_id && (
+                  <Badge variant="secondary">Directly in Facility</Badge>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
