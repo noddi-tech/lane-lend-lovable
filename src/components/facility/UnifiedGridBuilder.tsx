@@ -1170,7 +1170,7 @@ export function UnifiedGridBuilder({
         </Button>
       </div>
       <div className="text-xs text-muted-foreground mb-2">
-        💡 Hold Alt or middle-click to pan • Click and drag to move elements • Use handles to resize
+        💡 Hold Alt or Opt on Mac and click and drag with mouse to pan • Click and drag to move elements • Use handles to resize
       </div>
       <div className="overflow-auto border border-border rounded-lg shadow-lg bg-background">
         <canvas ref={canvasRef} />
