@@ -16,7 +16,9 @@ interface Lane {
   id: string;
   name?: string;
   position_order?: number;
+  grid_position_x?: number;
   grid_y?: number;
+  grid_width?: number;
   grid_height?: number;
 }
 
@@ -94,7 +96,7 @@ interface UnifiedGridBuilderProps {
   onZoneMove?: (zoneId: string, gridX: number, gridY: number) => void;
   onFacilityResize?: (gridWidth: number, gridHeight: number) => void;
   onGateResize?: (gateId: string, gridWidth: number, gridHeight: number) => void;
-  onLaneResize?: (laneId: string, gridHeight: number) => void;
+  onLaneResize?: (laneId: string, gridWidth: number, gridHeight: number) => void;
   onStationResize?: (stationId: string, gridWidth: number, gridHeight: number) => void;
   onRoomResize?: (roomId: string, gridWidth: number, gridHeight: number) => void;
   onOutsideAreaResize?: (areaId: string, gridWidth: number, gridHeight: number) => void;
@@ -623,8 +625,8 @@ export function UnifiedGridBuilder({
         callbacksRef.current.onGateMove?.(id, gridX, gridY);
         callbacksRef.current.onGateResize?.(id, gridWidth, gridHeight);
       } else if (type === 'lane') {
-        callbacksRef.current.onLaneMove?.(id, 0, gridY);
-        callbacksRef.current.onLaneResize?.(id, gridHeight);
+        callbacksRef.current.onLaneMove?.(id, gridX, gridY);
+        callbacksRef.current.onLaneResize?.(id, gridWidth, gridHeight);
       } else if (type === 'station') {
         callbacksRef.current.onStationMove?.(id, gridX, gridY);
         callbacksRef.current.onStationResize?.(id, gridWidth, gridHeight);
@@ -956,14 +958,16 @@ export function UnifiedGridBuilder({
 
     // Render lanes
     lanes.forEach((lane) => {
+      const laneX = (lane.grid_position_x || 0) * CELL_SIZE;
       const laneY = (lane.grid_y || 0) * CELL_SIZE;
+      const laneWidth = (lane.grid_width || 20) * CELL_SIZE;
       const laneHeight = (lane.grid_height || 5) * CELL_SIZE;
       const opacity = editMode === 'lane' ? 1 : 0.3;
 
       const laneRect = new Rect({
         left: 0,
         top: 0,
-        width: gridWidth * CELL_SIZE,
+        width: laneWidth,
         height: laneHeight,
         fill: COLORS.lanes.fill,
         stroke: COLORS.lanes.stroke,
@@ -980,24 +984,24 @@ export function UnifiedGridBuilder({
       });
 
       const laneGroup = new Group([laneRect, laneText], {
-        left: 0,
+        left: laneX,
         top: laneY,
         selectable: editMode === 'lane',
         hasControls: editMode === 'lane',
         lockRotation: true,
-        lockScalingX: true,
-        lockMovementX: true,
+        lockScalingX: false,
+        lockMovementX: false,
         evented: editMode === 'lane',
         cornerStyle: 'circle',
         borderColor: COLORS.selected.stroke,
         cornerColor: COLORS.selected.stroke,
         hoverCursor: editMode === 'lane' ? 'move' : 'default',
-        moveCursor: 'ns-resize',
+        moveCursor: 'move',
         data: { 
           type: 'lane', 
           id: lane.id, 
           originalData: lane,
-          baseGridWidth: gridWidth,
+          baseGridWidth: lane.grid_width || 20,
           baseGridHeight: lane.grid_height || 5,
         },
       } as any);

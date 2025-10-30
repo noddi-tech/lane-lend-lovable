@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,27 @@ export function CreateLaneDialog({ open, onOpenChange, facilityId }: CreateLaneD
   const { data: rooms } = useRooms(facilityId);
   const { data: zones } = useZones(facilityId);
   const { data: outsideAreas } = useOutsideAreas(facilityId);
+
+  // Auto-calculate position when parent changes
+  useEffect(() => {
+    if (parentType === 'none' || !parentId) return;
+
+    const parent = parentType === 'room' ? rooms?.find(r => r.id === parentId) :
+                   parentType === 'zone' ? zones?.find(z => z.id === parentId) :
+                   parentType === 'outside' ? outsideAreas?.find(a => a.id === parentId) : null;
+
+    if (parent) {
+      const parentX = (parent as any).grid_x || 0;
+      const parentY = (parent as any).grid_y || 0;
+      const parentWidth = (parent as any).grid_width || 20;
+      const parentHeight = (parent as any).grid_height || 20;
+
+      // Position lane at center of parent container
+      setGridX(parentX);
+      setGridY(parentY + Math.floor(parentHeight / 2) - Math.floor(gridHeight / 2));
+      setGridWidth(parentWidth); // Match parent width
+    }
+  }, [parentId, parentType, rooms, zones, outsideAreas, gridHeight]);
 
   const availableParents = parentType === 'room' ? (rooms || []) :
                            parentType === 'zone' ? (zones || []) :
