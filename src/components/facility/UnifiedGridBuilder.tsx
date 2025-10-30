@@ -455,13 +455,12 @@ export function UnifiedGridBuilder({
       const gridX = Math.round((obj.left || 0) / CELL_SIZE);
       const gridY = Math.round((obj.top || 0) / CELL_SIZE);
 
-      const rect = obj._objects?.[0];
-      const gridWidth = Math.round((rect?.width || 0) / CELL_SIZE);
-      const gridHeight = Math.round((rect?.height || 0) / CELL_SIZE);
+      // Use the base grid dimensions that were set during object:scaling
+      // instead of re-calculating from rect.width/height (which can be scaled)
+      const gridWidth = obj.data.baseGridWidth || 10;
+      const gridHeight = obj.data.baseGridHeight || 10;
       
-      // Sync base grid dimensions
-      obj.data.baseGridWidth = gridWidth;
-      obj.data.baseGridHeight = gridHeight;
+      const rect = obj._objects?.[0];
 
       // Validate placement for containment rules
       const validation = validatePlacement(type, gridX, gridY, gridWidth, gridHeight);
