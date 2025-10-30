@@ -11,7 +11,8 @@ import { useZones, useUpdateZone, useDeleteZone } from '@/hooks/admin/useZones';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Plus, X } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { ArrowLeft, Plus, X, MapPin, Package, Box, Layers } from 'lucide-react';
 import { UnifiedGridBuilder, type EditMode } from '@/components/facility/UnifiedGridBuilder';
 import { LibraryPalette } from '@/components/facility/LibraryPalette';
 import { CreateGateDialog } from '@/components/facility/dialogs/CreateGateDialog';
@@ -246,17 +247,182 @@ export default function FacilityLayoutBuilderPageUnified() {
 
       {/* Canvas */}
       <div className="flex-1 flex gap-6 overflow-auto p-6">
-        {/* Library Palette Sidebar */}
-        <div className="flex-shrink-0 w-80">
-          <LibraryPalette 
-            editMode={editMode}
-            onItemDragStart={(item, type) => {
-              console.log('Drag started:', item, type);
-            }}
-            onItemDragEnd={() => {
-              console.log('Drag ended');
-            }}
-          />
+        {/* Element Selection Sidebar */}
+        <div className="flex-shrink-0 w-80 space-y-3">
+          {/* Rooms */}
+          {editMode === 'room' && (
+            <div className="border rounded-lg overflow-hidden">
+              <div className="p-4 border-b bg-muted/50">
+                <h3 className="font-semibold text-sm">Rooms in Facility</h3>
+                <p className="text-xs text-muted-foreground mt-1">Click to select</p>
+              </div>
+              <ScrollArea className="h-64">
+                <div className="p-2 space-y-1">
+                  {roomsData.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">No rooms yet</p>
+                  ) : (
+                    roomsData.map((room) => (
+                      <Button
+                        key={room.id}
+                        variant={selectedElement?.id === room.id ? 'secondary' : 'ghost'}
+                        size="sm"
+                        className="w-full justify-start gap-2 h-auto py-2"
+                        onClick={() => handleElementSelect({ id: room.id, type: 'room', data: { originalData: room } })}
+                      >
+                        <div className="w-4 h-4 rounded border" style={{ backgroundColor: room.color }} />
+                        <div className="flex-1 text-left">
+                          <div className="font-medium text-sm">{room.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {room.grid_width} × {room.grid_height} at ({room.grid_x}, {room.grid_y})
+                          </div>
+                        </div>
+                      </Button>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+
+          {/* Gates */}
+          {editMode === 'gate' && (
+            <div className="border rounded-lg overflow-hidden">
+              <div className="p-4 border-b bg-muted/50">
+                <h3 className="font-semibold text-sm">Gates in Facility</h3>
+                <p className="text-xs text-muted-foreground mt-1">Click to select</p>
+              </div>
+              <ScrollArea className="h-64">
+                <div className="p-2 space-y-1">
+                  {gatesData.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">No gates yet</p>
+                  ) : (
+                    gatesData.map((gate) => (
+                      <Button
+                        key={gate.id}
+                        variant={selectedElement?.id === gate.id ? 'secondary' : 'ghost'}
+                        size="sm"
+                        className="w-full justify-start gap-2 h-auto py-2"
+                        onClick={() => handleElementSelect({ id: gate.id, type: 'gate', data: { originalData: gate } })}
+                      >
+                        <MapPin className="w-4 h-4" />
+                        <div className="flex-1 text-left">
+                          <div className="font-medium text-sm">{gate.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {gate.grid_width} × {gate.grid_height}
+                          </div>
+                        </div>
+                      </Button>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+
+          {/* Zones */}
+          {editMode === 'zone' && (
+            <div className="border rounded-lg overflow-hidden">
+              <div className="p-4 border-b bg-muted/50">
+                <h3 className="font-semibold text-sm">Zones in Facility</h3>
+                <p className="text-xs text-muted-foreground mt-1">Click to select</p>
+              </div>
+              <ScrollArea className="h-64">
+                <div className="p-2 space-y-1">
+                  {zonesData.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">No zones yet</p>
+                  ) : (
+                    zonesData.map((zone) => (
+                      <Button
+                        key={zone.id}
+                        variant={selectedElement?.id === zone.id ? 'secondary' : 'ghost'}
+                        size="sm"
+                        className="w-full justify-start gap-2 h-auto py-2"
+                        onClick={() => handleElementSelect({ id: zone.id, type: 'zone', data: { originalData: zone } })}
+                      >
+                        <Layers className="w-4 h-4" />
+                        <div className="flex-1 text-left">
+                          <div className="font-medium text-sm">{zone.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {zone.grid_width} × {zone.grid_height}
+                          </div>
+                        </div>
+                      </Button>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+
+          {/* Stations */}
+          {editMode === 'station' && (
+            <div className="border rounded-lg overflow-hidden">
+              <div className="p-4 border-b bg-muted/50">
+                <h3 className="font-semibold text-sm">Stations in Facility</h3>
+                <p className="text-xs text-muted-foreground mt-1">Click to select</p>
+              </div>
+              <ScrollArea className="h-64">
+                <div className="p-2 space-y-1">
+                  {stationsData.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">No stations yet</p>
+                  ) : (
+                    stationsData.map((station) => (
+                      <Button
+                        key={station.id}
+                        variant={selectedElement?.id === station.id ? 'secondary' : 'ghost'}
+                        size="sm"
+                        className="w-full justify-start gap-2 h-auto py-2"
+                        onClick={() => handleElementSelect({ id: station.id, type: 'station', data: { originalData: station } })}
+                      >
+                        <Box className="w-4 h-4" />
+                        <div className="flex-1 text-left">
+                          <div className="font-medium text-sm">{station.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {station.grid_width} × {station.grid_height}
+                          </div>
+                        </div>
+                      </Button>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+
+          {/* Storage Locations */}
+          {editMode === 'storage' && (
+            <div className="border rounded-lg overflow-hidden">
+              <div className="p-4 border-b bg-muted/50">
+                <h3 className="font-semibold text-sm">Storage Locations</h3>
+                <p className="text-xs text-muted-foreground mt-1">Click to select</p>
+              </div>
+              <ScrollArea className="h-64">
+                <div className="p-2 space-y-1">
+                  {storageLocationsData.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">No storage locations yet</p>
+                  ) : (
+                    storageLocationsData.map((storage) => (
+                      <Button
+                        key={storage.id}
+                        variant={selectedElement?.id === storage.id ? 'secondary' : 'ghost'}
+                        size="sm"
+                        className="w-full justify-start gap-2 h-auto py-2"
+                        onClick={() => handleElementSelect({ id: storage.id, type: 'storage', data: { originalData: storage } })}
+                      >
+                        <Package className="w-4 h-4" />
+                        <div className="flex-1 text-left">
+                          <div className="font-medium text-sm">{storage.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {storage.grid_width} × {storage.grid_height}
+                          </div>
+                        </div>
+                      </Button>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
         </div>
         
         {/* Canvas */}

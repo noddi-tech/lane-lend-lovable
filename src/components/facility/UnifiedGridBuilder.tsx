@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Canvas as FabricCanvas, Rect, Text as FabricText, Group, Line } from 'fabric';
 import { Button } from '@/components/ui/button';
-import { ZoomIn, ZoomOut } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 
 interface Gate {
   id: string;
@@ -209,6 +209,63 @@ export function UnifiedGridBuilder({
     stations,
     storageLocations,
   });
+
+  // Calculate bounds of all elements
+  const calculateBounds = useCallback(() => {
+    const allElements = [
+      ...rooms.map(r => ({ x: r.grid_x || 0, y: r.grid_y || 0, w: r.grid_width || 10, h: r.grid_height || 10 })),
+      ...gates.map(g => ({ x: g.grid_x || 0, y: g.grid_y || 0, w: g.grid_width || 10, h: g.grid_height || 10 })),
+      ...outsideAreas.map(a => ({ x: a.grid_x || 0, y: a.grid_y || 0, w: a.grid_width || 10, h: a.grid_height || 10 })),
+      ...zones.map(z => ({ x: z.grid_x || 0, y: z.grid_y || 0, w: z.grid_width || 10, h: z.grid_height || 10 })),
+      ...stations.map(s => ({ x: s.grid_x || 0, y: s.grid_y || 0, w: s.grid_width || 2, h: s.grid_height || 2 })),
+      ...storageLocations.map(s => ({ x: s.grid_x || 0, y: s.grid_y || 0, w: s.grid_width || 1, h: s.grid_height || 1 })),
+    ];
+    
+    if (allElements.length === 0) return null;
+    
+    const minX = Math.min(...allElements.map(e => e.x));
+    const minY = Math.min(...allElements.map(e => e.y));
+    const maxX = Math.max(...allElements.map(e => e.x + e.w));
+    const maxY = Math.max(...allElements.map(e => e.y + e.h));
+    
+    return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
+  }, [rooms, gates, outsideAreas, zones, stations, storageLocations]);
+
+  // Zoom to fit all elements
+  const zoomToFit = useCallback(() => {
+    if (!canvas || !containerRef.current) return;
+    
+    const bounds = calculateBounds();
+    if (!bounds) return;
+    
+    const padding = 50; // pixels
+    const containerWidth = containerRef.current.clientWidth - padding * 2;
+    const containerHeight = containerRef.current.clientHeight - padding * 2;
+    
+    const boundsWidth = bounds.width * CELL_SIZE;
+    const boundsHeight = bounds.height * CELL_SIZE;
+    
+    const scaleX = containerWidth / boundsWidth;
+    const scaleY = containerHeight / boundsHeight;
+    const newZoom = Math.min(scaleX, scaleY, 2); // Max 200% zoom
+    
+    const centerX = (bounds.minX + bounds.maxX) / 2 * CELL_SIZE;
+    const centerY = (bounds.minY + bounds.maxY) / 2 * CELL_SIZE;
+    
+    canvas.setZoom(newZoom);
+    setZoom(newZoom);
+    
+    const viewportCenterX = containerRef.current.clientWidth / 2;
+    const viewportCenterY = containerRef.current.clientHeight / 2;
+    
+    const vpt = canvas.viewportTransform;
+    if (vpt) {
+      vpt[4] = -(centerX * newZoom - viewportCenterX);
+      vpt[5] = -(centerY * newZoom - viewportCenterY);
+    }
+    
+    canvas.requestRenderAll();
+  }, [canvas, calculateBounds]);
   
   // Store callbacks in refs to prevent useEffect re-runs
   const callbacksRef = useRef({
@@ -357,6 +414,18 @@ export function UnifiedGridBuilder({
     canvas.setDimensions(canvasDimensions);
     canvas.renderAll();
   }, [canvas, canvasDimensions]);
+
+  // Auto-fit view when elements load
+  useEffect(() => {
+    if (!canvas || rooms.length === 0) return;
+    
+    // Delay to ensure canvas is fully rendered
+    const timer = setTimeout(() => {
+      zoomToFit();
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [canvas, rooms.length > 0, zoomToFit]);
 
   // Removed: canvas.selection toggle - always keep false to disable multi-select box
 
@@ -1092,6 +1161,9 @@ export function UnifiedGridBuilder({
         </Button>
         <Button variant="outline" size="sm" onClick={handleZoomOut}>
           <ZoomOut className="h-4 w-4" />
+        </Button>
+        <Button variant="outline" size="sm" onClick={zoomToFit} title="Fit to view">
+          <Maximize2 className="h-4 w-4" />
         </Button>
         <Button variant="outline" size="sm" onClick={handleResetZoom}>
           Reset ({Math.round(zoom * 100)}%)
