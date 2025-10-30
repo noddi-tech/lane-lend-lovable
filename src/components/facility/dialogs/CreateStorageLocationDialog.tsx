@@ -5,27 +5,41 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCreateStorageLocation } from '@/hooks/admin/useStorageLocations';
+import { useRooms } from '@/hooks/admin/useRooms';
+import { useZones } from '@/hooks/admin/useZones';
+import { useOutsideAreas } from '@/hooks/admin/useOutsideAreas';
 import { useState } from 'react';
 
 interface CreateStorageLocationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  laneId?: string;
-  roomId?: string;
+  lanes: Array<{ id: string; name: string }>;
+  facilityId: string;
 }
 
-export function CreateStorageLocationDialog({ open, onOpenChange, laneId, roomId }: CreateStorageLocationDialogProps) {
+export function CreateStorageLocationDialog({ open, onOpenChange, lanes, facilityId }: CreateStorageLocationDialogProps) {
   const createStorageLocation = useCreateStorageLocation();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [storageType, setStorageType] = useState<'general' | 'parts' | 'tools' | 'hazmat' | 'other'>('general');
+  const [parentType, setParentType] = useState<'lane' | 'room' | 'zone' | 'outside'>('lane');
+  const [parentId, setParentId] = useState<string>("");
+
+  const { data: rooms } = useRooms(facilityId);
+  const { data: zones } = useZones(facilityId);
+  const { data: outsideAreas } = useOutsideAreas(facilityId);
+
+  const availableParents = parentType === 'lane' ? lanes :
+                           parentType === 'room' ? (rooms || []) :
+                           parentType === 'zone' ? (zones || []) :
+                           parentType === 'outside' ? (outsideAreas || []) : [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     await createStorageLocation.mutateAsync({
-      lane_id: laneId || null,
-      room_id: roomId || null,
+      lane_id: parentType === 'lane' ? parentId : null,
+      room_id: parentType === 'room' ? parentId : null,
       name,
       description: description || null,
       storage_type: storageType,
@@ -34,11 +48,13 @@ export function CreateStorageLocationDialog({ open, onOpenChange, laneId, roomId
       grid_width: 1,
       grid_height: 1,
       status: 'available',
-    });
+    } as any);
 
     setName('');
     setDescription('');
     setStorageType('general');
+    setParentType('lane');
+    setParentId("");
     onOpenChange(false);
   };
 
@@ -60,6 +76,38 @@ export function CreateStorageLocationDialog({ open, onOpenChange, laneId, roomId
             />
           </div>
           
+          <div>
+            <Label>Place Inside</Label>
+            <Select value={parentType} onValueChange={(v: any) => {
+              setParentType(v);
+              setParentId("");
+            }}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="lane">🛣️ On a Lane</SelectItem>
+                <SelectItem value="room">🏠 Inside a Room</SelectItem>
+                <SelectItem value="zone">📍 Inside a Zone</SelectItem>
+                <SelectItem value="outside">🌳 Inside an Outside Area</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {availableParents.length > 0 && (
+            <div>
+              <Label>Select {parentType === 'lane' ? 'Lane' : parentType === 'room' ? 'Room' : parentType === 'zone' ? 'Zone' : 'Outside Area'}</Label>
+              <Select value={parentId} onValueChange={setParentId}>
+                <SelectTrigger>
+                  <SelectValue placeholder={`Choose a ${parentType}`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableParents.map((p: any) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div>
             <Label htmlFor="storage-type">Storage Type</Label>
             <Select value={storageType} onValueChange={(value: any) => setStorageType(value)}>

@@ -580,6 +580,7 @@ export default function FacilityLayoutBuilderPageUnified() {
         open={showCreateStationDialog}
         onOpenChange={setShowCreateStationDialog}
         lanes={facilityLanes.map(l => ({ id: l.id, name: l.name || `Lane ${l.position_order}` }))}
+        facilityId={facilityId!}
       />
       <CreateRoomDialog
         open={showCreateRoomDialog}
@@ -594,6 +595,8 @@ export default function FacilityLayoutBuilderPageUnified() {
       <CreateStorageLocationDialog
         open={showCreateStorageDialog}
         onOpenChange={setShowCreateStorageDialog}
+        lanes={facilityLanes.map(l => ({ id: l.id, name: l.name || `Lane ${l.position_order}` }))}
+        facilityId={facilityId!}
       />
       <CreateZoneDialog
         open={showCreateZoneDialog}

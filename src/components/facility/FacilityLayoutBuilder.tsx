@@ -461,6 +461,7 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
         open={showCreateStationDialog}
         onOpenChange={setShowCreateStationDialog}
         lanes={facilityLanes.map(l => ({ id: l.id, name: l.name }))}
+        facilityId={facility.id}
       />
 
       <CreateRoomDialog

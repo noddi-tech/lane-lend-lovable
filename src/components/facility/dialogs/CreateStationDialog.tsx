@@ -5,28 +5,43 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateStation } from "@/hooks/admin/useStations";
+import { useRooms } from "@/hooks/admin/useRooms";
+import { useZones } from "@/hooks/admin/useZones";
+import { useOutsideAreas } from "@/hooks/admin/useOutsideAreas";
 
 interface CreateStationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   lanes: Array<{ id: string; name: string }>;
+  facilityId: string;
 }
 
-export function CreateStationDialog({ open, onOpenChange, lanes }: CreateStationDialogProps) {
+export function CreateStationDialog({ open, onOpenChange, lanes, facilityId }: CreateStationDialogProps) {
   const [name, setName] = useState("");
-  const [laneId, setLaneId] = useState("");
+  const [parentType, setParentType] = useState<'lane' | 'room' | 'zone' | 'outside'>('lane');
+  const [parentId, setParentId] = useState<string>("");
   const [gridX, setGridX] = useState(10);
   const [gridY, setGridY] = useState(10);
   const [gridWidth, setGridWidth] = useState(4);
   const [gridHeight, setGridHeight] = useState(3);
 
   const createStation = useCreateStation();
+  const { data: rooms } = useRooms(facilityId);
+  const { data: zones } = useZones(facilityId);
+  const { data: outsideAreas } = useOutsideAreas(facilityId);
+
+  const availableParents = parentType === 'lane' ? lanes :
+                           parentType === 'room' ? (rooms || []) :
+                           parentType === 'zone' ? (zones || []) :
+                           parentType === 'outside' ? (outsideAreas || []) : [];
 
   const handleSubmit = async () => {
-    if (!laneId) return;
+    if (!parentId) return;
     
     await createStation.mutateAsync({
-      lane_id: laneId,
+      lane_id: parentType === 'lane' ? parentId : null,
+      room_id: parentType === 'room' ? parentId : null,
+      zone_id: parentType === 'zone' ? parentId : null,
       name,
       station_type: "service",
       grid_position_x: gridX,
@@ -36,7 +51,8 @@ export function CreateStationDialog({ open, onOpenChange, lanes }: CreateStation
     } as any);
     onOpenChange(false);
     setName("");
-    setLaneId("");
+    setParentType('lane');
+    setParentId("");
   };
 
   return (
@@ -59,20 +75,37 @@ export function CreateStationDialog({ open, onOpenChange, lanes }: CreateStation
             />
           </div>
           <div>
-            <Label htmlFor="lane">Lane</Label>
-            <Select value={laneId} onValueChange={setLaneId}>
-              <SelectTrigger id="lane">
-                <SelectValue placeholder="Select a lane" />
+            <Label>Place Inside</Label>
+            <Select value={parentType} onValueChange={(v: any) => {
+              setParentType(v);
+              setParentId("");
+            }}>
+              <SelectTrigger>
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {lanes.map((lane) => (
-                  <SelectItem key={lane.id} value={lane.id}>
-                    {lane.name}
-                  </SelectItem>
-                ))}
+                <SelectItem value="lane">🛣️ On a Lane</SelectItem>
+                <SelectItem value="room">🏠 Inside a Room</SelectItem>
+                <SelectItem value="zone">📍 Inside a Zone</SelectItem>
+                <SelectItem value="outside">🌳 Inside an Outside Area</SelectItem>
               </SelectContent>
             </Select>
           </div>
+          {availableParents.length > 0 && (
+            <div>
+              <Label>Select {parentType === 'lane' ? 'Lane' : parentType === 'room' ? 'Room' : parentType === 'zone' ? 'Zone' : 'Outside Area'}</Label>
+              <Select value={parentId} onValueChange={setParentId}>
+                <SelectTrigger>
+                  <SelectValue placeholder={`Choose a ${parentType}`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableParents.map((p: any) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="station-x">Grid X</Label>
@@ -122,7 +155,7 @@ export function CreateStationDialog({ open, onOpenChange, lanes }: CreateStation
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={!name || !laneId}>
+          <Button onClick={handleSubmit} disabled={!name || !parentId}>
             Create Station
           </Button>
         </DialogFooter>

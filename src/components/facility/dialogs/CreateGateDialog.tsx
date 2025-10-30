@@ -3,7 +3,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateDrivingGate } from "@/hooks/admin/useDrivingGates";
+import { useRooms } from "@/hooks/admin/useRooms";
+import { useZones } from "@/hooks/admin/useZones";
+import { useOutsideAreas } from "@/hooks/admin/useOutsideAreas";
 
 interface CreateGateDialogProps {
   open: boolean;
@@ -17,8 +21,17 @@ export function CreateGateDialog({ open, onOpenChange, facilityId }: CreateGateD
   const [gridY, setGridY] = useState(10);
   const [gridWidth, setGridWidth] = useState(3);
   const [gridHeight, setGridHeight] = useState(10);
+  const [parentType, setParentType] = useState<'room' | 'zone' | 'outside' | 'none'>('none');
+  const [parentId, setParentId] = useState<string>("");
 
   const createGate = useCreateDrivingGate();
+  const { data: rooms } = useRooms(facilityId);
+  const { data: zones } = useZones(facilityId);
+  const { data: outsideAreas } = useOutsideAreas(facilityId);
+
+  const availableParents = parentType === 'room' ? (rooms || []) :
+                           parentType === 'zone' ? (zones || []) :
+                           parentType === 'outside' ? (outsideAreas || []) : [];
 
   const handleSubmit = async () => {
     await createGate.mutateAsync({
@@ -30,9 +43,13 @@ export function CreateGateDialog({ open, onOpenChange, facilityId }: CreateGateD
       grid_position_y: gridY,
       grid_width: gridWidth,
       grid_height: gridHeight,
+      room_id: parentType === 'room' ? parentId : null,
+      zone_id: parentType === 'zone' ? parentId : null,
     } as any);
     onOpenChange(false);
     setName("");
+    setParentType('none');
+    setParentId("");
   };
 
   return (
@@ -54,6 +71,38 @@ export function CreateGateDialog({ open, onOpenChange, facilityId }: CreateGateD
               placeholder="e.g., Main Entrance"
             />
           </div>
+          <div>
+            <Label>Place Inside (Optional)</Label>
+            <Select value={parentType} onValueChange={(v: any) => {
+              setParentType(v);
+              setParentId("");
+            }}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Directly in Facility</SelectItem>
+                <SelectItem value="room">🏠 Inside a Room</SelectItem>
+                <SelectItem value="zone">📍 Inside a Zone</SelectItem>
+                <SelectItem value="outside">🌳 Inside an Outside Area</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {parentType !== 'none' && availableParents.length > 0 && (
+            <div>
+              <Label>Select {parentType === 'room' ? 'Room' : parentType === 'zone' ? 'Zone' : 'Outside Area'}</Label>
+              <Select value={parentId} onValueChange={setParentId}>
+                <SelectTrigger>
+                  <SelectValue placeholder={`Choose a ${parentType}`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableParents.map((p: any) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="gate-x">Grid X</Label>

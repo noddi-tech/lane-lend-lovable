@@ -256,6 +256,7 @@ export function FacilityLayoutBuilder({ facility, drivingGates }: FacilityLayout
           open={showCreateStationDialog}
           onOpenChange={setShowCreateStationDialog}
           lanes={(lanes || []).map(l => ({ id: l.id, name: l.name || `Lane ${l.position_order}` }))}
+          facilityId={facility?.id || ''}
         />
       </CardContent>
     </Card>

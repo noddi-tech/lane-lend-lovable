@@ -351,6 +351,7 @@ export type Database = {
           open_time: string
           room_id: string | null
           updated_at: string | null
+          zone_id: string | null
         }
         Insert: {
           close_time?: string
@@ -366,6 +367,7 @@ export type Database = {
           open_time?: string
           room_id?: string | null
           updated_at?: string | null
+          zone_id?: string | null
         }
         Update: {
           close_time?: string
@@ -381,6 +383,7 @@ export type Database = {
           open_time?: string
           room_id?: string | null
           updated_at?: string | null
+          zone_id?: string | null
         }
         Relationships: [
           {
@@ -395,6 +398,13 @@ export type Database = {
             columns: ["room_id"]
             isOneToOne: false
             referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driving_gates_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "zones"
             referencedColumns: ["id"]
           },
         ]
@@ -567,6 +577,7 @@ export type Database = {
           position_order: number
           room_id: string | null
           updated_at: string | null
+          zone_id: string | null
         }
         Insert: {
           close_time?: string | null
@@ -583,6 +594,7 @@ export type Database = {
           position_order?: number
           room_id?: string | null
           updated_at?: string | null
+          zone_id?: string | null
         }
         Update: {
           close_time?: string | null
@@ -599,6 +611,7 @@ export type Database = {
           position_order?: number
           room_id?: string | null
           updated_at?: string | null
+          zone_id?: string | null
         }
         Relationships: [
           {
@@ -613,6 +626,13 @@ export type Database = {
             columns: ["room_id"]
             isOneToOne: false
             referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lanes_new_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "zones"
             referencedColumns: ["id"]
           },
         ]
