@@ -16,8 +16,8 @@ interface Lane {
   id: string;
   name?: string;
   position_order?: number;
-  grid_position_x?: number;
-  grid_position_y?: number;
+  grid_x?: number;
+  grid_y?: number;
   grid_width?: number;
   grid_height?: number;
 }
@@ -25,8 +25,8 @@ interface Lane {
 interface Station {
   id: string;
   name?: string;
-  grid_position_x?: number;
-  grid_position_y?: number;
+  grid_x?: number;
+  grid_y?: number;
   grid_width?: number;
   grid_height?: number;
 }
@@ -55,8 +55,8 @@ interface OutsideArea {
 interface StorageLocation {
   id: string;
   name: string;
-  grid_position_x?: number;
-  grid_position_y?: number;
+  grid_x?: number;
+  grid_y?: number;
   grid_width?: number;
   grid_height?: number;
   storage_type?: string;
@@ -221,8 +221,8 @@ export function UnifiedGridBuilder({
       ...gates.map(g => ({ x: g.grid_x || 0, y: g.grid_y || 0, w: g.grid_width || 10, h: g.grid_height || 10 })),
       ...outsideAreas.map(a => ({ x: a.grid_x || 0, y: a.grid_y || 0, w: a.grid_width || 10, h: a.grid_height || 10 })),
       ...zones.map(z => ({ x: z.grid_x || 0, y: z.grid_y || 0, w: z.grid_width || 10, h: z.grid_height || 10 })),
-      ...stations.map(s => ({ x: s.grid_position_x || 0, y: s.grid_position_y || 0, w: s.grid_width || 2, h: s.grid_height || 2 })),
-      ...storageLocations.map(s => ({ x: s.grid_position_x || 0, y: s.grid_position_y || 0, w: s.grid_width || 1, h: s.grid_height || 1 })),
+      ...stations.map(s => ({ x: s.grid_x || 0, y: s.grid_y || 0, w: s.grid_width || 2, h: s.grid_height || 2 })),
+      ...storageLocations.map(s => ({ x: s.grid_x || 0, y: s.grid_y || 0, w: s.grid_width || 1, h: s.grid_height || 1 })),
     ];
     
     if (allElements.length === 0) return null;
@@ -337,7 +337,7 @@ export function UnifiedGridBuilder({
     if (type === 'station') {
       // Check if in lane
       const containingLane = dataRef.current.lanes?.find(lane => {
-        const laneY = lane.grid_position_y || 0;
+        const laneY = lane.grid_y || 0;
         const laneHeight = lane.grid_height || 5;
         return gridY >= laneY && gridY + gridHeight <= laneY + laneHeight;
       });
@@ -407,7 +407,7 @@ export function UnifiedGridBuilder({
     // Storage must be inside a lane or room
     if (type === 'storage') {
       const inLane = dataRef.current.lanes?.some(lane => {
-        const laneY = lane.grid_position_y || 0;
+        const laneY = lane.grid_y || 0;
         const laneHeight = lane.grid_height || 5;
         return gridY >= laneY && gridY + gridHeight <= laneY + laneHeight;
       });
@@ -971,8 +971,8 @@ export function UnifiedGridBuilder({
 
     // Render lanes
     lanes.forEach((lane) => {
-      const laneX = (lane.grid_position_x || 0) * CELL_SIZE;
-      const laneY = (lane.grid_position_y || 0) * CELL_SIZE;
+      const laneX = (lane.grid_x || 0) * CELL_SIZE;
+      const laneY = (lane.grid_y || 0) * CELL_SIZE;
       const laneWidth = (lane.grid_width || 20) * CELL_SIZE;
       const laneHeight = (lane.grid_height || 5) * CELL_SIZE;
       const opacity = editMode === 'lane' ? 1 : 0.3;
@@ -1076,8 +1076,8 @@ export function UnifiedGridBuilder({
 
     // Render stations
     stations.forEach((station) => {
-      const stationX = (station.grid_position_x || 0) * CELL_SIZE;
-      const stationY = (station.grid_position_y || 0) * CELL_SIZE;
+      const stationX = (station.grid_x || 0) * CELL_SIZE;
+      const stationY = (station.grid_y || 0) * CELL_SIZE;
       const stationWidth = (station.grid_width || 4) * CELL_SIZE;
       const stationHeight = (station.grid_height || 3) * CELL_SIZE;
       const opacity = editMode === 'station' ? 1 : 0.3;
@@ -1129,8 +1129,8 @@ export function UnifiedGridBuilder({
 
     // Render storage locations
     storageLocations.forEach((storage) => {
-      const storageX = (storage.grid_position_x || 0) * CELL_SIZE;
-      const storageY = (storage.grid_position_y || 0) * CELL_SIZE;
+      const storageX = (storage.grid_x || 0) * CELL_SIZE;
+      const storageY = (storage.grid_y || 0) * CELL_SIZE;
       const storageWidth = (storage.grid_width || 3) * CELL_SIZE;
       const storageHeight = (storage.grid_height || 3) * CELL_SIZE;
       const opacity = editMode === 'storage' ? 1 : 0.3;
