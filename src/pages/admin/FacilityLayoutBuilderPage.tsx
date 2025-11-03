@@ -175,6 +175,8 @@ export default function FacilityLayoutBuilderPageUnified() {
       grid_y: g.grid_position_y,
       grid_width: g.grid_width,
       grid_height: g.grid_height,
+      room_id: (g as any).room_id,
+      zone_id: (g as any).zone_id,
     })),
     [drivingGates]
   );
@@ -188,6 +190,8 @@ export default function FacilityLayoutBuilderPageUnified() {
       grid_y: l.grid_position_y,
       grid_width: l.grid_width,
       grid_height: l.grid_height,
+      room_id: (l as any).room_id,
+      zone_id: (l as any).zone_id,
     })),
     [facilityLanes]
   );
@@ -200,6 +204,9 @@ export default function FacilityLayoutBuilderPageUnified() {
       grid_y: s.grid_position_y,
       grid_width: s.grid_width,
       grid_height: s.grid_height,
+      room_id: (s as any).room_id,
+      zone_id: (s as any).zone_id,
+      lane_id: s.lane_id,
     })),
     [facilityStations]
   );
@@ -245,6 +252,9 @@ export default function FacilityLayoutBuilderPageUnified() {
       grid_height: s.grid_height,
       storage_type: s.storage_type,
       status: s.status,
+      room_id: (s as any).room_id,
+      zone_id: (s as any).zone_id,
+      lane_id: s.lane_id,
     })) || [],
     [allStorageLocations, facilityLaneIds, allRooms, allZones]
   );

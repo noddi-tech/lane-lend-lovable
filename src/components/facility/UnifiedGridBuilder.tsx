@@ -10,6 +10,8 @@ interface Gate {
   grid_y?: number;
   grid_width?: number;
   grid_height?: number;
+  room_id?: string;
+  zone_id?: string;
 }
 
 interface Lane {
@@ -20,6 +22,8 @@ interface Lane {
   grid_y?: number;
   grid_width?: number;
   grid_height?: number;
+  room_id?: string;
+  zone_id?: string;
 }
 
 interface Station {
@@ -29,6 +33,9 @@ interface Station {
   grid_y?: number;
   grid_width?: number;
   grid_height?: number;
+  room_id?: string;
+  zone_id?: string;
+  lane_id?: string;
 }
 
 interface Room {
@@ -61,6 +68,9 @@ interface StorageLocation {
   grid_height?: number;
   storage_type?: string;
   status?: string;
+  room_id?: string;
+  zone_id?: string;
+  lane_id?: string;
 }
 
 interface Zone {
