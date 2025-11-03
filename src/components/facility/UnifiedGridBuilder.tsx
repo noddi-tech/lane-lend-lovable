@@ -505,11 +505,8 @@ export function UnifiedGridBuilder({
       const snappedLeft = Math.round(left / CELL_SIZE) * CELL_SIZE;
       const snappedTop = Math.round(top / CELL_SIZE) * CELL_SIZE;
 
-      if (type === 'lane') {
-        obj.set({ left: 0, top: snappedTop });
-      } else {
-        obj.set({ left: snappedLeft, top: snappedTop });
-      }
+      // Allow lanes to move horizontally - removed forced left: 0
+      obj.set({ left: snappedLeft, top: snappedTop });
 
       // Visual feedback for validation during drag
       const rect = obj._objects?.[0];
@@ -633,7 +630,12 @@ export function UnifiedGridBuilder({
         callbacksRef.current.onGateResize?.(id, gridWidth, gridHeight);
       } else if (type === 'lane') {
         console.log(`🚗 Lane moved: id=${id}, gridX=${gridX}, gridY=${gridY}, gridWidth=${gridWidth}, gridHeight=${gridHeight}`);
-        callbacksRef.current.onLaneMove?.(id, gridX, gridY);
+        // Prevent accidental X=0 moves - lanes should maintain their X position
+        if (gridX !== 0 || obj.data.originalData?.grid_position_x === 0) {
+          callbacksRef.current.onLaneMove?.(id, gridX, gridY);
+        } else {
+          console.warn('⚠️ Prevented lane from snapping to X=0');
+        }
         callbacksRef.current.onLaneResize?.(id, gridWidth, gridHeight);
       } else if (type === 'station') {
         callbacksRef.current.onStationMove?.(id, gridX, gridY);
