@@ -1069,7 +1069,7 @@ export default function FacilityLayoutBuilderPageUnified() {
           onStorageLocationMove={(id, x, y) => updateStorageLocation.mutateAsync({ id, grid_position_x: x, grid_position_y: y } as any)}
           onZoneMove={(id, x, y) => updateZone.mutateAsync({ id, grid_position_x: x, grid_position_y: y } as any)}
           onGateResize={(id, w, h) => updateGate.mutateAsync({ id, grid_width: w, grid_height: h } as any)}
-          onLaneResize={(id, h) => updateLane.mutateAsync({ id, grid_height: h } as any)}
+          onLaneResize={(id, w, h) => updateLane.mutateAsync({ id, grid_width: w, grid_height: h } as any)}
           onStationResize={(id, w, h) => updateStation.mutateAsync({ id, grid_width: w, grid_height: h } as any)}
           onRoomResize={(id, w, h) => updateRoom.mutateAsync({ id, grid_width: w, grid_height: h } as any)}
           onOutsideAreaResize={(id, w, h) => updateOutsideArea.mutateAsync({ id, grid_width: w, grid_height: h } as any)}

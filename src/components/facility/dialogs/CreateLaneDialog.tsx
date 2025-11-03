@@ -38,8 +38,8 @@ export function CreateLaneDialog({ open, onOpenChange, facilityId }: CreateLaneD
                    parentType === 'outside' ? outsideAreas?.find(a => a.id === parentId) : null;
 
     if (parent) {
-      const parentX = (parent as any).grid_x || 0;
-      const parentY = (parent as any).grid_y || 0;
+      const parentX = (parent as any).grid_position_x || (parent as any).grid_x || 0;
+      const parentY = (parent as any).grid_position_y || (parent as any).grid_y || 0;
       const parentWidth = (parent as any).grid_width || 20;
       const parentHeight = (parent as any).grid_height || 20;
 

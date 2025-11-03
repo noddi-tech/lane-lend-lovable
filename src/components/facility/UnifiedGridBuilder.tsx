@@ -17,7 +17,7 @@ interface Lane {
   name?: string;
   position_order?: number;
   grid_position_x?: number;
-  grid_y?: number;
+  grid_position_y?: number;
   grid_width?: number;
   grid_height?: number;
 }
@@ -336,7 +336,7 @@ export function UnifiedGridBuilder({
     if (type === 'station') {
       // Check if in lane
       const containingLane = dataRef.current.lanes?.find(lane => {
-        const laneY = lane.grid_y || 0;
+        const laneY = lane.grid_position_y || 0;
         const laneHeight = lane.grid_height || 5;
         return gridY >= laneY && gridY + gridHeight <= laneY + laneHeight;
       });
@@ -406,7 +406,7 @@ export function UnifiedGridBuilder({
     // Storage must be inside a lane or room
     if (type === 'storage') {
       const inLane = dataRef.current.lanes?.some(lane => {
-        const laneY = lane.grid_y || 0;
+        const laneY = lane.grid_position_y || 0;
         const laneHeight = lane.grid_height || 5;
         return gridY >= laneY && gridY + gridHeight <= laneY + laneHeight;
       });
@@ -959,7 +959,7 @@ export function UnifiedGridBuilder({
     // Render lanes
     lanes.forEach((lane) => {
       const laneX = (lane.grid_position_x || 0) * CELL_SIZE;
-      const laneY = (lane.grid_y || 0) * CELL_SIZE;
+      const laneY = (lane.grid_position_y || 0) * CELL_SIZE;
       const laneWidth = (lane.grid_width || 20) * CELL_SIZE;
       const laneHeight = (lane.grid_height || 5) * CELL_SIZE;
       const opacity = editMode === 'lane' ? 1 : 0.3;
