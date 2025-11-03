@@ -490,6 +490,23 @@ export function UnifiedGridBuilder({
 
   // Removed: canvas.selection toggle - always keep false to disable multi-select box
 
+  // Helper function to find parent container for boundary checking
+  const findParentContainer = (elementData: any) => {
+    // Check for room parent
+    if (elementData.room_id) {
+      return dataRef.current.rooms?.find(r => r.id === elementData.room_id);
+    }
+    // Check for zone parent
+    if (elementData.zone_id) {
+      return dataRef.current.zones?.find(z => z.id === elementData.zone_id);
+    }
+    // Check for outside area parent
+    if (elementData.outside_id) {
+      return dataRef.current.outsideAreas?.find(a => a.id === elementData.outside_id);
+    }
+    return null;
+  };
+
   // Canvas-level event handlers for element interaction
   useEffect(() => {
     if (!canvas) return;
@@ -499,13 +516,34 @@ export function UnifiedGridBuilder({
       if (!obj?.data) return;
 
       const { type } = obj.data;
-      const left = obj.left || 0;
-      const top = obj.top || 0;
+      let left = obj.left || 0;
+      let top = obj.top || 0;
+
+      // Find parent container for boundary constraints
+      const parent = findParentContainer(obj.data);
+      
+      if (parent && (type === 'lane' || type === 'station' || type === 'storage')) {
+        const parentX = (parent.grid_x || 0) * CELL_SIZE;
+        const parentY = (parent.grid_y || 0) * CELL_SIZE;
+        const parentWidth = (parent.grid_width || 0) * CELL_SIZE;
+        const parentHeight = (parent.grid_height || 0) * CELL_SIZE;
+        
+        const objWidth = (obj._objects?.[0]?.width || 0) * (obj.scaleX || 1);
+        const objHeight = (obj._objects?.[0]?.height || 0) * (obj.scaleY || 1);
+        
+        // Clamp to parent boundaries
+        const minLeft = parentX;
+        const maxLeft = parentX + parentWidth - objWidth;
+        const minTop = parentY;
+        const maxTop = parentY + parentHeight - objHeight;
+        
+        left = Math.max(minLeft, Math.min(maxLeft, left));
+        top = Math.max(minTop, Math.min(maxTop, top));
+      }
 
       const snappedLeft = Math.round(left / CELL_SIZE) * CELL_SIZE;
       const snappedTop = Math.round(top / CELL_SIZE) * CELL_SIZE;
 
-      // Allow lanes to move horizontally - removed forced left: 0
       obj.set({ left: snappedLeft, top: snappedTop });
 
       // Visual feedback for validation during drag
@@ -545,8 +583,26 @@ export function UnifiedGridBuilder({
       const baseWidth = baseGridWidth * CELL_SIZE;
       const baseHeight = baseGridHeight * CELL_SIZE;
 
-      const newWidth = Math.round((baseWidth * scaleX) / CELL_SIZE) * CELL_SIZE;
-      const newHeight = Math.round((baseHeight * scaleY) / CELL_SIZE) * CELL_SIZE;
+      let newWidth = Math.round((baseWidth * scaleX) / CELL_SIZE) * CELL_SIZE;
+      let newHeight = Math.round((baseHeight * scaleY) / CELL_SIZE) * CELL_SIZE;
+
+      // Constrain resize to parent boundaries
+      const parent = findParentContainer(obj.data);
+      if (parent && (obj.data.type === 'lane' || obj.data.type === 'station' || obj.data.type === 'storage')) {
+        const parentWidth = (parent.grid_width || 0) * CELL_SIZE;
+        const parentHeight = (parent.grid_height || 0) * CELL_SIZE;
+        const objLeft = obj.left || 0;
+        const objTop = obj.top || 0;
+        const parentX = (parent.grid_x || 0) * CELL_SIZE;
+        const parentY = (parent.grid_y || 0) * CELL_SIZE;
+        
+        // Max size considering current position
+        const maxWidth = parentX + parentWidth - objLeft;
+        const maxHeight = parentY + parentHeight - objTop;
+        
+        newWidth = Math.min(newWidth, maxWidth);
+        newHeight = Math.min(newHeight, maxHeight);
+      }
 
       rect.set({ width: newWidth, height: newHeight });
       obj.set({ scaleX: 1, scaleY: 1 });
