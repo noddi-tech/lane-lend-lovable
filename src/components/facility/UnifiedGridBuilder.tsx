@@ -198,6 +198,7 @@ export function UnifiedGridBuilder({
   
   // Use refs for panning state to avoid stale closures
   const isPanningRef = useRef(false);
+  const renderingInProgress = useRef(false);
   const lastPanPointRef = useRef<{ x: number; y: number } | null>(null);
   
   // Ref to prevent infinite loop when programmatically setting selection
@@ -577,6 +578,12 @@ export function UnifiedGridBuilder({
     };
 
     const handleObjectModified = (e: any) => {
+      // Ignore modifications during initial rendering
+      if (renderingInProgress.current) {
+        console.log('⏸️ Ignoring object:modified during rendering');
+        return;
+      }
+
       const obj = e.target;
       if (!obj?.data) return;
 
@@ -625,6 +632,7 @@ export function UnifiedGridBuilder({
         callbacksRef.current.onGateMove?.(id, gridX, gridY);
         callbacksRef.current.onGateResize?.(id, gridWidth, gridHeight);
       } else if (type === 'lane') {
+        console.log(`🚗 Lane moved: id=${id}, gridX=${gridX}, gridY=${gridY}, gridWidth=${gridWidth}, gridHeight=${gridHeight}`);
         callbacksRef.current.onLaneMove?.(id, gridX, gridY);
         callbacksRef.current.onLaneResize?.(id, gridWidth, gridHeight);
       } else if (type === 'station') {
@@ -743,6 +751,9 @@ export function UnifiedGridBuilder({
 
   useEffect(() => {
     if (!canvas || !canvas.upperCanvasEl) return;
+
+    // Set flag to ignore object:modified events during rendering
+    renderingInProgress.current = true;
 
     canvas.clear();
     canvas.backgroundColor = COLORS.facility.background;
@@ -1168,6 +1179,11 @@ export function UnifiedGridBuilder({
     });
 
     canvas.renderAll();
+
+    // Reset flag after a small delay to allow all Fabric.js events to settle
+    setTimeout(() => {
+      renderingInProgress.current = false;
+    }, 100);
   }, [canvas, gridWidth, gridHeight, gates, lanes, stations, rooms, outsideAreas, storageLocations, zones, editMode]);
 
   // Clear selection when switching to incompatible edit mode
