@@ -502,17 +502,20 @@ export function UnifiedGridBuilder({
 
   // Helper function to find parent container for boundary checking
   const findParentContainer = (elementData: any) => {
+    // Parent IDs are stored in originalData
+    const data = elementData.originalData || elementData;
+    
     // Check for room parent
-    if (elementData.room_id) {
-      return dataRef.current.rooms?.find(r => r.id === elementData.room_id);
+    if (data.room_id) {
+      return dataRef.current.rooms?.find(r => r.id === data.room_id);
     }
     // Check for zone parent
-    if (elementData.zone_id) {
-      return dataRef.current.zones?.find(z => z.id === elementData.zone_id);
+    if (data.zone_id) {
+      return dataRef.current.zones?.find(z => z.id === data.zone_id);
     }
     // Check for outside area parent
-    if (elementData.outside_id) {
-      return dataRef.current.outsideAreas?.find(a => a.id === elementData.outside_id);
+    if (data.outside_id) {
+      return dataRef.current.outsideAreas?.find(a => a.id === data.outside_id);
     }
     return null;
   };
