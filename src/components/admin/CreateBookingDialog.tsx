@@ -1,0 +1,388 @@
+import { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { format } from 'date-fns';
+import { CalendarIcon, Clock, Loader2 } from 'lucide-react';
+import { useSalesItems } from '@/hooks/useSalesItems';
+import { useLanes } from '@/hooks/admin/useLanes';
+import { useAvailability } from '@/hooks/useAvailability';
+import { useCreateAdhocBooking, useCreateScheduledBooking } from '@/hooks/admin/useCreateAdminBooking';
+import { cn } from '@/lib/utils';
+import type { AvailabilitySlot } from '@/types/booking';
+
+interface Props {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export default function CreateBookingDialog({ open, onOpenChange }: Props) {
+  const [tab, setTab] = useState<string>('scheduled');
+
+  const handleClose = () => {
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Create Booking</DialogTitle>
+        </DialogHeader>
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="scheduled">Scheduled</TabsTrigger>
+            <TabsTrigger value="adhoc">Ad-hoc</TabsTrigger>
+          </TabsList>
+          <TabsContent value="scheduled">
+            <ScheduledBookingForm onSuccess={handleClose} />
+          </TabsContent>
+          <TabsContent value="adhoc">
+            <AdhocBookingForm onSuccess={handleClose} />
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Scheduled Booking Form ──
+function ScheduledBookingForm({ onSuccess }: { onSuccess: () => void }) {
+  const [step, setStep] = useState(1);
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(null);
+  const [vehicleMake, setVehicleMake] = useState('');
+  const [vehicleModel, setVehicleModel] = useState('');
+  const [vehicleYear, setVehicleYear] = useState('');
+  const [vehicleReg, setVehicleReg] = useState('');
+  const [adminNotes, setAdminNotes] = useState('');
+
+  const { data: salesItems } = useSalesItems();
+  const { data: availability, isLoading: loadingSlots } = useAvailability({
+    date: selectedDate,
+    salesItemIds: selectedItems,
+  });
+  const createBooking = useCreateScheduledBooking();
+
+  const toggleItem = (id: string) => {
+    setSelectedItems(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+    setSelectedSlot(null);
+  };
+
+  const handleSubmit = () => {
+    if (!selectedSlot) return;
+    createBooking.mutate(
+      {
+        sales_item_ids: selectedItems,
+        delivery_window_starts_at: selectedSlot.starts_at,
+        delivery_window_ends_at: selectedSlot.ends_at,
+        lane_id: selectedSlot.lane_id,
+        vehicle_make: vehicleMake || undefined,
+        vehicle_model: vehicleModel || undefined,
+        vehicle_year: vehicleYear ? parseInt(vehicleYear) : undefined,
+        vehicle_registration: vehicleReg || undefined,
+        admin_notes: adminNotes || undefined,
+      },
+      { onSuccess }
+    );
+  };
+
+  return (
+    <div className="space-y-4 pt-4">
+      {/* Step 1: Sales Items */}
+      {step === 1 && (
+        <div className="space-y-3">
+          <h3 className="font-medium text-sm text-muted-foreground">Step 1: Select Services</h3>
+          <div className="grid gap-2">
+            {salesItems?.map(item => (
+              <label
+                key={item.id}
+                className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/50"
+              >
+                <Checkbox
+                  checked={selectedItems.includes(item.id)}
+                  onCheckedChange={() => toggleItem(item.id)}
+                />
+                <div className="flex-1">
+                  <div className="font-medium text-sm">{item.name}</div>
+                  {item.description && (
+                    <div className="text-xs text-muted-foreground">{item.description}</div>
+                  )}
+                </div>
+                <Badge variant="outline">
+                  {Math.round(item.service_time_seconds / 60)} min
+                </Badge>
+              </label>
+            ))}
+          </div>
+          <Button
+            onClick={() => setStep(2)}
+            disabled={selectedItems.length === 0}
+            className="w-full"
+          >
+            Next: Pick Date & Slot
+          </Button>
+        </div>
+      )}
+
+      {/* Step 2: Date + Slot */}
+      {step === 2 && (
+        <div className="space-y-3">
+          <h3 className="font-medium text-sm text-muted-foreground">Step 2: Pick Date & Slot</h3>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className={cn('w-full justify-start text-left', !selectedDate && 'text-muted-foreground')}>
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {selectedDate ? format(selectedDate, 'PPP') : 'Select date'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar
+                mode="single"
+                selected={selectedDate || undefined}
+                onSelect={(d) => { setSelectedDate(d || null); setSelectedSlot(null); }}
+                disabled={(d) => d < new Date()}
+              />
+            </PopoverContent>
+          </Popover>
+
+          {loadingSlots && (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          )}
+
+          {availability?.slots && availability.slots.length > 0 && (
+            <div className="grid gap-2 max-h-48 overflow-y-auto">
+              {availability.slots.map(slot => (
+                <Card
+                  key={`${slot.interval_id}-${slot.lane_id}`}
+                  className={cn(
+                    'cursor-pointer transition-colors',
+                    selectedSlot?.interval_id === slot.interval_id && selectedSlot?.lane_id === slot.lane_id
+                      ? 'border-primary bg-primary/5'
+                      : 'hover:bg-muted/50'
+                  )}
+                  onClick={() => setSelectedSlot(slot)}
+                >
+                  <CardContent className="p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">
+                        {format(new Date(slot.starts_at), 'HH:mm')} – {format(new Date(slot.ends_at), 'HH:mm')}
+                      </span>
+                    </div>
+                    <Badge variant="outline">{slot.lane_name}</Badge>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {selectedDate && !loadingSlots && availability?.slots?.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              No available slots on this date
+            </p>
+          )}
+
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
+              Back
+            </Button>
+            <Button onClick={() => setStep(3)} disabled={!selectedSlot} className="flex-1">
+              Next: Vehicle Info
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 3: Vehicle + Notes + Submit */}
+      {step === 3 && (
+        <div className="space-y-3">
+          <h3 className="font-medium text-sm text-muted-foreground">Step 3: Vehicle & Notes (optional)</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Make</Label>
+              <Input value={vehicleMake} onChange={e => setVehicleMake(e.target.value)} placeholder="e.g. Toyota" />
+            </div>
+            <div>
+              <Label>Model</Label>
+              <Input value={vehicleModel} onChange={e => setVehicleModel(e.target.value)} placeholder="e.g. Corolla" />
+            </div>
+            <div>
+              <Label>Year</Label>
+              <Input value={vehicleYear} onChange={e => setVehicleYear(e.target.value)} placeholder="e.g. 2022" type="number" />
+            </div>
+            <div>
+              <Label>Registration</Label>
+              <Input value={vehicleReg} onChange={e => setVehicleReg(e.target.value)} placeholder="e.g. AB 12345" />
+            </div>
+          </div>
+          <div>
+            <Label>Admin Notes</Label>
+            <Textarea value={adminNotes} onChange={e => setAdminNotes(e.target.value)} placeholder="Internal notes..." rows={2} />
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setStep(2)} className="flex-1">
+              Back
+            </Button>
+            <Button onClick={handleSubmit} disabled={createBooking.isPending} className="flex-1">
+              {createBooking.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Create Booking
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Ad-hoc Booking Form ──
+function AdhocBookingForm({ onSuccess }: { onSuccess: () => void }) {
+  const [laneId, setLaneId] = useState('');
+  const [date, setDate] = useState('');
+  const [startTime, setStartTime] = useState('08:00');
+  const [endTime, setEndTime] = useState('09:00');
+  const [serviceMinutes, setServiceMinutes] = useState('60');
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [vehicleMake, setVehicleMake] = useState('');
+  const [vehicleModel, setVehicleModel] = useState('');
+  const [vehicleYear, setVehicleYear] = useState('');
+  const [vehicleReg, setVehicleReg] = useState('');
+  const [adminNotes, setAdminNotes] = useState('');
+
+  const { data: lanes } = useLanes();
+  const { data: salesItems } = useSalesItems();
+  const createAdhoc = useCreateAdhocBooking();
+
+  const toggleItem = (id: string) => {
+    setSelectedItems(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleSubmit = () => {
+    if (!laneId || !date || !startTime || !endTime) return;
+
+    const startsAt = new Date(`${date}T${startTime}:00`).toISOString();
+    const endsAt = new Date(`${date}T${endTime}:00`).toISOString();
+
+    createAdhoc.mutate(
+      {
+        lane_id: laneId,
+        delivery_window_starts_at: startsAt,
+        delivery_window_ends_at: endsAt,
+        service_time_seconds: parseInt(serviceMinutes) * 60,
+        sales_item_ids: selectedItems.length > 0 ? selectedItems : undefined,
+        vehicle_make: vehicleMake || undefined,
+        vehicle_model: vehicleModel || undefined,
+        vehicle_year: vehicleYear ? parseInt(vehicleYear) : undefined,
+        vehicle_registration: vehicleReg || undefined,
+        admin_notes: adminNotes || undefined,
+      },
+      { onSuccess }
+    );
+  };
+
+  const isValid = laneId && date && startTime && endTime && parseInt(serviceMinutes) > 0;
+
+  return (
+    <div className="space-y-4 pt-4">
+      {/* Lane */}
+      <div>
+        <Label>Lane *</Label>
+        <Select value={laneId} onValueChange={setLaneId}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select lane" />
+          </SelectTrigger>
+          <SelectContent>
+            {lanes?.map(lane => (
+              <SelectItem key={lane.id} value={lane.id}>{lane.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Date + Time */}
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <Label>Date *</Label>
+          <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
+        </div>
+        <div>
+          <Label>Start *</Label>
+          <Input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
+        </div>
+        <div>
+          <Label>End *</Label>
+          <Input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
+        </div>
+      </div>
+
+      {/* Service time */}
+      <div>
+        <Label>Service Time (minutes) *</Label>
+        <Input type="number" value={serviceMinutes} onChange={e => setServiceMinutes(e.target.value)} min="1" />
+      </div>
+
+      {/* Sales items (optional) */}
+      <div>
+        <Label className="text-muted-foreground">Sales Items (optional)</Label>
+        <div className="grid gap-1 mt-1 max-h-32 overflow-y-auto">
+          {salesItems?.map(item => (
+            <label key={item.id} className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox
+                checked={selectedItems.includes(item.id)}
+                onCheckedChange={() => toggleItem(item.id)}
+              />
+              {item.name}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Vehicle info */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label className="text-muted-foreground">Make</Label>
+          <Input value={vehicleMake} onChange={e => setVehicleMake(e.target.value)} placeholder="e.g. Toyota" />
+        </div>
+        <div>
+          <Label className="text-muted-foreground">Model</Label>
+          <Input value={vehicleModel} onChange={e => setVehicleModel(e.target.value)} placeholder="e.g. Corolla" />
+        </div>
+        <div>
+          <Label className="text-muted-foreground">Year</Label>
+          <Input value={vehicleYear} onChange={e => setVehicleYear(e.target.value)} type="number" />
+        </div>
+        <div>
+          <Label className="text-muted-foreground">Registration</Label>
+          <Input value={vehicleReg} onChange={e => setVehicleReg(e.target.value)} />
+        </div>
+      </div>
+
+      {/* Notes */}
+      <div>
+        <Label className="text-muted-foreground">Admin Notes</Label>
+        <Textarea value={adminNotes} onChange={e => setAdminNotes(e.target.value)} rows={2} />
+      </div>
+
+      <Button onClick={handleSubmit} disabled={!isValid || createAdhoc.isPending} className="w-full">
+        {createAdhoc.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+        Create Ad-hoc Booking
+      </Button>
+    </div>
+  );
+}
