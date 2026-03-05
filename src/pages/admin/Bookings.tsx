@@ -3,32 +3,25 @@ import { useAllBookings, useUpdateBookingStatus } from '@/hooks/admin/useAllBook
 import { useLanes } from '@/hooks/admin/useLanes';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format } from 'date-fns';
-import { Calendar, CheckCircle } from 'lucide-react';
+import { Calendar, CheckCircle, Plus } from 'lucide-react';
+import CreateBookingDialog from '@/components/admin/CreateBookingDialog';
 
 export default function AdminBookings() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [laneFilter, setLaneFilter] = useState<string>('all');
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [adminNotes, setAdminNotes] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
 
   const { data: lanes } = useLanes();
   const { data: bookings, isLoading } = useAllBookings({
@@ -44,17 +37,25 @@ export default function AdminBookings() {
     setAdminNotes('');
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, isAdhoc?: boolean) => {
+    const badges = [];
+    if (isAdhoc) {
+      badges.push(<Badge key="adhoc" variant="outline" className="text-xs bg-accent/10">Ad-hoc</Badge>);
+    }
     switch (status) {
       case 'confirmed':
-        return <Badge variant="default">Confirmed</Badge>;
+        badges.push(<Badge key="status" variant="default">Confirmed</Badge>);
+        break;
       case 'completed':
-        return <Badge className="bg-accent text-accent-foreground">Completed</Badge>;
+        badges.push(<Badge key="status" className="bg-accent text-accent-foreground">Completed</Badge>);
+        break;
       case 'cancelled':
-        return <Badge variant="destructive">Cancelled</Badge>;
+        badges.push(<Badge key="status" variant="destructive">Cancelled</Badge>);
+        break;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        badges.push(<Badge key="status" variant="outline">{status}</Badge>);
     }
+    return <div className="flex gap-1">{badges}</div>;
   };
 
   if (isLoading) {
@@ -67,9 +68,15 @@ export default function AdminBookings() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">All Bookings</h1>
-        <p className="text-muted-foreground mt-1">View and manage all customer bookings</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">All Bookings</h1>
+          <p className="text-muted-foreground mt-1">View and manage all customer bookings</p>
+        </div>
+        <Button onClick={() => setCreateOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          New Booking
+        </Button>
       </div>
 
       <Card>
@@ -99,9 +106,7 @@ export default function AdminBookings() {
                 <SelectContent>
                   <SelectItem value="all">All Lanes</SelectItem>
                   {lanes?.map((lane) => (
-                    <SelectItem key={lane.id} value={lane.id}>
-                      {lane.name}
-                    </SelectItem>
+                    <SelectItem key={lane.id} value={lane.id}>{lane.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -121,24 +126,22 @@ export default function AdminBookings() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {bookings?.map((booking) => (
+              {bookings?.map((booking: any) => (
                 <TableRow key={booking.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedBooking(booking)}>
                   <TableCell>
-                    <div className="font-medium">{booking.profiles?.full_name || 'N/A'}</div>
+                    <div className="font-medium">{booking.profiles?.full_name || 'Walk-in'}</div>
                     <div className="text-xs text-muted-foreground">{booking.profiles?.email}</div>
                   </TableCell>
-                  <TableCell>
-                    {booking.vehicle_registration || 'N/A'}
-                  </TableCell>
+                  <TableCell>{booking.vehicle_registration || 'N/A'}</TableCell>
                   <TableCell>
                     <div>{format(new Date(booking.delivery_window_starts_at), 'MMM d, yyyy')}</div>
                     <div className="text-xs text-muted-foreground">
-                      {format(new Date(booking.delivery_window_starts_at), 'HH:mm')} - 
+                      {format(new Date(booking.delivery_window_starts_at), 'HH:mm')} –{' '}
                       {format(new Date(booking.delivery_window_ends_at), 'HH:mm')}
                     </div>
                   </TableCell>
                   <TableCell>{booking.lanes?.name}</TableCell>
-                  <TableCell>{getStatusBadge(booking.status)}</TableCell>
+                  <TableCell>{getStatusBadge(booking.status, booking.is_adhoc)}</TableCell>
                   <TableCell className="text-right">
                     {booking.status === 'confirmed' && (
                       <Button
@@ -160,13 +163,12 @@ export default function AdminBookings() {
           </Table>
 
           {!bookings?.length && (
-            <div className="text-center py-8 text-muted-foreground">
-              No bookings found
-            </div>
+            <div className="text-center py-8 text-muted-foreground">No bookings found</div>
           )}
         </CardContent>
       </Card>
 
+      {/* Booking Detail Dialog */}
       <Dialog open={!!selectedBooking} onOpenChange={() => setSelectedBooking(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -177,7 +179,7 @@ export default function AdminBookings() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <div className="text-sm text-muted-foreground">Customer</div>
-                  <div className="font-medium">{selectedBooking.profiles?.full_name || 'N/A'}</div>
+                  <div className="font-medium">{selectedBooking.profiles?.full_name || 'Walk-in'}</div>
                   <div className="text-sm">{selectedBooking.profiles?.email}</div>
                 </div>
                 <div>
@@ -188,12 +190,13 @@ export default function AdminBookings() {
                   <div className="text-sm">{selectedBooking.vehicle_registration}</div>
                 </div>
               </div>
-
+              {selectedBooking.is_adhoc && (
+                <Badge variant="outline" className="bg-accent/10">Ad-hoc Booking (Manual)</Badge>
+              )}
               <div>
                 <div className="text-sm text-muted-foreground">Customer Notes</div>
                 <div className="text-sm">{selectedBooking.customer_notes || 'None'}</div>
               </div>
-
               <div>
                 <div className="text-sm text-muted-foreground mb-2">Admin Notes</div>
                 <Textarea
@@ -203,11 +206,8 @@ export default function AdminBookings() {
                   rows={3}
                 />
               </div>
-
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setSelectedBooking(null)}>
-                  Close
-                </Button>
+                <Button variant="outline" onClick={() => setSelectedBooking(null)}>Close</Button>
                 {selectedBooking.status === 'confirmed' && (
                   <Button onClick={() => handleUpdateStatus(selectedBooking.id, 'completed')}>
                     Mark Complete
@@ -218,6 +218,8 @@ export default function AdminBookings() {
           )}
         </DialogContent>
       </Dialog>
+
+      <CreateBookingDialog open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   );
 }

@@ -161,6 +161,7 @@ export type Database = {
           delivery_window_ends_at: string
           delivery_window_starts_at: string
           id: string
+          is_adhoc: boolean
           lane_id: string
           service_time_seconds: number
           status: string | null
@@ -179,6 +180,7 @@ export type Database = {
           delivery_window_ends_at: string
           delivery_window_starts_at: string
           id?: string
+          is_adhoc?: boolean
           lane_id: string
           service_time_seconds: number
           status?: string | null
@@ -197,6 +199,7 @@ export type Database = {
           delivery_window_ends_at?: string
           delivery_window_starts_at?: string
           id?: string
+          is_adhoc?: boolean
           lane_id?: string
           service_time_seconds?: number
           status?: string | null

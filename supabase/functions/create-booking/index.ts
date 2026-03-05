@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.76.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 interface CreateBookingRequest {
@@ -16,6 +16,11 @@ interface CreateBookingRequest {
   vehicle_year?: number;
   vehicle_registration?: string;
   customer_notes?: string;
+  admin_notes?: string;
+  is_adhoc?: boolean;
+  admin_override?: boolean;
+  customer_user_id?: string;
+  service_time_seconds?: number;
 }
 
 Deno.serve(async (req) => {
@@ -24,64 +29,144 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Missing authorization header');
-    }
-
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    // Get user from JWT
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      throw new Error('Unauthorized');
-    }
-
     const bookingData: CreateBookingRequest = await req.json();
-    console.log('Creating booking for user:', user.id, bookingData);
+    const isAdhoc = bookingData.is_adhoc === true;
+    const isAdminOverride = bookingData.admin_override === true;
 
-    // Validate lane exists and is not closed
+    let userId: string | null = null;
+
+    // For admin override, use service role key and skip user JWT
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
+    if (isAdminOverride) {
+      // Verify the caller is an admin via their JWT
+      const authHeader = req.headers.get('Authorization');
+      if (authHeader) {
+        const verifyClient = createClient(supabaseUrl, serviceRoleKey, {
+          global: { headers: { Authorization: authHeader } },
+        });
+        const { data: { user }, error: authError } = await verifyClient.auth.getUser();
+        if (authError || !user) {
+          throw new Error('Unauthorized');
+        }
+        // Check admin role
+        const adminCheck = createClient(supabaseUrl, serviceRoleKey);
+        const { data: roleData } = await adminCheck
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('role', 'admin')
+          .maybeSingle();
+        if (!roleData) {
+          throw new Error('Admin access required');
+        }
+      } else {
+        throw new Error('Missing authorization header');
+      }
+
+      // Use customer_user_id if provided, otherwise null (walk-in)
+      userId = bookingData.customer_user_id || null;
+    } else {
+      // Normal user flow
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader) {
+        throw new Error('Missing authorization header');
+      }
+      const supabase = createClient(supabaseUrl, serviceRoleKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        throw new Error('Unauthorized');
+      }
+      userId = user.id;
+    }
+
+    // Use service role client for all DB operations
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    console.log('Creating booking:', { userId, isAdhoc, isAdminOverride });
+
+    // ── Ad-hoc booking: skip all capacity logic ──
+    if (isAdhoc) {
+      const totalServiceTime = bookingData.service_time_seconds ||
+        (bookingData.sales_item_ids?.length
+          ? await calculateServiceTime(supabase, bookingData.sales_item_ids)
+          : 3600);
+
+      const { data: booking, error: bookingError } = await supabase
+        .from('bookings')
+        .insert({
+          user_id: userId,
+          lane_id: bookingData.lane_id,
+          address_id: bookingData.address_id,
+          delivery_window_starts_at: bookingData.delivery_window_starts_at,
+          delivery_window_ends_at: bookingData.delivery_window_ends_at,
+          service_time_seconds: totalServiceTime,
+          vehicle_make: bookingData.vehicle_make,
+          vehicle_model: bookingData.vehicle_model,
+          vehicle_year: bookingData.vehicle_year,
+          vehicle_registration: bookingData.vehicle_registration,
+          customer_notes: bookingData.customer_notes,
+          admin_notes: bookingData.admin_notes,
+          is_adhoc: true,
+          status: 'confirmed',
+        })
+        .select()
+        .single();
+
+      if (bookingError) {
+        console.error('Ad-hoc booking error:', bookingError);
+        throw new Error('Failed to create ad-hoc booking');
+      }
+
+      // Optionally link sales items
+      if (bookingData.sales_item_ids?.length) {
+        await supabase.from('booking_sales_items').insert(
+          bookingData.sales_item_ids.map(id => ({
+            booking_id: booking.id,
+            sales_item_id: id,
+          }))
+        );
+      }
+
+      console.log('Ad-hoc booking created:', booking.id);
+      return new Response(
+        JSON.stringify({ booking_id: booking.id, status: 'confirmed', is_adhoc: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ── Capacity-managed booking (existing logic) ──
+
+    // Validate lane
     const { data: lane, error: laneError } = await supabase
       .from('lanes')
       .select('id, name, closed_for_new_bookings_at')
       .eq('id', bookingData.lane_id)
       .single();
 
-    if (laneError || !lane) {
-      throw new Error('Lane not found');
-    }
-
+    if (laneError || !lane) throw new Error('Lane not found');
     if (lane.closed_for_new_bookings_at && new Date(lane.closed_for_new_bookings_at) < new Date()) {
       throw new Error(`Lane "${lane.name}" is closed for new bookings`);
     }
 
-    // Get required capabilities from selected services
+    // Get required capabilities
     const { data: requiredCapabilities } = await supabase
       .from('sales_item_capabilities')
       .select('capability_id')
       .in('sales_item_id', bookingData.sales_item_ids);
 
     const requiredCapabilityIds = [...new Set(requiredCapabilities?.map(c => c.capability_id) || [])];
-    console.log('Required capabilities:', requiredCapabilityIds);
 
-    // Find active stations in this lane that have all required capabilities
+    // Find compatible stations
     const { data: allStations } = await supabase
       .from('stations')
-      .select(`
-        id,
-        name,
-        grid_position_x,
-        grid_position_y,
-        station_capabilities!inner(capability_id)
-      `)
+      .select(`id, name, grid_position_x, grid_position_y, station_capabilities!inner(capability_id)`)
       .eq('lane_id', bookingData.lane_id)
       .eq('active', true);
 
-    // Filter stations that have ALL required capabilities
     const compatibleStations = (allStations || []).filter((station: any) => {
       const stationCapIds = station.station_capabilities.map((sc: any) => sc.capability_id);
       return requiredCapabilityIds.every(capId => stationCapIds.includes(capId));
@@ -91,25 +176,15 @@ Deno.serve(async (req) => {
       throw new Error('No stations available with required capabilities');
     }
 
-    // Sort by grid position for logical flow through facility
     compatibleStations.sort((a: any, b: any) => {
-      if (a.grid_position_x !== b.grid_position_x) {
-        return a.grid_position_x - b.grid_position_x;
-      }
+      if (a.grid_position_x !== b.grid_position_x) return a.grid_position_x - b.grid_position_x;
       return a.grid_position_y - b.grid_position_y;
     });
 
-    // Automatically assign station sequence (use all compatible stations)
     const assignedStationIds = compatibleStations.map((s: any) => s.id);
-    console.log('Auto-assigned stations:', assignedStationIds);
 
-    // Calculate total service time
-    const { data: salesItems } = await supabase
-      .from('sales_items')
-      .select('service_time_seconds')
-      .in('id', bookingData.sales_item_ids);
-
-    const totalServiceTime = salesItems?.reduce((sum, item) => sum + item.service_time_seconds, 0) || 0;
+    // Calculate service time
+    const totalServiceTime = await calculateServiceTime(supabase, bookingData.sales_item_ids);
 
     // Get overlapping intervals
     const { data: intervals, error: intError } = await supabase
@@ -123,13 +198,11 @@ Deno.serve(async (req) => {
       throw new Error('No capacity intervals found for delivery window');
     }
 
-    console.log(`Found ${intervals.length} overlapping intervals`);
-
     // Create booking
     const { data: booking, error: bookingError } = await supabase
       .from('bookings')
       .insert({
-        user_id: user.id,
+        user_id: userId,
         lane_id: bookingData.lane_id,
         address_id: bookingData.address_id,
         delivery_window_starts_at: bookingData.delivery_window_starts_at,
@@ -140,6 +213,8 @@ Deno.serve(async (req) => {
         vehicle_year: bookingData.vehicle_year,
         vehicle_registration: bookingData.vehicle_registration,
         customer_notes: bookingData.customer_notes,
+        admin_notes: bookingData.admin_notes,
+        is_adhoc: false,
         status: 'confirmed',
       })
       .select()
@@ -150,17 +225,13 @@ Deno.serve(async (req) => {
       throw new Error('Failed to create booking');
     }
 
-    console.log('Booking created:', booking.id);
-
-    // Insert booking_stations records with automatically assigned sequence
+    // Insert booking_stations
     const stationServiceTime = Math.floor(totalServiceTime / assignedStationIds.length);
     let cumulativeTime = 0;
-    
     const bookingStationsData = assignedStationIds.map((stId, index) => {
       const startTime = new Date(new Date(bookingData.delivery_window_starts_at).getTime() + cumulativeTime * 1000);
       const endTime = new Date(startTime.getTime() + stationServiceTime * 1000);
       cumulativeTime += stationServiceTime;
-      
       return {
         booking_id: booking.id,
         station_id: stId,
@@ -175,47 +246,30 @@ Deno.serve(async (req) => {
       .insert(bookingStationsData);
 
     if (bookingStationsError) {
-      console.error('Failed to insert booking stations:', bookingStationsError);
       throw new Error('Failed to create booking station sequence');
     }
 
-    console.log(`Auto-assigned ${assignedStationIds.length} stations to booking`);
-
-    // Calculate total window duration for pro-rata distribution
+    // Distribute service time across intervals
     const windowStart = new Date(bookingData.delivery_window_starts_at).getTime();
     const windowEnd = new Date(bookingData.delivery_window_ends_at).getTime();
     const totalWindowDuration = (windowEnd - windowStart) / 1000;
 
-    // Distribute service time across intervals
     for (const interval of intervals) {
       const intervalStart = new Date(interval.starts_at).getTime();
       const intervalEnd = new Date(interval.ends_at).getTime();
-
       const overlapStart = Math.max(windowStart, intervalStart);
       const overlapEnd = Math.min(windowEnd, intervalEnd);
       const overlapDuration = (overlapEnd - overlapStart) / 1000;
-
       if (overlapDuration <= 0) continue;
 
       const proRataSeconds = Math.round((overlapDuration / totalWindowDuration) * totalServiceTime);
 
-      console.log(`Interval ${interval.id}: allocating ${proRataSeconds}s`);
+      await supabase.from('booking_intervals').insert({
+        booking_id: booking.id,
+        interval_id: interval.id,
+        booked_seconds: proRataSeconds,
+      });
 
-      // Insert booking_intervals
-      const { error: biError } = await supabase
-        .from('booking_intervals')
-        .insert({
-          booking_id: booking.id,
-          interval_id: interval.id,
-          booked_seconds: proRataSeconds,
-        });
-
-      if (biError) {
-        console.error('Error inserting booking_interval:', biError);
-        throw new Error('Failed to create booking intervals');
-      }
-
-      // Update lane capacity
       const { data: existingCapacity } = await supabase
         .from('lane_interval_capacity')
         .select('total_booked_seconds')
@@ -224,18 +278,11 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       const newBookedSeconds = (existingCapacity?.total_booked_seconds || 0) + proRataSeconds;
-
-      const { error: licError } = await supabase
-        .from('lane_interval_capacity')
-        .upsert({
-          interval_id: interval.id,
-          lane_id: bookingData.lane_id,
-          total_booked_seconds: newBookedSeconds,
-        });
-
-      if (licError) {
-        console.error('Error updating lane_interval_capacity:', licError);
-      }
+      await supabase.from('lane_interval_capacity').upsert({
+        interval_id: interval.id,
+        lane_id: bookingData.lane_id,
+        total_booked_seconds: newBookedSeconds,
+      });
     }
 
     // Insert booking_sales_items
@@ -248,18 +295,13 @@ Deno.serve(async (req) => {
       .from('booking_sales_items')
       .insert(salesItemInserts);
 
-    if (bsiError) {
-      console.error('Error inserting booking_sales_items:', bsiError);
-      throw new Error('Failed to link services to booking');
-    }
-
-    console.log('Booking created successfully:', booking.id);
+    if (bsiError) throw new Error('Failed to link services to booking');
 
     return new Response(
-      JSON.stringify({ 
-        booking_id: booking.id, 
+      JSON.stringify({
+        booking_id: booking.id,
         status: 'confirmed',
-        assigned_stations: assignedStationIds 
+        assigned_stations: assignedStationIds,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -273,3 +315,11 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+async function calculateServiceTime(supabase: any, salesItemIds: string[]): Promise<number> {
+  const { data: salesItems } = await supabase
+    .from('sales_items')
+    .select('service_time_seconds')
+    .in('id', salesItemIds);
+  return salesItems?.reduce((sum: number, item: any) => sum + item.service_time_seconds, 0) || 0;
+}
