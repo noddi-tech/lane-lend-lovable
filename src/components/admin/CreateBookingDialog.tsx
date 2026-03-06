@@ -16,8 +16,10 @@ import { format } from 'date-fns';
 import { CalendarIcon, Clock, Loader2, Zap } from 'lucide-react';
 import { useSalesItems } from '@/hooks/useSalesItems';
 import { useLanes } from '@/hooks/admin/useLanes';
+import { useCompatibleLanes } from '@/hooks/admin/useCompatibleLanes';
 import { useAvailability } from '@/hooks/useAvailability';
 import { useCreateAdhocBooking, useCreateScheduledBooking } from '@/hooks/admin/useCreateAdminBooking';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { AvailabilitySlot } from '@/types/booking';
 import VehicleFields from './VehicleFields';
@@ -248,21 +250,51 @@ function ScheduledBookingForm({ onSuccess }: { onSuccess: () => void }) {
 // ── Ad-hoc Booking Form ──
 function AdhocBookingForm({ onSuccess }: { onSuccess: () => void }) {
   const [isNow, setIsNow] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [laneId, setLaneId] = useState('');
   const [date, setDate] = useState('');
   const [startTime, setStartTime] = useState('08:00');
   const [endTime, setEndTime] = useState('09:00');
   const [serviceMinutes, setServiceMinutes] = useState('60');
-  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [serviceTimeOverridden, setServiceTimeOverridden] = useState(false);
   const [vehicleMake, setVehicleMake] = useState('');
   const [vehicleModel, setVehicleModel] = useState('');
   const [vehicleYear, setVehicleYear] = useState('');
   const [vehicleReg, setVehicleReg] = useState('');
   const [adminNotes, setAdminNotes] = useState('');
 
-  const { data: lanes } = useLanes();
   const { data: salesItems } = useSalesItems();
+  const { data: compatibleLanes, isLoading: lanesLoading } = useCompatibleLanes(selectedItems);
   const createAdhoc = useCreateAdhocBooking();
+
+  // Auto-sum service time from selected sales items
+  useEffect(() => {
+    if (serviceTimeOverridden || !salesItems || selectedItems.length === 0) return;
+    const totalSeconds = salesItems
+      .filter(item => selectedItems.includes(item.id))
+      .reduce((sum, item) => sum + item.service_time_seconds, 0);
+    if (totalSeconds > 0) {
+      setServiceMinutes(String(Math.round(totalSeconds / 60)));
+    }
+  }, [selectedItems, salesItems, serviceTimeOverridden]);
+
+  // Reset lane if no longer compatible
+  useEffect(() => {
+    if (!laneId || !compatibleLanes) return;
+    if (!compatibleLanes.find(l => l.id === laneId)) {
+      setLaneId('');
+      if (selectedItems.length > 0) {
+        toast.info('Lane reset — no longer compatible with selected services');
+      }
+    }
+  }, [compatibleLanes, laneId, selectedItems.length]);
+
+  // Auto-select lane if only one compatible
+  useEffect(() => {
+    if (compatibleLanes?.length === 1 && !laneId) {
+      setLaneId(compatibleLanes[0].id);
+    }
+  }, [compatibleLanes, laneId]);
 
   // "Now" toggle logic
   const applyNow = () => {
@@ -293,6 +325,7 @@ function AdhocBookingForm({ onSuccess }: { onSuccess: () => void }) {
     setSelectedItems(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
+    setServiceTimeOverridden(false);
   };
 
   const handleSubmit = () => {
@@ -318,6 +351,7 @@ function AdhocBookingForm({ onSuccess }: { onSuccess: () => void }) {
   };
 
   const isValid = laneId && date && startTime && endTime && parseInt(serviceMinutes) > 0;
+  const isFiltered = selectedItems.length > 0;
 
   return (
     <div className="space-y-4 pt-4">
@@ -333,17 +367,46 @@ function AdhocBookingForm({ onSuccess }: { onSuccess: () => void }) {
         <Switch checked={isNow} onCheckedChange={handleNowToggle} />
       </div>
 
-      {/* Lane */}
+      {/* Services (Sales Items) — moved to top */}
       <div>
-        <Label>Lane *</Label>
+        <Label>Services</Label>
+        <div className="grid gap-1 mt-1 max-h-40 overflow-y-auto">
+          {salesItems?.map(item => (
+            <label key={item.id} className="flex items-center gap-3 p-2 rounded-lg border cursor-pointer hover:bg-muted/50">
+              <Checkbox
+                checked={selectedItems.includes(item.id)}
+                onCheckedChange={() => toggleItem(item.id)}
+              />
+              <div className="flex-1">
+                <div className="text-sm font-medium">{item.name}</div>
+              </div>
+              <Badge variant="outline">
+                {Math.round(item.service_time_seconds / 60)} min
+              </Badge>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Lane — filtered by capabilities */}
+      <div>
+        <Label>
+          Lane *
+          {isFiltered && (
+            <Badge variant="secondary" className="ml-2 text-xs">filtered by services</Badge>
+          )}
+        </Label>
         <Select value={laneId} onValueChange={setLaneId}>
           <SelectTrigger>
-            <SelectValue placeholder="Select lane" />
+            <SelectValue placeholder={lanesLoading ? 'Loading...' : 'Select lane'} />
           </SelectTrigger>
           <SelectContent>
-            {lanes?.map(lane => (
+            {compatibleLanes?.map(lane => (
               <SelectItem key={lane.id} value={lane.id}>{lane.name}</SelectItem>
             ))}
+            {compatibleLanes?.length === 0 && (
+              <div className="px-2 py-1.5 text-sm text-muted-foreground">No compatible lanes</div>
+            )}
           </SelectContent>
         </Select>
       </div>
@@ -366,24 +429,18 @@ function AdhocBookingForm({ onSuccess }: { onSuccess: () => void }) {
 
       {/* Service time */}
       <div>
-        <Label>Service Time (minutes) *</Label>
-        <Input type="number" value={serviceMinutes} onChange={e => setServiceMinutes(e.target.value)} min="1" />
-      </div>
-
-      {/* Sales items (optional) */}
-      <div>
-        <Label className="text-muted-foreground">Sales Items (optional)</Label>
-        <div className="grid gap-1 mt-1 max-h-32 overflow-y-auto">
-          {salesItems?.map(item => (
-            <label key={item.id} className="flex items-center gap-2 text-sm cursor-pointer">
-              <Checkbox
-                checked={selectedItems.includes(item.id)}
-                onCheckedChange={() => toggleItem(item.id)}
-              />
-              {item.name}
-            </label>
-          ))}
-        </div>
+        <Label>
+          Service Time (minutes) *
+          {selectedItems.length > 0 && !serviceTimeOverridden && (
+            <span className="text-xs text-muted-foreground ml-2">(auto-calculated)</span>
+          )}
+        </Label>
+        <Input
+          type="number"
+          value={serviceMinutes}
+          onChange={e => { setServiceMinutes(e.target.value); setServiceTimeOverridden(true); }}
+          min="1"
+        />
       </div>
 
       {/* Vehicle info */}
