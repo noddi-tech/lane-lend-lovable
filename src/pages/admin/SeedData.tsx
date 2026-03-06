@@ -150,6 +150,7 @@ export default function SeedData() {
       
       // Now safe to delete base entities
       await supabase.from('lanes_new' as any).delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('lanes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       await supabase.from('service_workers').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       await supabase.from('capabilities').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       await supabase.from('skills').delete().neq('id', '00000000-0000-0000-0000-000000000000');
@@ -313,21 +314,36 @@ export default function SeedData() {
     console.log('Assigned skills to workers');
 
     console.log('Creating sample lanes...');
-    const lanes = [
-      { name: 'Express Lane 1', open_time: '08:00', close_time: '17:00', position_order: 0, grid_position_x: 0, grid_position_y: 0, grid_width: 100, grid_height: 2, lane_type: 'service' },
-      { name: 'Express Lane 2', open_time: '08:00', close_time: '17:00', position_order: 1, grid_position_x: 0, grid_position_y: 2, grid_width: 100, grid_height: 2, lane_type: 'service' },
-      { name: 'Full Service Bay', open_time: '09:00', close_time: '18:00', position_order: 2, grid_position_x: 0, grid_position_y: 4, grid_width: 100, grid_height: 2, lane_type: 'service' },
+    const laneIds = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()];
+    const lanesNew = [
+      { id: laneIds[0], name: 'Express Lane 1', open_time: '08:00', close_time: '17:00', position_order: 0, grid_position_x: 0, grid_position_y: 0, grid_width: 100, grid_height: 2, lane_type: 'service' },
+      { id: laneIds[1], name: 'Express Lane 2', open_time: '08:00', close_time: '17:00', position_order: 1, grid_position_x: 0, grid_position_y: 2, grid_width: 100, grid_height: 2, lane_type: 'service' },
+      { id: laneIds[2], name: 'Full Service Bay', open_time: '09:00', close_time: '18:00', position_order: 2, grid_position_x: 0, grid_position_y: 4, grid_width: 100, grid_height: 2, lane_type: 'service' },
     ];
 
     const { data: createdLanes, error: lanesError } = await supabase
       .from('lanes_new' as any)
-      .insert(lanes as any)
+      .insert(lanesNew as any)
       .select();
 
-    if (lanesError) throw new Error(`Lanes: ${lanesError.message}`);
+    if (lanesError) throw new Error(`Lanes (lanes_new): ${lanesError.message}`);
     const createdLanesTyped = createdLanes as any as { id: string }[];
     results.lanes = createdLanesTyped?.length || 0;
-    console.log(`Created ${results.lanes} lanes`);
+    console.log(`Created ${results.lanes} lanes in lanes_new`);
+
+    // Also insert into old lanes table (for lane_capabilities FK)
+    const lanesOld = [
+      { id: laneIds[0], name: 'Express Lane 1', open_time: '08:00', close_time: '17:00' },
+      { id: laneIds[1], name: 'Express Lane 2', open_time: '08:00', close_time: '17:00' },
+      { id: laneIds[2], name: 'Full Service Bay', open_time: '09:00', close_time: '18:00' },
+    ];
+
+    const { error: lanesOldError } = await supabase
+      .from('lanes')
+      .insert(lanesOld);
+
+    if (lanesOldError) throw new Error(`Lanes (old): ${lanesOldError.message}`);
+    console.log('Created lanes in old lanes table for FK compatibility');
 
     console.log('Assigning capabilities to lanes...');
     const laneCapabilities = [
@@ -651,6 +667,7 @@ export default function SeedData() {
                         await supabase.from('worker_capabilities').delete().neq('worker_id', '00000000-0000-0000-0000-000000000000');
                         await supabase.from('stations' as any).delete().neq('id', '00000000-0000-0000-0000-000000000000');
                         await supabase.from('lanes_new' as any).delete().neq('id', '00000000-0000-0000-0000-000000000000');
+                        await supabase.from('lanes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
                         await supabase.from('service_workers').delete().neq('id', '00000000-0000-0000-0000-000000000000');
                         await supabase.from('capabilities').delete().neq('id', '00000000-0000-0000-0000-000000000000');
                         await supabase.from('skills').delete().neq('id', '00000000-0000-0000-0000-000000000000');
