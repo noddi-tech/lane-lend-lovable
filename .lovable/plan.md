@@ -1,54 +1,59 @@
 
 
-## Plan: Ad-hoc "Now" Mode + Vehicle Make/Model/Year Dropdowns
+## Plan: Sales Items First, Then Auto-Filter Lanes by Capability
 
-### Changes
+### Problem
 
-All changes are in **`src/components/admin/CreateBookingDialog.tsx`** only. No backend changes needed.
+The current ad-hoc form asks the admin to pick a Lane before Sales Items. This is backwards -- the admin doesn't know which lane supports the service they need. The lane should be auto-filtered based on which sales items are selected, using the existing capability chain: `sales_item_capabilities` -> `lane_capabilities`.
 
-### 1. "Now" Toggle on Ad-hoc Form
+### Solution
 
-Add a "Happening Now" switch/button at the top of the ad-hoc form. When toggled on:
-- Auto-fill date to today, start time to current time (rounded to nearest 5 min), end time to start + service minutes
-- Disable the date/start/end fields (greyed out, auto-calculated)
-- When service minutes changes, recalculate end time automatically
-- When toggled off, fields become editable again with the pre-filled values
+Reorder the ad-hoc form and add a capability-aware lane filter:
 
-### 2. Vehicle Make Dropdown (Top 30)
+1. **Move Sales Items to the top** (right after the "Happening Now" toggle)
+2. **Create a new hook `useCompatibleLanes`** that, given selected sales item IDs, queries the capability chain to return only lanes whose capabilities satisfy all selected items
+3. **Filter the Lane dropdown** to show only compatible lanes. If no sales items are selected, show all lanes (current behavior)
+4. **Auto-select lane** if only one compatible lane exists
+5. **Reset lane selection** when sales items change and the current lane is no longer compatible
 
-Replace the free-text Make input with a searchable `Select` (combobox) containing the 30 most popular car makes in Norway/Europe:
+### New Hook: `src/hooks/admin/useCompatibleLanes.ts`
 
-Toyota, Volkswagen, BMW, Mercedes-Benz, Audi, Volvo, Ford, Hyundai, Kia, Nissan, Skoda, Peugeot, Mazda, Honda, Mitsubishi, Suzuki, Renault, Citroën, Opel, Fiat, Tesla, Subaru, Jeep, Land Rover, Porsche, MINI, Lexus, Dacia, Seat, Cupra
+Query logic:
+```sql
+-- For each selected sales item, get required capability IDs
+SELECT capability_id FROM sales_item_capabilities WHERE sales_item_id IN (...)
 
-Plus an "Other" option that reveals a free-text input for unlisted makes.
+-- Get lanes that have ALL those capabilities
+SELECT lane_id FROM lane_capabilities WHERE capability_id IN (...required...)
+GROUP BY lane_id HAVING COUNT(DISTINCT capability_id) = :required_count
+```
 
-### 3. Model Dropdown (Filtered by Make)
+This uses two simple Supabase queries joined client-side. Returns filtered lane objects from the existing `lanes` table.
 
-A static lookup object mapping each make to its ~8-15 most popular models. When a make is selected, the Model dropdown populates with matching models. Includes an "Other" option with free-text fallback.
+### UI Changes in `CreateBookingDialog.tsx` (Ad-hoc form)
 
-Example subset:
-- Toyota → Corolla, RAV4, Yaris, Camry, C-HR, Hilux, Aygo, Proace, Land Cruiser
-- Volkswagen → Golf, Passat, Tiguan, Polo, ID.4, ID.3, T-Roc, Touran, Caddy
-- Tesla → Model 3, Model Y, Model S, Model X
+New field order:
+1. "Happening Now" toggle
+2. **Sales Items** (moved up, label changed to "Services" with required feel)
+3. **Lane** (filtered by selected items' capabilities, shows badge if filtered)
+4. Date / Start / End
+5. Service Time
+6. Vehicle fields
+7. Admin Notes
+8. Submit
 
-### 4. Year Dropdown
+When sales items are selected, the Lane dropdown label updates to show "Lane (filtered by services)" and incompatible lanes are excluded. If the previously selected lane becomes incompatible, it's cleared with a toast notification.
 
-Replace the number input with a `Select` dropdown listing years from 2026 down to 1990 (descending, newest first). Quick to scroll, no typos.
+### Auto-calculate service time
 
-### 5. Registration (License Plate)
+When sales items are selected, auto-sum their `service_time_seconds` and pre-fill the Service Time field. Admin can still override manually.
 
-Keep as a text input but add:
-- Uppercase transform (`uppercase` class)
-- Placeholder "e.g. AB 12345"
+### Files Changed
 
-### 6. Apply to Both Forms
+| File | Change |
+|------|--------|
+| `src/hooks/admin/useCompatibleLanes.ts` | New hook - queries capability chain to filter lanes |
+| `src/components/admin/CreateBookingDialog.tsx` | Reorder ad-hoc form, wire up filtered lanes, auto-sum service time |
 
-Apply the same vehicle dropdowns to the Scheduled booking form (Step 3) for consistency.
-
-### Technical Details
-
-- Vehicle data will be a static constant object (`VEHICLE_DATA`) defined at the top of the file — no API calls needed
-- Use the existing `Select` component for Make, Model, and Year
-- The "Now" toggle uses a `Switch` component; toggling it calls `new Date()` to populate fields
-- Approximately ~200 lines of static vehicle data + ~50 lines of UI changes per form
+No database or migration changes needed -- all capability relationships already exist.
 
