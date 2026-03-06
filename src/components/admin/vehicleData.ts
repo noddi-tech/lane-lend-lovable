@@ -1,0 +1,42 @@
+export const VEHICLE_MAKES = [
+  'Toyota', 'Volkswagen', 'BMW', 'Mercedes-Benz', 'Audi', 'Volvo', 'Ford',
+  'Hyundai', 'Kia', 'Nissan', 'Skoda', 'Peugeot', 'Mazda', 'Honda',
+  'Mitsubishi', 'Suzuki', 'Renault', 'Citroën', 'Opel', 'Fiat', 'Tesla',
+  'Subaru', 'Jeep', 'Land Rover', 'Porsche', 'MINI', 'Lexus', 'Dacia',
+  'Seat', 'Cupra',
+] as const;
+
+export const VEHICLE_MODELS: Record<string, string[]> = {
+  Toyota: ['Corolla', 'RAV4', 'Yaris', 'Camry', 'C-HR', 'Hilux', 'Aygo', 'Proace', 'Land Cruiser', 'Supra', 'Prius'],
+  Volkswagen: ['Golf', 'Passat', 'Tiguan', 'Polo', 'ID.4', 'ID.3', 'T-Roc', 'Touran', 'Caddy', 'Arteon', 'T-Cross'],
+  BMW: ['3 Series', '5 Series', 'X3', 'X5', '1 Series', 'X1', 'iX', 'i4', '4 Series', '7 Series'],
+  'Mercedes-Benz': ['C-Class', 'E-Class', 'A-Class', 'GLC', 'GLE', 'EQC', 'CLA', 'S-Class', 'B-Class', 'GLA'],
+  Audi: ['A3', 'A4', 'Q5', 'A6', 'Q3', 'e-tron', 'Q7', 'A1', 'Q8', 'TT'],
+  Volvo: ['XC60', 'XC40', 'V60', 'XC90', 'S60', 'V90', 'EX30', 'EX90', 'C40', 'S90'],
+  Ford: ['Focus', 'Fiesta', 'Kuga', 'Mustang Mach-E', 'Puma', 'Explorer', 'Transit', 'Ranger', 'Mondeo'],
+  Hyundai: ['Tucson', 'Kona', 'i20', 'i30', 'IONIQ 5', 'Santa Fe', 'i10', 'IONIQ 6', 'Bayon'],
+  Kia: ['Sportage', 'Ceed', 'Niro', 'EV6', 'Picanto', 'Sorento', 'Stonic', 'Soul', 'XCeed'],
+  Nissan: ['Qashqai', 'Leaf', 'Juke', 'X-Trail', 'Ariya', 'Micra', 'Navara', 'Townstar'],
+  Skoda: ['Octavia', 'Kodiaq', 'Superb', 'Karoq', 'Fabia', 'Kamiq', 'Enyaq', 'Scala'],
+  Peugeot: ['3008', '208', '308', '2008', '5008', 'e-208', '508', 'Rifter', 'Partner'],
+  Mazda: ['CX-5', 'Mazda3', 'CX-30', 'MX-5', 'CX-60', 'Mazda2', 'CX-3'],
+  Honda: ['CR-V', 'Civic', 'HR-V', 'Jazz', 'e:Ny1', 'ZR-V', 'Honda e'],
+  Mitsubishi: ['Outlander', 'ASX', 'Eclipse Cross', 'L200', 'Space Star'],
+  Suzuki: ['Vitara', 'Swift', 'S-Cross', 'Jimny', 'Ignis', 'Across'],
+  Renault: ['Clio', 'Captur', 'Megane E-Tech', 'Arkana', 'Austral', 'Kangoo', 'Zoe', 'Scenic'],
+  'Citroën': ['C3', 'C4', 'C5 Aircross', 'Berlingo', 'C3 Aircross', 'ë-C4', 'C5 X'],
+  Opel: ['Corsa', 'Astra', 'Mokka', 'Grandland', 'Crossland', 'Combo', 'Vivaro'],
+  Fiat: ['500', 'Panda', 'Tipo', '500X', '500e', 'Ducato', 'Doblo'],
+  Tesla: ['Model 3', 'Model Y', 'Model S', 'Model X'],
+  Subaru: ['Outback', 'Forester', 'XV', 'Impreza', 'Solterra', 'BRZ'],
+  Jeep: ['Wrangler', 'Compass', 'Renegade', 'Grand Cherokee', 'Avenger', 'Cherokee'],
+  'Land Rover': ['Range Rover', 'Range Rover Sport', 'Defender', 'Discovery Sport', 'Range Rover Evoque', 'Discovery'],
+  Porsche: ['Cayenne', 'Macan', 'Taycan', '911', 'Panamera', 'Boxster', 'Cayman'],
+  MINI: ['Cooper', 'Countryman', 'Clubman', 'Convertible', 'Electric'],
+  Lexus: ['NX', 'RX', 'UX', 'ES', 'IS', 'LC', 'RZ'],
+  Dacia: ['Sandero', 'Duster', 'Jogger', 'Spring', 'Logan'],
+  Seat: ['Leon', 'Arona', 'Ateca', 'Ibiza', 'Tarraco'],
+  Cupra: ['Formentor', 'Born', 'Leon', 'Ateca', 'Tavascan'],
+};
+
+export const VEHICLE_YEARS = Array.from({ length: 2026 - 1990 + 1 }, (_, i) => 2026 - i);
