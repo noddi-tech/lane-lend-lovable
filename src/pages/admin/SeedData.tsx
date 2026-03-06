@@ -21,6 +21,7 @@ interface DataStats {
   capabilities: number;
   workers: number;
   lanes: number;
+  stations: number;
   contributions: number;
   capacityIntervals: number;
   contributionIntervals: number;
@@ -40,6 +41,7 @@ export default function SeedData() {
     capabilities: 0,
     workers: 0,
     lanes: 0,
+    stations: 0,
     contributions: 0,
     capacityIntervals: 0,
     contributionIntervals: 0,
@@ -63,11 +65,12 @@ export default function SeedData() {
   const loadCurrentStats = async () => {
     setIsLoadingStats(true);
     try {
-      const [skillsRes, capabilitiesRes, workersRes, lanesRes, contributionsRes, intervalsRes, contribIntervalsRes, customersRes, bookingsRes, addressesRes] = await Promise.all([
+      const [skillsRes, capabilitiesRes, workersRes, lanesRes, stationsRes, contributionsRes, intervalsRes, contribIntervalsRes, customersRes, bookingsRes, addressesRes] = await Promise.all([
         supabase.from('skills').select('id', { count: 'exact', head: true }),
         supabase.from('capabilities').select('id', { count: 'exact', head: true }),
         supabase.from('service_workers').select('id', { count: 'exact', head: true }),
         supabase.from('lanes').select('id', { count: 'exact', head: true }),
+        supabase.from('stations' as any).select('id', { count: 'exact', head: true }),
         supabase.from('worker_contributions').select('id', { count: 'exact', head: true }),
         supabase.from('capacity_intervals').select('id', { count: 'exact', head: true }),
         supabase.from('contribution_intervals').select('contribution_id', { count: 'exact', head: true }),
@@ -81,6 +84,7 @@ export default function SeedData() {
         capabilities: capabilitiesRes.count || 0,
         workers: workersRes.count || 0,
         lanes: lanesRes.count || 0,
+        stations: stationsRes.count || 0,
         contributions: contributionsRes.count || 0,
         capacityIntervals: intervalsRes.count || 0,
         contributionIntervals: contribIntervalsRes.count || 0,
@@ -140,6 +144,9 @@ export default function SeedData() {
       await supabase.from('worker_skills').delete().neq('worker_id', '00000000-0000-0000-0000-000000000000');
       await supabase.from('capability_skills').delete().neq('capability_id', '00000000-0000-0000-0000-000000000000');
       await supabase.from('worker_capabilities').delete().neq('worker_id', '00000000-0000-0000-0000-000000000000');
+      
+      // Delete stations before lanes (foreign key)
+      await supabase.from('stations' as any).delete().neq('id', '00000000-0000-0000-0000-000000000000');
       
       // Now safe to delete base entities
       await supabase.from('lanes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
@@ -340,6 +347,23 @@ export default function SeedData() {
     if (lcError) throw new Error(`Lane-Capabilities: ${lcError.message}`);
     console.log('Assigned capabilities to lanes');
 
+    // Create stations (one per lane)
+    console.log('Creating stations...');
+    const stationsData = [
+      { name: 'Express Station 1', lane_id: createdLanes[0].id, station_type: 'general', active: true },
+      { name: 'Express Station 2', lane_id: createdLanes[1].id, station_type: 'general', active: true },
+      { name: 'Full Service Station', lane_id: createdLanes[2].id, station_type: 'general', active: true },
+    ];
+
+    const { data: createdStationsRaw, error: stationsError } = await supabase
+      .from('stations' as any)
+      .insert(stationsData as any)
+      .select();
+
+    if (stationsError) throw new Error(`Stations: ${stationsError.message}`);
+    const createdStations = createdStationsRaw as any as { id: string }[];
+    console.log(`Created ${createdStations?.length || 0} stations`);
+
     console.log('Creating sample worker shifts...');
     const today = new Date();
     const shifts = [];
@@ -352,6 +376,7 @@ export default function SeedData() {
       shifts.push({
         worker_id: createdWorkers[0].id,
         lane_id: createdLanes[0].id,
+        station_id: createdStations[0].id,
         starts_at: `${dateStr}T08:00:00Z`,
         ends_at: `${dateStr}T12:00:00Z`,
         available_seconds: 14400,
@@ -362,6 +387,7 @@ export default function SeedData() {
       shifts.push({
         worker_id: createdWorkers[1].id,
         lane_id: createdLanes[1].id,
+        station_id: createdStations[1].id,
         starts_at: `${dateStr}T13:00:00Z`,
         ends_at: `${dateStr}T17:00:00Z`,
         available_seconds: 14400,
@@ -372,6 +398,7 @@ export default function SeedData() {
       shifts.push({
         worker_id: createdWorkers[2].id,
         lane_id: createdLanes[2].id,
+        station_id: createdStations[2].id,
         starts_at: `${dateStr}T09:00:00Z`,
         ends_at: `${dateStr}T18:00:00Z`,
         available_seconds: 32400,
@@ -465,9 +492,13 @@ export default function SeedData() {
                     <span className="text-2xl font-bold">{currentStats.workers}</span>
                     <span className="text-sm text-muted-foreground">Workers</span>
                   </div>
-                  <div className="flex flex-col items-center p-4 rounded-lg bg-muted/50">
+                   <div className="flex flex-col items-center p-4 rounded-lg bg-muted/50">
                     <span className="text-2xl font-bold">{currentStats.lanes}</span>
                     <span className="text-sm text-muted-foreground">Lanes</span>
+                  </div>
+                  <div className="flex flex-col items-center p-4 rounded-lg bg-muted/50">
+                    <span className="text-2xl font-bold">{currentStats.stations}</span>
+                    <span className="text-sm text-muted-foreground">Stations</span>
                   </div>
                   <div className="flex flex-col items-center p-4 rounded-lg bg-muted/50">
                     <span className="text-2xl font-bold">{currentStats.contributions}</span>
@@ -617,6 +648,7 @@ export default function SeedData() {
                         await supabase.from('worker_skills').delete().neq('worker_id', '00000000-0000-0000-0000-000000000000');
                         await supabase.from('capability_skills').delete().neq('capability_id', '00000000-0000-0000-0000-000000000000');
                         await supabase.from('worker_capabilities').delete().neq('worker_id', '00000000-0000-0000-0000-000000000000');
+                        await supabase.from('stations' as any).delete().neq('id', '00000000-0000-0000-0000-000000000000');
                         await supabase.from('lanes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
                         await supabase.from('service_workers').delete().neq('id', '00000000-0000-0000-0000-000000000000');
                         await supabase.from('capabilities').delete().neq('id', '00000000-0000-0000-0000-000000000000');
