@@ -1,49 +1,54 @@
 
 
-## Add Wheel Change & Wheel Storage Sales Items with Skills and Capabilities
+## Plan: Ad-hoc "Now" Mode + Vehicle Make/Model/Year Dropdowns
 
-### Current State
-- **Skills**: Brake Expert, Electrical Systems, Engine Diagnostics, Oil Change Certified, Tire Specialist
-- **Capabilities**: Advanced Diagnostics, Basic Service, Brake Service, Tire Service
-- **Sales Items**: EV Battery Check, Full Diagnostic, Heavy Vehicle Inspection, Oil Change, Tire Rotation
-- **Note**: No `sales_item_capabilities` links exist yet for any items
+### Changes
 
-### Data to Insert
+All changes are in **`src/components/admin/CreateBookingDialog.tsx`** only. No backend changes needed.
 
-**1. New Skills**
-| Skill | Description |
-|-------|-------------|
-| Wheel Mounting | Certified for wheel mounting, dismounting, and torque procedures |
-| Storage Handling | Qualified to handle and organize seasonal tire/wheel storage |
+### 1. "Now" Toggle on Ad-hoc Form
 
-**2. New Capabilities**
-| Capability | Description | Required Skills |
-|------------|-------------|-----------------|
-| Wheel Change Service | Full wheel swap including mounting and balancing | Tire Specialist + Wheel Mounting |
-| Wheel Storage Service | Seasonal wheel intake, labeling, and storage | Storage Handling |
+Add a "Happening Now" switch/button at the top of the ad-hoc form. When toggled on:
+- Auto-fill date to today, start time to current time (rounded to nearest 5 min), end time to start + service minutes
+- Disable the date/start/end fields (greyed out, auto-calculated)
+- When service minutes changes, recalculate end time automatically
+- When toggled off, fields become editable again with the pre-filled values
 
-**3. New Sales Items**
-| Item | Description | Price | Service Time |
-|------|-------------|-------|-------------|
-| Wheel Change | Swap and balance all 4 wheels | 1299 NOK | 45 min (2700s) |
-| Wheel Storage | Seasonal storage for 4 wheels/tires | 799 NOK | 20 min (1200s) |
+### 2. Vehicle Make Dropdown (Top 30)
 
-**4. Link Sales Items to Capabilities**
-- Wheel Change → Wheel Change Service capability
-- Wheel Storage → Wheel Storage Service capability
-- Also link existing items: Oil Change → Basic Service, Tire Rotation → Tire Service, Full Diagnostic → Advanced Diagnostics, etc.
+Replace the free-text Make input with a searchable `Select` (combobox) containing the 30 most popular car makes in Norway/Europe:
 
-### Implementation
+Toyota, Volkswagen, BMW, Mercedes-Benz, Audi, Volvo, Ford, Hyundai, Kia, Nissan, Skoda, Peugeot, Mazda, Honda, Mitsubishi, Suzuki, Renault, Citroën, Opel, Fiat, Tesla, Subaru, Jeep, Land Rover, Porsche, MINI, Lexus, Dacia, Seat, Cupra
 
-All changes are **data inserts** (no schema changes needed). I will use SQL inserts to:
+Plus an "Other" option that reveals a free-text input for unlisted makes.
 
-1. Insert 2 new skills
-2. Insert 2 new capabilities
-3. Link capabilities to their required skills via `capability_skills`
-4. Insert 2 new sales items
-5. Link all sales items (including existing ones) to their capabilities via `sales_item_capabilities`
+### 3. Model Dropdown (Filtered by Make)
 
-### File Changes
+A static lookup object mapping each make to its ~8-15 most popular models. When a make is selected, the Model dropdown populates with matching models. Includes an "Other" option with free-text fallback.
 
-No frontend code changes needed -- the existing Skills, Capabilities, and Sales Items pages already display these dynamically from the database.
+Example subset:
+- Toyota → Corolla, RAV4, Yaris, Camry, C-HR, Hilux, Aygo, Proace, Land Cruiser
+- Volkswagen → Golf, Passat, Tiguan, Polo, ID.4, ID.3, T-Roc, Touran, Caddy
+- Tesla → Model 3, Model Y, Model S, Model X
+
+### 4. Year Dropdown
+
+Replace the number input with a `Select` dropdown listing years from 2026 down to 1990 (descending, newest first). Quick to scroll, no typos.
+
+### 5. Registration (License Plate)
+
+Keep as a text input but add:
+- Uppercase transform (`uppercase` class)
+- Placeholder "e.g. AB 12345"
+
+### 6. Apply to Both Forms
+
+Apply the same vehicle dropdowns to the Scheduled booking form (Step 3) for consistency.
+
+### Technical Details
+
+- Vehicle data will be a static constant object (`VEHICLE_DATA`) defined at the top of the file — no API calls needed
+- Use the existing `Select` component for Make, Model, and Year
+- The "Now" toggle uses a `Switch` component; toggling it calls `new Date()` to populate fields
+- Approximately ~200 lines of static vehicle data + ~50 lines of UI changes per form
 
