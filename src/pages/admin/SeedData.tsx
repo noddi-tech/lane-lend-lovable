@@ -69,7 +69,7 @@ export default function SeedData() {
         supabase.from('skills').select('id', { count: 'exact', head: true }),
         supabase.from('capabilities').select('id', { count: 'exact', head: true }),
         supabase.from('service_workers').select('id', { count: 'exact', head: true }),
-        supabase.from('lanes').select('id', { count: 'exact', head: true }),
+        supabase.from('lanes_new' as any).select('id', { count: 'exact', head: true }),
         supabase.from('stations' as any).select('id', { count: 'exact', head: true }),
         supabase.from('worker_contributions').select('id', { count: 'exact', head: true }),
         supabase.from('capacity_intervals').select('id', { count: 'exact', head: true }),
@@ -149,7 +149,7 @@ export default function SeedData() {
       await supabase.from('stations' as any).delete().neq('id', '00000000-0000-0000-0000-000000000000');
       
       // Now safe to delete base entities
-      await supabase.from('lanes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('lanes_new' as any).delete().neq('id', '00000000-0000-0000-0000-000000000000');
       await supabase.from('service_workers').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       await supabase.from('capabilities').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       await supabase.from('skills').delete().neq('id', '00000000-0000-0000-0000-000000000000');
@@ -314,30 +314,31 @@ export default function SeedData() {
 
     console.log('Creating sample lanes...');
     const lanes = [
-      { name: 'Express Lane 1', open_time: '08:00', close_time: '17:00', time_zone: 'Europe/Oslo' },
-      { name: 'Express Lane 2', open_time: '08:00', close_time: '17:00', time_zone: 'Europe/Oslo' },
-      { name: 'Full Service Bay', open_time: '09:00', close_time: '18:00', time_zone: 'Europe/Oslo' },
+      { name: 'Express Lane 1', open_time: '08:00', close_time: '17:00', position_order: 0, grid_position_x: 0, grid_position_y: 0, grid_width: 100, grid_height: 2, lane_type: 'service' },
+      { name: 'Express Lane 2', open_time: '08:00', close_time: '17:00', position_order: 1, grid_position_x: 0, grid_position_y: 2, grid_width: 100, grid_height: 2, lane_type: 'service' },
+      { name: 'Full Service Bay', open_time: '09:00', close_time: '18:00', position_order: 2, grid_position_x: 0, grid_position_y: 4, grid_width: 100, grid_height: 2, lane_type: 'service' },
     ];
 
     const { data: createdLanes, error: lanesError } = await supabase
-      .from('lanes')
-      .insert(lanes)
+      .from('lanes_new' as any)
+      .insert(lanes as any)
       .select();
 
     if (lanesError) throw new Error(`Lanes: ${lanesError.message}`);
-    results.lanes = createdLanes?.length || 0;
+    const createdLanesTyped = createdLanes as any as { id: string }[];
+    results.lanes = createdLanesTyped?.length || 0;
     console.log(`Created ${results.lanes} lanes`);
 
     console.log('Assigning capabilities to lanes...');
     const laneCapabilities = [
-      { lane_id: createdLanes[0].id, capability_id: createdCapabilities[0].id },
-      { lane_id: createdLanes[0].id, capability_id: createdCapabilities[1].id },
-      { lane_id: createdLanes[1].id, capability_id: createdCapabilities[0].id },
-      { lane_id: createdLanes[1].id, capability_id: createdCapabilities[1].id },
-      { lane_id: createdLanes[2].id, capability_id: createdCapabilities[0].id },
-      { lane_id: createdLanes[2].id, capability_id: createdCapabilities[1].id },
-      { lane_id: createdLanes[2].id, capability_id: createdCapabilities[2].id },
-      { lane_id: createdLanes[2].id, capability_id: createdCapabilities[3].id },
+      { lane_id: createdLanesTyped[0].id, capability_id: createdCapabilities[0].id },
+      { lane_id: createdLanesTyped[0].id, capability_id: createdCapabilities[1].id },
+      { lane_id: createdLanesTyped[1].id, capability_id: createdCapabilities[0].id },
+      { lane_id: createdLanesTyped[1].id, capability_id: createdCapabilities[1].id },
+      { lane_id: createdLanesTyped[2].id, capability_id: createdCapabilities[0].id },
+      { lane_id: createdLanesTyped[2].id, capability_id: createdCapabilities[1].id },
+      { lane_id: createdLanesTyped[2].id, capability_id: createdCapabilities[2].id },
+      { lane_id: createdLanesTyped[2].id, capability_id: createdCapabilities[3].id },
     ];
 
     const { error: lcError } = await supabase
@@ -350,9 +351,9 @@ export default function SeedData() {
     // Create stations (one per lane)
     console.log('Creating stations...');
     const stationsData = [
-      { name: 'Express Station 1', lane_id: createdLanes[0].id, station_type: 'general', active: true },
-      { name: 'Express Station 2', lane_id: createdLanes[1].id, station_type: 'general', active: true },
-      { name: 'Full Service Station', lane_id: createdLanes[2].id, station_type: 'general', active: true },
+      { name: 'Express Station 1', lane_id: createdLanesTyped[0].id, station_type: 'general', active: true },
+      { name: 'Express Station 2', lane_id: createdLanesTyped[1].id, station_type: 'general', active: true },
+      { name: 'Full Service Station', lane_id: createdLanesTyped[2].id, station_type: 'general', active: true },
     ];
 
     const { data: createdStationsRaw, error: stationsError } = await supabase
@@ -375,7 +376,7 @@ export default function SeedData() {
 
       shifts.push({
         worker_id: createdWorkers[0].id,
-        lane_id: createdLanes[0].id,
+        lane_id: createdLanesTyped[0].id,
         station_id: createdStations[0].id,
         starts_at: `${dateStr}T08:00:00Z`,
         ends_at: `${dateStr}T12:00:00Z`,
@@ -386,7 +387,7 @@ export default function SeedData() {
 
       shifts.push({
         worker_id: createdWorkers[1].id,
-        lane_id: createdLanes[1].id,
+        lane_id: createdLanesTyped[1].id,
         station_id: createdStations[1].id,
         starts_at: `${dateStr}T13:00:00Z`,
         ends_at: `${dateStr}T17:00:00Z`,
@@ -397,7 +398,7 @@ export default function SeedData() {
 
       shifts.push({
         worker_id: createdWorkers[2].id,
-        lane_id: createdLanes[2].id,
+        lane_id: createdLanesTyped[2].id,
         station_id: createdStations[2].id,
         starts_at: `${dateStr}T09:00:00Z`,
         ends_at: `${dateStr}T18:00:00Z`,
@@ -649,7 +650,7 @@ export default function SeedData() {
                         await supabase.from('capability_skills').delete().neq('capability_id', '00000000-0000-0000-0000-000000000000');
                         await supabase.from('worker_capabilities').delete().neq('worker_id', '00000000-0000-0000-0000-000000000000');
                         await supabase.from('stations' as any).delete().neq('id', '00000000-0000-0000-0000-000000000000');
-                        await supabase.from('lanes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+                        await supabase.from('lanes_new' as any).delete().neq('id', '00000000-0000-0000-0000-000000000000');
                         await supabase.from('service_workers').delete().neq('id', '00000000-0000-0000-0000-000000000000');
                         await supabase.from('capabilities').delete().neq('id', '00000000-0000-0000-0000-000000000000');
                         await supabase.from('skills').delete().neq('id', '00000000-0000-0000-0000-000000000000');
