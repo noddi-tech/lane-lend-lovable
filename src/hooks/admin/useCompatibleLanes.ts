@@ -6,18 +6,26 @@ interface Lane {
   name: string;
 }
 
-export function useCompatibleLanes(salesItemIds: string[]) {
+interface CompatibleLanesResult {
+  lanes: Lane[];
+  allLanes: Lane[];
+  isFiltered: boolean;
+}
+
+export function useCompatibleLanes(salesItemIds: string[], override = false) {
   return useQuery({
-    queryKey: ['compatible-lanes', salesItemIds],
-    queryFn: async (): Promise<Lane[]> => {
-      // If no sales items selected, return all lanes
-      if (salesItemIds.length === 0) {
-        const { data, error } = await supabase
-          .from('lanes')
-          .select('id, name')
-          .order('name');
-        if (error) throw error;
-        return data;
+    queryKey: ['compatible-lanes', salesItemIds, override],
+    queryFn: async (): Promise<CompatibleLanesResult> => {
+      // Always fetch all lanes
+      const { data: allLanes, error: allError } = await supabase
+        .from('lanes')
+        .select('id, name')
+        .order('name');
+      if (allError) throw allError;
+
+      // If no sales items selected or override active, return all lanes
+      if (salesItemIds.length === 0 || override) {
+        return { lanes: allLanes, allLanes, isFiltered: false };
       }
 
       // Step 1: Get required capability IDs for selected sales items
@@ -31,12 +39,7 @@ export function useCompatibleLanes(salesItemIds: string[]) {
 
       // If no capabilities required, return all lanes
       if (uniqueCapIds.length === 0) {
-        const { data, error } = await supabase
-          .from('lanes')
-          .select('id, name')
-          .order('name');
-        if (error) throw error;
-        return data;
+        return { lanes: allLanes, allLanes, isFiltered: false };
       }
 
       // Step 2: Get lanes that have ALL required capabilities
@@ -46,7 +49,6 @@ export function useCompatibleLanes(salesItemIds: string[]) {
         .in('capability_id', uniqueCapIds);
       if (laneError) throw laneError;
 
-      // Count capabilities per lane, keep only those with all required
       const laneCapCount = new Map<string, number>();
       for (const lc of laneCaps) {
         laneCapCount.set(lc.lane_id, (laneCapCount.get(lc.lane_id) || 0) + 1);
@@ -56,17 +58,8 @@ export function useCompatibleLanes(salesItemIds: string[]) {
         .filter(([, count]) => count >= uniqueCapIds.length)
         .map(([id]) => id);
 
-      if (compatibleLaneIds.length === 0) return [];
-
-      // Step 3: Fetch lane details
-      const { data: lanes, error: lanesError } = await supabase
-        .from('lanes')
-        .select('id, name')
-        .in('id', compatibleLaneIds)
-        .order('name');
-      if (lanesError) throw lanesError;
-
-      return lanes;
+      const filtered = allLanes.filter(l => compatibleLaneIds.includes(l.id));
+      return { lanes: filtered, allLanes, isFiltered: true };
     },
   });
 }

@@ -15,7 +15,7 @@ import { Switch } from '@/components/ui/switch';
 import { format } from 'date-fns';
 import { CalendarIcon, Clock, Loader2, Zap } from 'lucide-react';
 import { useSalesItems } from '@/hooks/useSalesItems';
-import { useLanes } from '@/hooks/admin/useLanes';
+import { AlertTriangle } from 'lucide-react';
 import { useCompatibleLanes } from '@/hooks/admin/useCompatibleLanes';
 import { useAvailability } from '@/hooks/useAvailability';
 import { useCreateAdhocBooking, useCreateScheduledBooking } from '@/hooks/admin/useCreateAdminBooking';
@@ -252,6 +252,7 @@ function AdhocBookingForm({ onSuccess }: { onSuccess: () => void }) {
   const [isNow, setIsNow] = useState(false);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [laneId, setLaneId] = useState('');
+  const [laneOverride, setLaneOverride] = useState(false);
   const [date, setDate] = useState('');
   const [startTime, setStartTime] = useState('08:00');
   const [endTime, setEndTime] = useState('09:00');
@@ -264,8 +265,11 @@ function AdhocBookingForm({ onSuccess }: { onSuccess: () => void }) {
   const [adminNotes, setAdminNotes] = useState('');
 
   const { data: salesItems } = useSalesItems();
-  const { data: compatibleLanes, isLoading: lanesLoading } = useCompatibleLanes(selectedItems);
+  const { data: laneData, isLoading: lanesLoading } = useCompatibleLanes(selectedItems, laneOverride);
   const createAdhoc = useCreateAdhocBooking();
+
+  const displayedLanes = laneOverride ? laneData?.allLanes : laneData?.lanes;
+  const noCompatibleLanes = laneData?.isFiltered && laneData.lanes.length === 0 && !laneOverride;
 
   // Auto-sum service time from selected sales items
   useEffect(() => {
@@ -280,21 +284,26 @@ function AdhocBookingForm({ onSuccess }: { onSuccess: () => void }) {
 
   // Reset lane if no longer compatible
   useEffect(() => {
-    if (!laneId || !compatibleLanes) return;
-    if (!compatibleLanes.find(l => l.id === laneId)) {
+    if (!laneId || !displayedLanes) return;
+    if (!displayedLanes.find(l => l.id === laneId)) {
       setLaneId('');
-      if (selectedItems.length > 0) {
+      if (selectedItems.length > 0 && !laneOverride) {
         toast.info('Lane reset — no longer compatible with selected services');
       }
     }
-  }, [compatibleLanes, laneId, selectedItems.length]);
+  }, [displayedLanes, laneId, selectedItems.length, laneOverride]);
 
   // Auto-select lane if only one compatible
   useEffect(() => {
-    if (compatibleLanes?.length === 1 && !laneId) {
-      setLaneId(compatibleLanes[0].id);
+    if (displayedLanes?.length === 1 && !laneId) {
+      setLaneId(displayedLanes[0].id);
     }
-  }, [compatibleLanes, laneId]);
+  }, [displayedLanes, laneId]);
+
+  // Reset override when services change
+  useEffect(() => {
+    setLaneOverride(false);
+  }, [selectedItems]);
 
   // "Now" toggle logic
   const applyNow = () => {
@@ -351,7 +360,6 @@ function AdhocBookingForm({ onSuccess }: { onSuccess: () => void }) {
   };
 
   const isValid = laneId && date && startTime && endTime && parseInt(serviceMinutes) > 0;
-  const isFiltered = selectedItems.length > 0;
 
   return (
     <div className="space-y-4 pt-4">
@@ -367,7 +375,7 @@ function AdhocBookingForm({ onSuccess }: { onSuccess: () => void }) {
         <Switch checked={isNow} onCheckedChange={handleNowToggle} />
       </div>
 
-      {/* Services (Sales Items) — moved to top */}
+      {/* Services (Sales Items) */}
       <div>
         <Label>Services</Label>
         <div className="grid gap-1 mt-1 max-h-40 overflow-y-auto">
@@ -388,24 +396,54 @@ function AdhocBookingForm({ onSuccess }: { onSuccess: () => void }) {
         </div>
       </div>
 
-      {/* Lane — filtered by capabilities */}
+      {/* Lane — filtered by capabilities with admin override */}
       <div>
-        <Label>
+        <Label className="flex items-center gap-2">
           Lane *
-          {isFiltered && (
-            <Badge variant="secondary" className="ml-2 text-xs">filtered by services</Badge>
+          {laneData?.isFiltered && !laneOverride && displayedLanes && displayedLanes.length > 0 && (
+            <Badge variant="secondary" className="text-xs">filtered by services</Badge>
+          )}
+          {laneOverride && (
+            <Badge className="text-xs bg-amber-500/15 text-amber-600 border-amber-300 hover:bg-amber-500/20">
+              ⚠ admin override
+            </Badge>
           )}
         </Label>
+
+        {noCompatibleLanes && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 mt-1 mb-2">
+            <div className="flex items-start gap-2">
+              <span className="text-amber-600 text-sm mt-0.5">⚠</span>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                  No lanes match the required capabilities
+                </p>
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                  The selected services require capabilities that no lane currently provides.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 text-xs border-amber-400 text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                  onClick={() => setLaneOverride(true)}
+                >
+                  Show all lanes (override)
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <Select value={laneId} onValueChange={setLaneId}>
           <SelectTrigger>
             <SelectValue placeholder={lanesLoading ? 'Loading...' : 'Select lane'} />
           </SelectTrigger>
           <SelectContent>
-            {compatibleLanes?.map(lane => (
+            {displayedLanes?.map(lane => (
               <SelectItem key={lane.id} value={lane.id}>{lane.name}</SelectItem>
             ))}
-            {compatibleLanes?.length === 0 && (
-              <div className="px-2 py-1.5 text-sm text-muted-foreground">No compatible lanes</div>
+            {!noCompatibleLanes && displayedLanes?.length === 0 && (
+              <div className="px-2 py-1.5 text-sm text-muted-foreground">No lanes available</div>
             )}
           </SelectContent>
         </Select>
