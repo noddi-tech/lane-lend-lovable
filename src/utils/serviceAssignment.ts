@@ -7,11 +7,13 @@ export interface ServiceAssignment {
 }
 
 const serviceWeights: Record<string, number> = {
-  'Oil Change': 0.35,
-  'Tire Rotation': 0.25,
-  'Full Diagnostic': 0.15,
-  'EV Battery Check': 0.15,
-  'Heavy Vehicle Inspection': 0.10,
+  'Oil Change': 0.25,
+  'Tire Rotation': 0.15,
+  'Full Diagnostic': 0.10,
+  'EV Battery Check': 0.10,
+  'Heavy Vehicle Inspection': 0.08,
+  'Wheel Change': 0.20,
+  'Wheel Storage': 0.12,
 };
 
 function weightedRandomSelection(items: SalesItem[]): SalesItem {
