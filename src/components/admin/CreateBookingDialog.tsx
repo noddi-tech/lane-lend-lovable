@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -11,14 +11,16 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
 import { format } from 'date-fns';
-import { CalendarIcon, Clock, Loader2 } from 'lucide-react';
+import { CalendarIcon, Clock, Loader2, Zap } from 'lucide-react';
 import { useSalesItems } from '@/hooks/useSalesItems';
 import { useLanes } from '@/hooks/admin/useLanes';
 import { useAvailability } from '@/hooks/useAvailability';
 import { useCreateAdhocBooking, useCreateScheduledBooking } from '@/hooks/admin/useCreateAdminBooking';
 import { cn } from '@/lib/utils';
 import type { AvailabilitySlot } from '@/types/booking';
+import VehicleFields from './VehicleFields';
 
 interface Props {
   open: boolean;
@@ -27,10 +29,6 @@ interface Props {
 
 export default function CreateBookingDialog({ open, onOpenChange }: Props) {
   const [tab, setTab] = useState<string>('scheduled');
-
-  const handleClose = () => {
-    onOpenChange(false);
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -44,15 +42,31 @@ export default function CreateBookingDialog({ open, onOpenChange }: Props) {
             <TabsTrigger value="adhoc">Ad-hoc</TabsTrigger>
           </TabsList>
           <TabsContent value="scheduled">
-            <ScheduledBookingForm onSuccess={handleClose} />
+            <ScheduledBookingForm onSuccess={() => onOpenChange(false)} />
           </TabsContent>
           <TabsContent value="adhoc">
-            <AdhocBookingForm onSuccess={handleClose} />
+            <AdhocBookingForm onSuccess={() => onOpenChange(false)} />
           </TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>
   );
+}
+
+// ── Helpers ──
+function roundToNearest5(date: Date): Date {
+  const d = new Date(date);
+  const mins = d.getMinutes();
+  d.setMinutes(Math.ceil(mins / 5) * 5, 0, 0);
+  return d;
+}
+
+function toTimeString(date: Date): string {
+  return format(date, 'HH:mm');
+}
+
+function toDateString(date: Date): string {
+  return format(date, 'yyyy-MM-dd');
 }
 
 // ── Scheduled Booking Form ──
@@ -101,7 +115,6 @@ function ScheduledBookingForm({ onSuccess }: { onSuccess: () => void }) {
 
   return (
     <div className="space-y-4 pt-4">
-      {/* Step 1: Sales Items */}
       {step === 1 && (
         <div className="space-y-3">
           <h3 className="font-medium text-sm text-muted-foreground">Step 1: Select Services</h3>
@@ -127,17 +140,12 @@ function ScheduledBookingForm({ onSuccess }: { onSuccess: () => void }) {
               </label>
             ))}
           </div>
-          <Button
-            onClick={() => setStep(2)}
-            disabled={selectedItems.length === 0}
-            className="w-full"
-          >
+          <Button onClick={() => setStep(2)} disabled={selectedItems.length === 0} className="w-full">
             Next: Pick Date & Slot
           </Button>
         </div>
       )}
 
-      {/* Step 2: Date + Slot */}
       {step === 2 && (
         <div className="space-y-3">
           <h3 className="font-medium text-sm text-muted-foreground">Step 2: Pick Date & Slot</h3>
@@ -198,9 +206,7 @@ function ScheduledBookingForm({ onSuccess }: { onSuccess: () => void }) {
           )}
 
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
-              Back
-            </Button>
+            <Button variant="outline" onClick={() => setStep(1)} className="flex-1">Back</Button>
             <Button onClick={() => setStep(3)} disabled={!selectedSlot} className="flex-1">
               Next: Vehicle Info
             </Button>
@@ -208,36 +214,26 @@ function ScheduledBookingForm({ onSuccess }: { onSuccess: () => void }) {
         </div>
       )}
 
-      {/* Step 3: Vehicle + Notes + Submit */}
       {step === 3 && (
         <div className="space-y-3">
           <h3 className="font-medium text-sm text-muted-foreground">Step 3: Vehicle & Notes (optional)</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Make</Label>
-              <Input value={vehicleMake} onChange={e => setVehicleMake(e.target.value)} placeholder="e.g. Toyota" />
-            </div>
-            <div>
-              <Label>Model</Label>
-              <Input value={vehicleModel} onChange={e => setVehicleModel(e.target.value)} placeholder="e.g. Corolla" />
-            </div>
-            <div>
-              <Label>Year</Label>
-              <Input value={vehicleYear} onChange={e => setVehicleYear(e.target.value)} placeholder="e.g. 2022" type="number" />
-            </div>
-            <div>
-              <Label>Registration</Label>
-              <Input value={vehicleReg} onChange={e => setVehicleReg(e.target.value)} placeholder="e.g. AB 12345" />
-            </div>
-          </div>
+          <VehicleFields
+            make={vehicleMake}
+            model={vehicleModel}
+            year={vehicleYear}
+            registration={vehicleReg}
+            onMakeChange={setVehicleMake}
+            onModelChange={setVehicleModel}
+            onYearChange={setVehicleYear}
+            onRegistrationChange={setVehicleReg}
+            optional
+          />
           <div>
             <Label>Admin Notes</Label>
             <Textarea value={adminNotes} onChange={e => setAdminNotes(e.target.value)} placeholder="Internal notes..." rows={2} />
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setStep(2)} className="flex-1">
-              Back
-            </Button>
+            <Button variant="outline" onClick={() => setStep(2)} className="flex-1">Back</Button>
             <Button onClick={handleSubmit} disabled={createBooking.isPending} className="flex-1">
               {createBooking.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Create Booking
@@ -251,6 +247,7 @@ function ScheduledBookingForm({ onSuccess }: { onSuccess: () => void }) {
 
 // ── Ad-hoc Booking Form ──
 function AdhocBookingForm({ onSuccess }: { onSuccess: () => void }) {
+  const [isNow, setIsNow] = useState(false);
   const [laneId, setLaneId] = useState('');
   const [date, setDate] = useState('');
   const [startTime, setStartTime] = useState('08:00');
@@ -267,6 +264,31 @@ function AdhocBookingForm({ onSuccess }: { onSuccess: () => void }) {
   const { data: salesItems } = useSalesItems();
   const createAdhoc = useCreateAdhocBooking();
 
+  // "Now" toggle logic
+  const applyNow = () => {
+    const now = roundToNearest5(new Date());
+    setDate(toDateString(now));
+    setStartTime(toTimeString(now));
+    const end = new Date(now.getTime() + parseInt(serviceMinutes || '60') * 60 * 1000);
+    setEndTime(toTimeString(end));
+  };
+
+  const handleNowToggle = (checked: boolean) => {
+    setIsNow(checked);
+    if (checked) applyNow();
+  };
+
+  // Recalculate end time when service minutes changes while in "Now" mode
+  useEffect(() => {
+    if (!isNow) return;
+    const mins = parseInt(serviceMinutes);
+    if (isNaN(mins) || mins <= 0) return;
+    const start = new Date(`${date}T${startTime}:00`);
+    if (isNaN(start.getTime())) return;
+    const end = new Date(start.getTime() + mins * 60 * 1000);
+    setEndTime(toTimeString(end));
+  }, [serviceMinutes, isNow, date, startTime]);
+
   const toggleItem = (id: string) => {
     setSelectedItems(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
@@ -275,7 +297,6 @@ function AdhocBookingForm({ onSuccess }: { onSuccess: () => void }) {
 
   const handleSubmit = () => {
     if (!laneId || !date || !startTime || !endTime) return;
-
     const startsAt = new Date(`${date}T${startTime}:00`).toISOString();
     const endsAt = new Date(`${date}T${endTime}:00`).toISOString();
 
@@ -300,6 +321,18 @@ function AdhocBookingForm({ onSuccess }: { onSuccess: () => void }) {
 
   return (
     <div className="space-y-4 pt-4">
+      {/* "Happening Now" toggle */}
+      <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/30">
+        <div className="flex items-center gap-2">
+          <Zap className="h-4 w-4 text-primary" />
+          <div>
+            <div className="text-sm font-medium">Happening Now</div>
+            <div className="text-xs text-muted-foreground">Auto-fill date & time to right now</div>
+          </div>
+        </div>
+        <Switch checked={isNow} onCheckedChange={handleNowToggle} />
+      </div>
+
       {/* Lane */}
       <div>
         <Label>Lane *</Label>
@@ -319,15 +352,15 @@ function AdhocBookingForm({ onSuccess }: { onSuccess: () => void }) {
       <div className="grid grid-cols-3 gap-3">
         <div>
           <Label>Date *</Label>
-          <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
+          <Input type="date" value={date} onChange={e => setDate(e.target.value)} disabled={isNow} />
         </div>
         <div>
           <Label>Start *</Label>
-          <Input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
+          <Input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} disabled={isNow} />
         </div>
         <div>
           <Label>End *</Label>
-          <Input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
+          <Input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} disabled={isNow} />
         </div>
       </div>
 
@@ -354,24 +387,17 @@ function AdhocBookingForm({ onSuccess }: { onSuccess: () => void }) {
       </div>
 
       {/* Vehicle info */}
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label className="text-muted-foreground">Make</Label>
-          <Input value={vehicleMake} onChange={e => setVehicleMake(e.target.value)} placeholder="e.g. Toyota" />
-        </div>
-        <div>
-          <Label className="text-muted-foreground">Model</Label>
-          <Input value={vehicleModel} onChange={e => setVehicleModel(e.target.value)} placeholder="e.g. Corolla" />
-        </div>
-        <div>
-          <Label className="text-muted-foreground">Year</Label>
-          <Input value={vehicleYear} onChange={e => setVehicleYear(e.target.value)} type="number" />
-        </div>
-        <div>
-          <Label className="text-muted-foreground">Registration</Label>
-          <Input value={vehicleReg} onChange={e => setVehicleReg(e.target.value)} />
-        </div>
-      </div>
+      <VehicleFields
+        make={vehicleMake}
+        model={vehicleModel}
+        year={vehicleYear}
+        registration={vehicleReg}
+        onMakeChange={setVehicleMake}
+        onModelChange={setVehicleModel}
+        onYearChange={setVehicleYear}
+        onRegistrationChange={setVehicleReg}
+        optional
+      />
 
       {/* Notes */}
       <div>
